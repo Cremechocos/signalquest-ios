@@ -132,7 +132,7 @@ struct MapLayersSheet: View {
             || $0.marketCode.caseInsensitiveCompare(market) == .orderedSame }
     }
     private var communityOnly: Bool { selectedEntry?.isCommunityOnly == true }
-    private var communityAvailable: Bool { selectedEntry?.capabilities.communityLayers == true }
+    private var communityAvailable: Bool { selectedEntry?.hasCommunityCells == true }
     private var plannedAvailable: Bool { selectedEntry?.capabilities.previsionnel == true }
     private var allOperators: Bool { operatorName.uppercased() == "ALL" }
 

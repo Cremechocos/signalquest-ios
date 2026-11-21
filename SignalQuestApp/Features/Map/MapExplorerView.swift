@@ -620,8 +620,9 @@ final class MapExplorerViewModel: ObservableObject {
         MapMarketStore.saveManual(market: marketFilter, operator: canonical)
     }
 
+    /// Le marché peut-il avoir des cellules communautaires (requêtes community-sites) ?
     var supportsCommunityLayers: Bool {
-        currentMarketEntry?.capabilities.communityLayers ?? false
+        currentMarketEntry?.hasCommunityCells ?? false
     }
 
     var isCommunityOnlyMarket: Bool {

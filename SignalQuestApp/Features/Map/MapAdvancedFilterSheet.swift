@@ -50,7 +50,7 @@ struct MapAdvancedFilterSheet: View {
             || $0.marketCode.caseInsensitiveCompare(draft.market) == .orderedSame }
     }
     private var catalogMarket: String { selectedEntry?.marketCode ?? draft.market }
-    private var communityAvailable: Bool { selectedEntry?.capabilities.communityLayers == true }
+    private var communityAvailable: Bool { selectedEntry?.hasCommunityCells == true }
     private var plannedAvailable: Bool { selectedEntry?.capabilities.previsionnel == true }
 
     /// Couches qui ont des réglages ici.

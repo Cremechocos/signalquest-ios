@@ -113,6 +113,61 @@ final class MapOutageFilterTests: XCTestCase {
         }
     }
 
+    /// « Cellules » n'est proposée que là où le serveur crée des cellules communautaires : jamais
+    /// en France, DROM, Canada ni Suisse (une cellule inconnue y est rapprochée du registre
+    /// officiel), mais en Belgique grâce à la Wallonie. Déjà allumée, la tuile reste pour qu'on
+    /// puisse l'éteindre (décision d'Alexandre du 21/11, « iOS lit l'existant »).
+    func testCellsTileFollowsWhereTheServerCreatesCommunityCells() throws {
+        let url = try XCTUnwrap(Bundle.main.url(forResource: "market_registry_fallback", withExtension: "json"))
+        let markets = try JSONDecoder.signalQuest.decode(MarketRegistryPayload.self, from: Data(contentsOf: url)).markets
+        XCTAssertEqual(markets.filter { !$0.hasCommunityCells }.map(\.code).sorted(), ["CA", "CH", "DROM", "FR"])
+        for market in ["FR", "DROM", "CA", "CH"] {
+            XCTAssertFalse(sheet(market: market, markets: markets).layerOptions.map(\.0).contains(.communitySite),
+                           "Cellules proposée en \(market)")
+        }
+        for market in ["BE", "PT", "BA"] {
+            XCTAssertTrue(sheet(market: market, markets: markets).layerOptions.map(\.0).contains(.communitySite),
+                          "Cellules absente en \(market)")
+        }
+        let alreadyOn = MapLayersSheet(market: "FR", operatorName: "ALL",
+                                       layers: .constant(MapFilterStore.defaultFilters.union([.communitySite])),
+                                       allMarkets: markets)
+        XCTAssertTrue(alreadyOn.layerOptions.map(\.0).contains(.communitySite))
+    }
+
+    /// Règle du serveur : la capacité du marché, ou celle d'une région fusionnée par-dessus.
+    /// Un registre qui ne la donne pas garde `communityLayers`, même après le cache disque
+    /// (« absent » ne doit pas y devenir « faux »).
+    func testCommunityCellsRuleMergesRegionsAndFallsBackWhenAbsent() throws {
+        func radio(_ probable: Bool) -> String {
+            """
+            "radioCapabilities": { "officialAntennas": true, "communitySpeedtests": true, "communityCoverage": true,
+              "communityRatings": true, "communityProbableSites": \(probable), "communityPhotos": true, "offline": false,
+              "officialAzimuths": false, "officialCoverage": "none" }
+            """
+        }
+        let json = """
+        { "markets": [
+          { "code": "HY", \(radio(false)),
+            "regionPolicies": [ { "regionCode": "HY-A", "capabilities": { "communityProbableSites": true } } ] },
+          { "code": "OF", \(radio(false)),
+            "regionPolicies": [ { "regionCode": "OF-A", "capabilities": { "offline": true } } ] },
+          { "code": "CO", \(radio(true)), "regionPolicies": [ { "regionCode": "CO-A", "capabilities": { "communityProbableSites": false } } ] },
+          { "code": "OLDON", "capabilities": { "communityLayers": true } },
+          { "code": "OLDOFF", "capabilities": {} },
+          { "code": "OLDREGION", "capabilities": {}, "regionPolicies": [ { "regionCode": "R", "capabilities": { "communityProbableSites": true } } ] }
+        ] }
+        """
+        let decoded = try JSONDecoder.signalQuest.decode(MarketRegistryPayload.self, from: Data(json.utf8))
+        let cached = try JSONDecoder.signalQuest.decode(MarketRegistryPayload.self,
+                                                        from: JSONEncoder.signalQuest.encode(decoded))
+        for payload in [decoded, cached] {
+            let cells = Dictionary(uniqueKeysWithValues: payload.markets.map { ($0.code, $0.hasCommunityCells) })
+            XCTAssertEqual(cells, ["HY": true, "OF": false, "CO": true, "OLDON": true, "OLDOFF": false, "OLDREGION": true])
+        }
+        XCTAssertNil(cached.market(forCode: "OLDON")?.radioCapabilities.communityProbableSites)
+    }
+
     func testCanadianPlannedLayerCanBeChosenWhenTheRegistryExposesTheCapability() throws {
         let url = try XCTUnwrap(Bundle.main.url(forResource: "market_registry_fallback", withExtension: "json"))
         let markets = try JSONDecoder.signalQuest.decode(MarketRegistryPayload.self, from: Data(contentsOf: url)).markets

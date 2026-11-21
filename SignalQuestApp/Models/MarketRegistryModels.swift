@@ -166,6 +166,9 @@ struct MarketRegistryEntry: Codable, Equatable, Identifiable, Sendable {
     let mccs: [Int]
     let sourceMode: String
     let radioCapabilities: MarketRadioCapabilities
+    /// Régions dont les capacités radio prolongent celles du marché (la Wallonie,
+    /// communautaire, dans une Belgique officielle).
+    let regionPolicies: [MarketRegionPolicy]
     let source: MarketRegistrySource
     /// Opérateurs RADIO (résolution SIM par MNC/PLMN), distincts des opérateurs
     /// d'affichage `operators` (qui n'ont pas de MNC). Indispensable pour rattacher
@@ -194,6 +197,18 @@ struct MarketRegistryEntry: Codable, Equatable, Identifiable, Sendable {
     /// d'antennes officielles à afficher.
     var isCommunityOnly: Bool {
         sourceMode.caseInsensitiveCompare("community") == .orderedSame
+    }
+
+    /// Le serveur peut-il créer des cellules communautaires (couche « Cellules ») ici ?
+    /// Même règle que le serveur à l'écriture : la capacité du marché, ou celle d'une de ses
+    /// régions fusionnée par-dessus. Faux en France, DROM, Canada et Suisse, où une cellule
+    /// inconnue est rapprochée du registre officiel. Un registre qui ne le dit pas garde
+    /// `communityLayers`, pour ne pas masquer la couche partout.
+    var hasCommunityCells: Bool {
+        let market = radioCapabilities.communityProbableSites
+        let regions = regionPolicies.map { $0.capabilities.communityProbableSites ?? market }
+        if market == true || regions.contains(true) { return true }
+        return market == nil ? capabilities.communityLayers : false
     }
 
     /// Le nom d'opérateur tel que le registre du marché l'écrit — « Orange », jamais la clé
@@ -275,7 +290,7 @@ struct MarketRegistryEntry: Codable, Equatable, Identifiable, Sendable {
     enum CodingKeys: String, CodingKey {
         case code, label, countryCode, publicSelectable, antennaCompatible
         case defaultLanguage, supportedLanguages, defaultMapCenter, defaultMapZoom
-        case capabilities, operators, marketCode, mccs, sourceMode, radioCapabilities, radioOperators, radioMvnos, source
+        case capabilities, operators, marketCode, mccs, sourceMode, radioCapabilities, regionPolicies, radioOperators, radioMvnos, source
     }
 
     init(from decoder: Decoder) throws {
@@ -296,6 +311,7 @@ struct MarketRegistryEntry: Codable, Equatable, Identifiable, Sendable {
         mccs = c.decodeLossyArray([Int].self, forKey: .mccs)
         sourceMode = c.decodeFlexibleString(forKey: .sourceMode) ?? "official"
         radioCapabilities = (try? c.decode(MarketRadioCapabilities.self, forKey: .radioCapabilities)) ?? MarketRadioCapabilities()
+        regionPolicies = c.decodeLossyArray([MarketRegionPolicy].self, forKey: .regionPolicies)
         radioOperators = c.decodeLossyArray([MarketRadioOperator].self, forKey: .radioOperators)
         radioMvnos = c.decodeLossyArray([MarketRadioMvno].self, forKey: .radioMvnos)
         source = (try? c.decode(MarketRegistrySource.self, forKey: .source)) ?? MarketRegistrySource()
@@ -367,7 +383,9 @@ struct MarketRadioCapabilities: Codable, Equatable, Sendable {
     let communitySpeedtests: Bool
     let communityCoverage: Bool
     let communityRatings: Bool
-    let communityProbableSites: Bool
+    /// `nil` quand le registre ne le dit pas : « absent » ne vaut pas « faux », sinon un
+    /// registre incomplet masquerait la couche Cellules partout.
+    let communityProbableSites: Bool?
     let communityPhotos: Bool
     let offline: Bool
     let officialAzimuths: Bool
@@ -378,7 +396,7 @@ struct MarketRadioCapabilities: Codable, Equatable, Sendable {
         communitySpeedtests: Bool = false,
         communityCoverage: Bool = false,
         communityRatings: Bool = false,
-        communityProbableSites: Bool = false,
+        communityProbableSites: Bool? = nil,
         communityPhotos: Bool = false,
         offline: Bool = false,
         officialAzimuths: Bool = false,
@@ -393,6 +411,25 @@ struct MarketRadioCapabilities: Codable, Equatable, Sendable {
         self.offline = offline
         self.officialAzimuths = officialAzimuths
         self.officialCoverage = officialCoverage
+    }
+}
+
+/// Région d'un marché aux capacités radio propres (`regionPolicies` du registre). Seule
+/// `communityProbableSites` est lue : les autres capacités de région ne servent pas à iOS.
+struct MarketRegionPolicy: Codable, Equatable, Sendable {
+    struct Capabilities: Codable, Equatable, Sendable {
+        let communityProbableSites: Bool?
+    }
+
+    let regionCode: String
+    let capabilities: Capabilities
+
+    enum CodingKeys: String, CodingKey { case regionCode, capabilities }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        regionCode = c.decodeFlexibleString(forKey: .regionCode) ?? ""
+        capabilities = (try? c.decode(Capabilities.self, forKey: .capabilities)) ?? Capabilities(communityProbableSites: nil)
     }
 }
 
