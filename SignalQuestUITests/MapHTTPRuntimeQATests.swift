@@ -525,6 +525,8 @@ final class MapHTTPRuntimeQATests: XCTestCase {
 
     /// Les couches s'appliquent dès le toucher, dans la feuille Carte.
     private func setLayer(_ kind: String, selected: Bool, in app: XCUIApplication) throws {
+        // En « Tous », la tuile Couverture éteinte n'est pas proposée : rien à éteindre.
+        if kind == "coverage", !selected, app.buttons["map.operator.option.ALL"].isSelected { return }
         let button = app.buttons["map.layer." + kind]
         try reveal(button, in: app, sheet: Self.layersSheet)
         if button.isSelected != selected { try tap(button, in: app) }

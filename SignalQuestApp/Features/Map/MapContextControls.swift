@@ -174,6 +174,9 @@ struct MapLayersSheet: View {
         Self.layerOrder.compactMap { kind in
             switch kind {
             case .friend where !showsFriendsLayer: return nil
+            // En « Tous », la couverture n'a rien à montrer : la tuile s'efface (l'indice
+            // sous la grille dit pourquoi), sauf allumée, pour qu'on puisse l'éteindre.
+            case .coverage where allOperators && !layers.contains(.coverage): return nil
             case .planned where !plannedAvailable && !layers.contains(.planned): return nil
             case .communitySite where !communityAvailable && !layers.contains(.communitySite): return nil
             default: return (kind, Self.layerTitle(kind, communityOnly: communityOnly), Self.layerIcon(kind))
@@ -220,33 +223,8 @@ struct MapLayersSheet: View {
     private var operatorSection: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             Text("Opérateur").sqKicker().accessibilityAddTraits(.isHeader)
-            MapFlowLayout(spacing: SQSpace.xs2) {
-                ForEach(operatorOptions, id: \.self) { key in
-                    let selected = key.caseInsensitiveCompare(operatorName) == .orderedSame
-                    Button {
-                        Haptics.selection()
-                        onChooseOperator(key)
-                    } label: {
-                        HStack(spacing: SQSpace.xs2) {
-                            if key.uppercased() != "ALL" {
-                                Circle().fill(operatorAccent(key)).frame(width: 8, height: 8)
-                                    .overlay { Circle().strokeBorder(SQColor.bg.opacity(selected ? 0.6 : 0), lineWidth: 1) }
-                                    .accessibilityHidden(true)
-                            }
-                            Text(operatorLabel(key)).font(SQType.chip)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .foregroundStyle(selected ? SQColor.bg : SQColor.chipInk)
-                        .padding(.horizontal, SQSpace.md)
-                        .frame(minHeight: 44)
-                        .sqSurface(selected ? SQColor.label : SQColor.chip, in: Capsule(style: .continuous))
-                        .contentShape(Capsule())
-                    }
-                    .buttonStyle(SQPressButtonStyle())
-                    .accessibilityAddTraits(selected ? .isSelected : [])
-                    .accessibilityIdentifier("map.operator.option.\(key)")
-                }
-            }
+            MapOperatorPicker(options: operatorOptions, selection: operatorName,
+                              label: operatorLabel, accent: operatorAccent, onChoose: onChooseOperator)
         }
     }
 
@@ -298,7 +276,7 @@ struct MapLayersSheet: View {
                     .frame(minHeight: 44)
                     .accessibilityIdentifier("map.filters.photosFriendsOnly")
             }
-            if allOperators && layerOptions.contains(where: { $0.0 == .coverage }) {
+            if allOperators {
                 hint("Choisis un opérateur pour afficher la couverture.")
             }
             if communityOnly { hint("Dans ce pays, les sites proviennent de la communauté.") }
@@ -557,6 +535,122 @@ struct MapSheetRow<Icon: View>: View {
         }
         .frame(minHeight: 52)
         .contentShape(Rectangle())
+    }
+}
+
+/// Choix de l'opérateur : une piste segmentée comme « Lobes / Traits », avec la
+/// couleur de chaque opérateur sur la carte. Les segments gardent leur largeur
+/// naturelle et se partagent le reste de la ligne ; quand ils ne tiennent pas
+/// (beaucoup d'opérateurs, grand texte), la piste passe sur deux colonnes, puis
+/// sur une seule aux tailles d'accessibilité.
+struct MapOperatorPicker: View {
+    let options: [String]
+    let selection: String
+    let label: (String) -> String
+    let accent: (String) -> Color
+    let onChoose: (String) -> Void
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Choix montré dès le toucher, le temps que la carte prenne le relais.
+    @State private var pending: String?
+
+    private var current: String { pending ?? selection }
+
+    var body: some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                grid(columns: 1)
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    track(MapSegmentRowLayout(spacing: 3) { segments })
+                    grid(columns: 2)
+                }
+            }
+        }
+        .onChangeCompat(of: selection) { _, _ in pending = nil }
+    }
+
+    private func grid(columns: Int) -> some View {
+        track(LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 3), count: columns), spacing: 3) {
+            segments
+        })
+    }
+
+    private func track(_ content: some View) -> some View {
+        content
+            .padding(SQSpace.xs)
+            .background(SQColor.segTrack, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+    }
+
+    private var segments: some View {
+        ForEach(options, id: \.self) { key in segment(key) }
+    }
+
+    private func segment(_ key: String) -> some View {
+        let isSelected = key.caseInsensitiveCompare(current) == .orderedSame
+        return Button {
+            Haptics.selection()
+            withAnimation(reduceMotion ? nil : SQMotion.snappy) { pending = key }
+            onChoose(key)
+        } label: {
+            HStack(spacing: SQSpace.xs2) {
+                if key.uppercased() != "ALL" {
+                    Circle().fill(accent(key)).frame(width: 8, height: 8)
+                        .accessibilityHidden(true)
+                }
+                Text(label(key))
+                    .font(SQType.chip)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .foregroundStyle(isSelected ? SQColor.label : SQColor.labelSecondary)
+            .padding(.horizontal, SQSpace.xs)
+            .frame(maxWidth: .infinity, minHeight: 36)
+            .background {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .fill(SQColor.segThumb)
+                        .shadow(color: SQColor.shadowSoft, radius: 2, y: 1)
+                }
+            }
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier("map.operator.option.\(key)")
+    }
+}
+
+/// Segments sur une ligne à leur largeur naturelle, le reste partagé à parts
+/// égales : « Bouygues » garde son nom entier à côté de « SFR ». La largeur idéale
+/// (somme des segments) permet à `ViewThatFits` de choisir une autre forme.
+struct MapSegmentRowLayout: Layout {
+    var spacing: CGFloat = 3
+
+    private func natural(_ subviews: Subviews) -> (sizes: [CGSize], width: CGFloat) {
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        let width = sizes.reduce(0) { $0 + $1.width } + spacing * CGFloat(max(subviews.count - 1, 0))
+        return (sizes, width)
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let (sizes, width) = natural(subviews)
+        let height = sizes.map(\.height).max() ?? 0
+        guard let proposed = proposal.width, proposed.isFinite else { return CGSize(width: width, height: height) }
+        return CGSize(width: max(proposed, width), height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let (sizes, width) = natural(subviews)
+        let extra = max(0, bounds.width - width) / CGFloat(max(subviews.count, 1))
+        var x = bounds.minX
+        for (subview, size) in zip(subviews, sizes) {
+            let segmentWidth = size.width + extra
+            subview.place(at: CGPoint(x: x, y: bounds.minY), anchor: .topLeading,
+                          proposal: ProposedViewSize(width: segmentWidth, height: bounds.height))
+            x += segmentWidth + spacing
+        }
     }
 }
 

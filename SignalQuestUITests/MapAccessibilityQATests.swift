@@ -30,4 +30,34 @@ final class MapAccessibilityQATests: XCTestCase {
         shot.lifetime = .keepAlways
         add(shot)
     }
+
+    /// Feuille Carte : les opérateurs tiennent sur une ligne à la taille par défaut, le
+    /// choix est annoncé « sélectionné », et la tuile Couverture n'est proposée qu'avec
+    /// un opérateur (audit de la carte du 21/11).
+    func testOperatorPickerKeepsOneRowAndOffersCoverageOnlyWithAnOperator() {
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth", "--reset-map"], locale: "fr")
+        defer { app.terminate() }
+        SignalQuestUITestSupport.tab(named: "Carte", in: app).tap()
+        let pill = app.buttons["map.operator"]
+        XCTAssertTrue(pill.waitForExistence(timeout: 20))
+        pill.tap()
+        let all = app.buttons["map.operator.option.ALL"]
+        XCTAssertTrue(all.waitForExistence(timeout: 10), "Feuille Carte absente")
+        all.tap()
+        XCTAssertTrue(all.isSelected)
+
+        let options = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "map.operator.option."))
+            .allElementsBoundByIndex
+        XCTAssertGreaterThanOrEqual(options.count, 5)
+        let rows = Set(options.map { Int($0.frame.minY.rounded()) })
+        XCTAssertEqual(rows.count, 1, "Opérateurs sur plusieurs lignes : \(rows.sorted())")
+        XCTAssertFalse(app.buttons["map.layer.coverage"].exists, "Couverture proposée en « Tous »")
+
+        let orange = app.buttons["map.operator.option.ORANGE"]
+        orange.tap()
+        XCTAssertTrue(orange.isSelected)
+        XCTAssertFalse(all.isSelected)
+        XCTAssertTrue(app.buttons["map.layer.coverage"].waitForExistence(timeout: 5), "Couverture absente avec un opérateur")
+    }
 }

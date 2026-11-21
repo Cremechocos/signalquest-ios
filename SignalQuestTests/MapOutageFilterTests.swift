@@ -55,9 +55,23 @@ final class MapOutageFilterTests: XCTestCase {
         return payload.markets
     }
 
-    private func sheet(market: String, markets: [MarketRegistryEntry], signedIn: Bool = true) -> MapLayersSheet {
-        MapLayersSheet(market: market, operatorName: "ALL", layers: .constant(MapFilterStore.defaultFilters),
+    private func sheet(market: String, markets: [MarketRegistryEntry], signedIn: Bool = true,
+                       operatorName: String = "ALL") -> MapLayersSheet {
+        MapLayersSheet(market: market, operatorName: operatorName, layers: .constant(MapFilterStore.defaultFilters),
                        allMarkets: markets, showsFriendsLayer: signedIn)
+    }
+
+    /// En « Tous », la couverture ne peut rien afficher : sa tuile n'est pas
+    /// proposée (l'indice sous la grille dit pourquoi). Avec un opérateur, elle
+    /// revient ; déjà allumée, elle reste pour qu'on puisse l'éteindre.
+    func testCoverageTileIsHiddenForAllOperatorsUnlessAlreadyOn() throws {
+        let markets = try registry()
+        XCTAssertFalse(sheet(market: "FR", markets: markets).layerOptions.map(\.0).contains(.coverage))
+        XCTAssertTrue(sheet(market: "FR", markets: markets, operatorName: "ORANGE").layerOptions.map(\.0).contains(.coverage))
+        let withCoverage = MapLayersSheet(market: "FR", operatorName: "ALL",
+                                          layers: .constant(MapFilterStore.defaultFilters.union([.coverage])),
+                                          allMarkets: markets)
+        XCTAssertTrue(withCoverage.layerOptions.map(\.0).contains(.coverage))
     }
 
     /// Un invité n'a pas d'amis à afficher : la puce « Amis » ne lui est pas proposée.
@@ -120,7 +134,7 @@ final class MapOutageFilterTests: XCTestCase {
         let english = try XCTUnwrap(Bundle(path: path))
         let absent = "@@absent@@"
         for market in ["FR", "BA", "CA"] {
-            for option in sheet(market: market, markets: try registry()).layerOptions {
+            for option in sheet(market: market, markets: try registry(), operatorName: "ORANGE").layerOptions {
                 XCTAssertFalse(option.1.isEmpty, "Puce sans libellé sur \(market)")
                 XCTAssertNotEqual(
                     english.localizedString(forKey: option.1, value: absent, table: nil),
