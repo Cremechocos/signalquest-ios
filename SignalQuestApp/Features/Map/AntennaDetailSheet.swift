@@ -16,7 +16,8 @@ final class AntennaDetailViewModel: ObservableObject {
     /// de l'un à l'autre les montre sans nouvel appel (audit perf, C7). Toute
     /// relecture explicite (photo, vote, relance) les oublie, car elle suit une écriture.
     private var operatorDetails: [String: AntennaDetails] = [:]
-    private var detailsOperator: String?
+    /// Opérateur de la fiche affichée.
+    private(set) var detailsOperator: String?
     init(service: AntennasServicing) { self.service = service }
 
     /// Fiche lue ailleurs dans la feuille (bandes des autres opérateurs).
@@ -301,6 +302,12 @@ struct AntennaDetailSheet: View {
                 // facette précédente ne doivent pas rester affichées sous la nouvelle.
                 outages = []
                 operatorIncidents = []
+                // L'opérateur qu'on quitte garde ses bandes et son n° ARCEP : sa ligne
+                // affichait « Bandes non publiées » juste après la bascule, la tuile de
+                // la carte ne lui attribuant pas toujours ses bandes.
+                if let shown = model.details, let left = model.detailsOperator, left != selectedOperator {
+                    keepBands(of: shown, operatorName: left)
+                }
                 // En parallèle de la fiche : les pannes n'ont pas à attendre `details`.
                 async let outagesLoad: Void = loadOutages()
                 // Sans cette lecture, l'étoile s'affiche éteinte sur un site pourtant suivi — le
@@ -1301,12 +1308,16 @@ struct AntennaDetailSheet: View {
                 loadingOtherOperators.remove(op)
                 guard let details else { continue }
                 model.remember(details, operatorName: op)
-                let systems = Self.scopedSystems(of: details)
-                let number = details.core?.operatorSiteNumber
-                if !systems.isEmpty { otherOperatorSystems[op] = systems }
-                otherOperatorSiteNumbers[op] = .some(number)
+                keepBands(of: details, operatorName: op)
             }
         }
+    }
+
+    /// Bandes et n° ARCEP d'un autre opérateur, lus dans sa fiche.
+    private func keepBands(of details: AntennaDetails, operatorName op: String) {
+        let systems = Self.scopedSystems(of: details)
+        if !systems.isEmpty { otherOperatorSystems[op] = systems }
+        otherOperatorSiteNumbers[op] = .some(details.core?.operatorSiteNumber)
     }
 
     /// « Mêmes bandes déclarées par Bouygues Telecom et Orange » quand tous les
