@@ -86,6 +86,8 @@ protocol SocialFeedServicing: Sendable {
     /// sinon le flux public est balayé côté client (pas de route auteur backend).
     func userPosts(userId: String, cursor: String?, mine: Bool) async throws -> SocialFeedPage
     func trendingHashtags() async throws -> [TrendingHashtag]
+    /// Accueil : les derniers posts de « Pour toi » et les tendances, en une requête.
+    func homePreview(limit: Int) async throws -> SocialFeedPage
     func suggestedUsers() async throws -> [SocialFeedAuthor]
     func searchUsers(query: String, limit: Int) async throws -> [SocialUserSearchResult]
     /// Dernier speedtest sauvegardé côté backend (pour l'attacher à un post).
@@ -108,6 +110,10 @@ extension SocialFeedServicing {
     }
 
     func retryPendingPosts() async {}
+
+    func homePreview(limit: Int) async throws -> SocialFeedPage {
+        try await loadFeedItems(cursor: nil, hashtag: nil, tab: .forYou)
+    }
 
     func experienceTest(id: String) async throws -> ExperienceTestDetail? { nil }
 
@@ -766,6 +772,16 @@ final class SocialFeedService: SocialFeedServicing {
         ]
         let page = try await api.request(APIEndpoint(path: "/api/social/feed", query: query), as: SocialFeedPage.self)
         return page.trendingHashtags
+    }
+
+    func homePreview(limit: Int) async throws -> SocialFeedPage {
+        let query = [
+            URLQueryItem(name: "limit", value: String(limit)),
+            URLQueryItem(name: "filter", value: FeedTab.forYou.filter),
+            URLQueryItem(name: "ranking", value: FeedTab.forYou.ranking),
+            URLQueryItem(name: "include", value: "items,trends")
+        ]
+        return try await api.request(APIEndpoint(path: "/api/social/feed", query: query), as: SocialFeedPage.self)
     }
 
     func suggestedUsers() async throws -> [SocialFeedAuthor] {

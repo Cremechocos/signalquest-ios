@@ -52,6 +52,8 @@ struct SignalQuestHomeView: View {
     @State private var lastAccountRefreshAt: Date = .distantPast
     @State private var stories: [SocialStory] = []
     @State private var trending: [TrendingHashtag] = []
+    /// Derniers posts des autres membres dans « Pour toi » (module Communauté).
+    @State private var feedPreview: [UnifiedSocialFeedItem] = []
     @State private var week: WeekSummary?
     @State private var showLeaderboards = false
     @State private var liveFriends: [SocialFriendLive]?
@@ -72,6 +74,8 @@ struct SignalQuestHomeView: View {
 
     /// Rayon des mesures, du verdict et de la comparaison (1 km).
     private static let nearbyRadiusMeters = 1000
+    /// Posts demandés pour le module Communauté : les siens écartés, il en reste assez.
+    private static let feedPreviewFetch = 6
     /// Demi-fenêtre englobant le cercle de 1 km (le filtrage distance affine ensuite).
     private static let nearbyHalfSpanLat = 0.011
     private static let nearbyHalfSpanLng = 0.016
@@ -311,7 +315,10 @@ struct SignalQuestHomeView: View {
             case .evolutions:
                 // Pas de prévisionnel dans ce pays : le module annoncerait « rien de nouveau ».
                 if marketEntry?.capabilities.previsionnel ?? true { evolutionsModule }
-            case .community: communityModule
+            case .community:
+                // Rien à montrer (ni story, ni tendance, ni post) : le module se retire
+                // plutôt que d'afficher une phrase de remplissage (choix du 21/11).
+                if !storyAuthors.isEmpty || !trending.isEmpty || !feedPreview.isEmpty { communityModule }
             case .followedSites:
                 HomeFollowedSitesModule(favorites: services.favoriteAntennas, registry: marketEntry)
             case .operators: operatorsModule
@@ -1118,11 +1125,50 @@ struct SignalQuestHomeView: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityHint("Ouvre le fil")
             }
-            if authors.isEmpty && trending.isEmpty {
-                moduleMessage("Les mesures, pannes et photos partagées par la communauté se retrouvent dans le fil.")
+            if !feedPreview.isEmpty {
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    ForEach(feedPreview) { item in feedPreviewRow(item) }
+                }
             }
         }
         .accessibilityIdentifier("home.module.community")
+    }
+
+    /// Un post en une ligne d'en-tête et une de texte ; le toucher l'ouvre dans le fil.
+    private func feedPreviewRow(_ item: UnifiedSocialFeedItem) -> some View {
+        let preview = HomeFeedPreview(item: item)
+        return Button {
+            Haptics.selection()
+            router.route(toPost: item.id)
+        } label: {
+            HStack(alignment: .top, spacing: SQSpace.sm) {
+                Image(systemName: preview.symbol)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(SQColor.accentInk)
+                    .frame(width: 28, height: 28)
+                    .background(SQColor.accentSoft, in: Circle())
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: preview.header)
+                        .font(SQType.caption(.semibold))
+                        .foregroundStyle(SQColor.label)
+                        .lineLimit(2)
+                    if let line = preview.line {
+                        Text(verbatim: line)
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.ink2)
+                            .lineLimit(2)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Ouvre le fil")
+        .accessibilityIdentifier("home.community.post")
     }
 
     private func trendingRow(_ count: Int) -> some View {
@@ -1479,6 +1525,7 @@ struct SignalQuestHomeView: View {
             stories = HomeDemoData.stories
             trending = [TrendingHashtag(tag: "5G", postCount: 42), TrendingHashtag(tag: "Lyon", postCount: 17),
                         TrendingHashtag(tag: "panne", postCount: 9)]
+            feedPreview = HomeFeedPreview.others(in: SocialFeedPage.demo.items)
             week = WeekSummary(points: 1_240, rank: 3, friendsCount: 8)
             liveFriends = []
             return
@@ -1489,12 +1536,17 @@ struct SignalQuestHomeView: View {
         let wantsWeek = has(.week)
         let wantsFriends = has(.liveFriends)
         async let storiesTask: [SocialStory]? = wantsCommunity ? try? await services.stories.list() : nil
-        async let trendingTask: [TrendingHashtag]? = wantsCommunity ? try? await services.feed.trendingHashtags() : nil
+        // Posts et tendances en une seule requête.
+        async let previewTask: SocialFeedPage? = wantsCommunity
+            ? try? await services.feed.homePreview(limit: Self.feedPreviewFetch) : nil
         async let weekTask: PointsLeaderboardResult? = wantsWeek
             ? try? await services.leaderboards.pointsLeaderboard(period: "week", scope: "friends") : nil
         async let friendsTask: [SocialFriendLive]? = wantsFriends ? try? await services.map.friendsSnapshot() : nil
         if let value = await storiesTask { stories = value }
-        if let value = await trendingTask { trending = value }
+        if let page = await previewTask {
+            trending = page.trendingHashtags
+            feedPreview = HomeFeedPreview.others(in: page.items)
+        }
         if let result = await weekTask {
             let mine = result.entries.first { $0.userId == user.id }
             week = WeekSummary(points: mine?.periodPoints ?? mine?.points ?? (mine == nil ? nil : 0),
@@ -2164,6 +2216,49 @@ private struct HomeLayoutPresetsSheet: View {
 
 /// Un module de l'accueil. Chacun dit une seule chose ; l'ordre, la taille et la présence
 /// se règlent dans « Modifier l'accueil », comme le tableau de bord Radio d'Android.
+/// Un post du fil résumé pour le module Communauté de l'Accueil : le symbole de
+/// son type, « Auteur · type · il y a 2 heures », puis une ligne de texte. Les
+/// titres sont ceux des cartes du fil, pour lire la même chose aux deux endroits.
+struct HomeFeedPreview {
+    /// Posts montrés sur l'Accueil.
+    static let limit = 3
+
+    let symbol: String
+    let header: String
+    let line: String?
+
+    init(item: UnifiedSocialFeedItem) {
+        var kind: String?
+        let text: String
+        if let activity = FeedActivity(item: item) {
+            symbol = activity.symbol
+            text = activity.title
+        } else {
+            switch item.cardKind {
+            case "speedtest": symbol = "speedometer"; kind = String(localized: "Test de débit")
+            case "experience": symbol = "play.rectangle"; kind = String(localized: "Test d’expérience")
+            case "validation": symbol = "checkmark"; kind = String(localized: "Antenne identifiée")
+            case "coverage", "session", "drive_test": symbol = "point.topleft.down.curvedto.point.bottomright.up"
+            case "photo", "antenna_photo": symbol = "camera"; kind = String(localized: "Photo d’un support")
+            case "outage": symbol = "exclamationmark.triangle"
+            case "rating": symbol = "star.fill"; kind = String(localized: "A noté son réseau")
+            default: symbol = "text.bubble"
+            }
+            text = item.displayText
+        }
+        let when = item.createdAt.map { $0.formatted(.relative(presentation: .named)) }
+        header = [item.author.displayName, kind, when].compactMap { $0 }.joined(separator: " · ")
+        let flat = text.split(whereSeparator: \.isNewline).joined(separator: " ")
+            .trimmingCharacters(in: .whitespaces)
+        line = flat.isEmpty ? nil : flat
+    }
+
+    /// Les posts des autres membres seulement : le module montre la communauté.
+    static func others(in items: [UnifiedSocialFeedItem]) -> [UnifiedSocialFeedItem] {
+        Array(items.filter { $0.isMine != true }.prefix(limit))
+    }
+}
+
 enum HomeModule: String, CaseIterable, Identifiable, Sendable {
     case network, outages, latestTest, week, evolutions, community, followedSites
     case operators, nearbyMeasures, liveFriends, shortcuts

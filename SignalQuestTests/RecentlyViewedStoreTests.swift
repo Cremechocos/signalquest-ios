@@ -200,3 +200,35 @@ final class HomeLayoutTests: XCTestCase {
         XCTAssertEqual(roundTrip, layout)
     }
 }
+
+/// Module Communauté de l'Accueil : les derniers posts des autres membres,
+/// chacun résumé par le titre de sa carte du fil et une ligne de texte.
+final class HomeFeedPreviewTests: XCTestCase {
+    private func item(_ id: String, kind: String = "post", text: String = "Bonjour", mine: Bool? = nil) -> UnifiedSocialFeedItem {
+        let isMine = mine.map { #","isMine":\#($0)"# } ?? ""
+        let raw = #"{"id":"\#(id)","kind":"\#(kind)","author":{"id":"a-\#(id)","name":"Camille"},"text":"\#(text)"\#(isMine)}"#
+        return try! JSONDecoder.signalQuest.decode(UnifiedSocialFeedItem.self, from: Data(raw.utf8))
+    }
+
+    func testRowReadsLikeTheFeedCard() {
+        let speedtest = HomeFeedPreview(item: item("1", kind: "speedtest", text: "412 Mb/s à Paris"))
+        XCTAssertEqual(speedtest.symbol, "speedometer")
+        XCTAssertEqual(speedtest.header, "Camille · \(String(localized: "Test de débit"))")
+        XCTAssertEqual(speedtest.line, "412 Mb/s à Paris")
+
+        let photo = HomeFeedPreview(item: item("2", kind: "antenna_photo"))
+        XCTAssertEqual(photo.symbol, "camera")
+        XCTAssertEqual(photo.header, "Camille · \(String(localized: "Photo d’un support"))")
+
+        // Une publication ordinaire n'a pas de type ; son texte tient sur une ligne.
+        let post = HomeFeedPreview(item: item("3", text: "Premi\\u00e8re ligne\\nseconde"))
+        XCTAssertEqual(post.header, "Camille")
+        XCTAssertEqual(post.line, "Première ligne seconde")
+        XCTAssertNil(HomeFeedPreview(item: item("4", text: "  ")).line)
+    }
+
+    func testOnlyOtherMembersPostsAreShownThreeAtMost() {
+        let items = [item("mine", mine: true), item("a"), item("b", mine: false), item("c"), item("d")]
+        XCTAssertEqual(HomeFeedPreview.others(in: items).map(\.id), ["a", "b", "c"])
+    }
+}
