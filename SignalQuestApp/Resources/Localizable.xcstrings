@@ -43125,29 +43125,29 @@
       },
       "shouldTranslate" : false
     },
-    "Ton abonnement souscrit sur le web sera résilié dès la suppression, sans remboursement, sauf si tu es encore dans ton délai de rétractation de 14 jours et que tu n’y as pas renoncé." : {
+    "Ton abonnement souscrit sur le web sera résilié dès la suppression, sans remboursement, sauf si tu es encore dans ton délai de rétractation de 14 jours." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Your subscription taken out on the web will be cancelled on deletion, with no refund, unless you’re still within your 14-day withdrawal period and haven’t waived it."
+            "value" : "Your subscription taken out on the web will be cancelled on deletion, with no refund, unless you’re still within your 14-day withdrawal period."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ton abonnement souscrit sur le web sera résilié dès la suppression, sans remboursement, sauf si tu es encore dans ton délai de rétractation de 14 jours et que tu n’y as pas renoncé."
+            "value" : "Ton abonnement souscrit sur le web sera résilié dès la suppression, sans remboursement, sauf si tu es encore dans ton délai de rétractation de 14 jours."
           }
         }
       }
     },
-    "SQFormal|Ton abonnement souscrit sur le web sera résilié dès la suppression, sans remboursement, sauf si tu es encore dans ton délai de rétractation de 14 jours et que tu n’y as pas renoncé." : {
+    "SQFormal|Ton abonnement souscrit sur le web sera résilié dès la suppression, sans remboursement, sauf si tu es encore dans ton délai de rétractation de 14 jours." : {
       "extractionState" : "manual",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Votre abonnement souscrit sur le web sera résilié dès la suppression, sans remboursement, sauf si vous êtes encore dans votre délai de rétractation de 14 jours et que vous n’y avez pas renoncé."
+            "value" : "Votre abonnement souscrit sur le web sera résilié dès la suppression, sans remboursement, sauf si vous êtes encore dans votre délai de rétractation de 14 jours."
           }
         }
       },

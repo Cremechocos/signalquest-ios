@@ -325,7 +325,7 @@ struct AccountDeletionSubscriptionNotice: View {
                 String(localized: "Ton abonnement App Store est déjà résilié : il s’arrêtera le \(SubscriptionStatusPresentation.day($0)), sans nouveau paiement. Un remboursement se demande à Apple.")
             } ?? String(localized: "Ton abonnement App Store est déjà résilié : il s’arrêtera sans nouveau paiement. Un remboursement se demande à Apple.")
         case .stripe:
-            return String(localized: "Ton abonnement souscrit sur le web sera résilié dès la suppression, sans remboursement, sauf si tu es encore dans ton délai de rétractation de 14 jours et que tu n’y as pas renoncé.")
+            return String(localized: "Ton abonnement souscrit sur le web sera résilié dès la suppression, sans remboursement, sauf si tu es encore dans ton délai de rétractation de 14 jours.")
         case .googlePlay, .unknown:
             return String(localized: "Ton abonnement souscrit sur un autre appareil sera résilié dès la suppression : aucun nouveau prélèvement. La période en cours n’est pas remboursée par SignalQuest ; un remboursement se demande là où il a été souscrit.")
         }
