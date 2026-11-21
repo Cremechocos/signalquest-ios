@@ -1023,13 +1023,17 @@ struct AntennaDetailSheet: View {
                 .font(SQType.callout(.bold))
                 .foregroundStyle(SQColor.label)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            if isActive, model.details != nil {
-                Text(identityLine ?? String(localized: "n° non publié"))
+            // N° ARCEP de chaque opérateur, comme le Web (choix d'Alexandre du 21/11) :
+            // l'identifiant radio (eNB/gNB) reste dans l'onglet Identifiants.
+            if let number = isCustomSite ? customRadioIdentity : Self.operatorNumberShortText(operatorSiteNumber(op)) {
+                Text(verbatim: number)
                     .font(SQType.caption(.semibold))
                     .monospacedDigit()
                     .foregroundStyle(SQColor.labelSecondary)
                     .lineLimit(1)
-            } else if isSwitchable {
+                    .accessibilityIdentifier("antenna.detail.operatorRowNumber")
+            }
+            if isSwitchable {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(SQColor.labelTertiary)
@@ -1085,21 +1089,37 @@ struct AntennaDetailSheet: View {
     /// « n° 3810003843 » sous un opérateur, en France et outre-mer comme le Web ; « n° non publié par
     /// l’ARCEP » une fois sa fiche lue sans numéro ; rien tant qu'elle ne l'est pas, ni ailleurs.
     private func operatorNumberLine(_ op: String) -> String? {
+        operatorSiteNumber(op).map(Self.operatorNumberText)
+    }
+
+    /// Site ajouté par la communauté : pas de n° ARCEP, son eNB ou gNB relevé.
+    private var customRadioIdentity: String? {
+        if let enb = customSite?.radio?.enb { return "eNB \(enb)" }
+        if let gnb = customSite?.radio?.gnb { return "gNB \(gnb)" }
+        return nil
+    }
+
+    /// N° ARCEP d'un opérateur du support : `nil` tant que sa fiche n'est pas lue (ou hors
+    /// France et outre-mer), `.some(nil)` une fois lue sans numéro.
+    private func operatorSiteNumber(_ op: String) -> String?? {
         let code = market.uppercased()
         guard code == "FR" || code == "DROM", !isCustomSite else { return nil }
-        let number: String?
         if op == selectedOperator {
             guard let core = model.details?.core else { return nil }
-            number = core.operatorSiteNumber
-        } else {
-            guard let served = otherOperatorSiteNumbers[op] else { return nil }
-            number = served
+            return .some(core.operatorSiteNumber)
         }
-        return Self.operatorNumberText(number)
+        return otherOperatorSiteNumbers[op]
     }
 
     nonisolated static func operatorNumberText(_ number: String?) -> String {
         number.map { String(localized: "n° \($0)") } ?? String(localized: "n° non publié par l’ARCEP")
+    }
+
+    /// Forme courte de la rangée Radio (Essentiel) : « n° 170023 », ou « n° non publié » une fois
+    /// la fiche lue sans numéro ; rien tant qu'elle ne l'est pas.
+    nonisolated static func operatorNumberShortText(_ number: String??) -> String? {
+        guard let number else { return nil }
+        return number.map { String(localized: "n° \($0)") } ?? String(localized: "n° non publié")
     }
 
     /// Lit une fois par support son historique ANFR : en France, et outre-mer une fois ses relevés
@@ -1239,18 +1259,6 @@ struct AntennaDetailSheet: View {
             }
         }
         .accessibilityIdentifier("antenna.detail.operatorBands")
-    }
-
-    /// « eNB 812345 » ou « gNB 1203344 » : le numéro du site pour l'opérateur affiché.
-    private var identityLine: String? {
-        let identifiers = model.details?.core?.cellIdentifiers
-        if let enb = identifiers?.enb.first ?? customSite?.radio?.enb {
-            return "eNB \(enb)"
-        }
-        if let gnb = identifiers?.gnb.first ?? customSite?.radio?.gnb {
-            return "gNB \(gnb)"
-        }
-        return nil
     }
 
     /// Bandes d'un opérateur par génération : la fiche scopée pour l'opérateur

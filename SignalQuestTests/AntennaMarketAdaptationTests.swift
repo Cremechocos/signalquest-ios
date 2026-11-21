@@ -226,6 +226,12 @@ final class AntennaMarketAdaptationTests: XCTestCase {
         XCTAssertEqual(AntennaDetailSheet.operatorNumberText("3810003843"), french ? "n° 3810003843" : "no. 3810003843")
         XCTAssertEqual(AntennaDetailSheet.operatorNumberText(nil),
                        french ? "n° non publié par l’ARCEP" : "no. not published by ARCEP")
+        // Rangée Radio de l'onglet Essentiel (choix du 21/11) : le n° ARCEP de chaque opérateur,
+        // rien tant que sa fiche n'est pas lue, la forme courte une fois lue sans numéro.
+        XCTAssertEqual(AntennaDetailSheet.operatorNumberShortText(.some("170023")), french ? "n° 170023" : "no. 170023")
+        XCTAssertEqual(AntennaDetailSheet.operatorNumberShortText(.some(nil)),
+                       french ? "n° non publié" : "number not published")
+        XCTAssertNil(AntennaDetailSheet.operatorNumberShortText(nil))
     }
 
     private func change(_ id: String, _ technology: String, _ generation: String, _ type: String,
