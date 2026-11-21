@@ -3163,11 +3163,11 @@ struct MapExplorerView: View {
         .disabled(model.registryMarkets.isEmpty)
     }
 
-    /// Couches affichées, dans l'ordre de la feuille Carte.
-    /// Sans compte, la couche Amis n'affiche rien : elle ne compte pas.
+    /// Couches affichées, dans l'ordre de la feuille Carte. Une couche qui ne peut rien
+    /// montrer ici (Amis sans compte, Couverture en « Tous »…) ne compte pas.
     private var shownLayers: [MapDisplayItem.Kind] {
-        let signedIn = services.auth.hasStoredCredentials()
-        return MapLayersSheet.layerOrder.filter { filters.contains($0) && ($0 != .friend || signedIn) }
+        MapLayersSheet.countedLayers(filters, in: model.currentMarketEntry, operatorKey: model.operatorFilter,
+                                     signedIn: services.auth.hasStoredCredentials())
     }
 
     /// Pastille d'état (bas-gauche) : l'opérateur et la couche principale, plus

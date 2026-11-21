@@ -168,6 +168,26 @@ final class MapOutageFilterTests: XCTestCase {
         XCTAssertNil(cached.market(forCode: "OLDON")?.radioCapabilities.communityProbableSites)
     }
 
+    /// La pastille d'état ne compte que les couches qui peuvent montrer quelque chose ici :
+    /// ni la couverture en « Tous », ni les prévus ou les cellules d'un pays qui n'en a pas,
+    /// ni les amis sans compte. Avec un opérateur et dans le bon pays, elles reviennent.
+    func testStatePillSkipsLayersThatCannotShowAnythingHere() throws {
+        let markets = try registry()
+        let fr = markets.first { $0.code == "FR" }
+        let ba = markets.first { $0.code == "BA" }
+        let all: Set<MapDisplayItem.Kind> = [.antenna, .coverage, .planned, .friend, .customSite, .communitySite]
+        XCTAssertEqual(MapLayersSheet.countedLayers(all, in: fr, operatorKey: "ALL", signedIn: false),
+                       [.antenna, .planned, .customSite])
+        XCTAssertEqual(MapLayersSheet.countedLayers(all, in: fr, operatorKey: "ORANGE", signedIn: true),
+                       [.antenna, .coverage, .planned, .friend, .customSite])
+        XCTAssertEqual(MapLayersSheet.countedLayers(all, in: ba, operatorKey: "all", signedIn: true),
+                       [.antenna, .friend, .customSite, .communitySite])
+        // Registre pas encore lu : rien n'assure que le pays a des prévus ou des cellules.
+        XCTAssertEqual(MapLayersSheet.countedLayers(all, in: nil, operatorKey: "ORANGE", signedIn: true),
+                       [.antenna, .coverage, .friend, .customSite])
+        XCTAssertEqual(MapLayersSheet.countedLayers([.coverage], in: fr, operatorKey: "ALL", signedIn: true), [])
+    }
+
     func testCanadianPlannedLayerCanBeChosenWhenTheRegistryExposesTheCapability() throws {
         let url = try XCTUnwrap(Bundle.main.url(forResource: "market_registry_fallback", withExtension: "json"))
         let markets = try JSONDecoder.signalQuest.decode(MarketRegistryPayload.self, from: Data(contentsOf: url)).markets

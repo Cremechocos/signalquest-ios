@@ -188,14 +188,34 @@ struct MapLayersSheet: View {
         }
     }
 
+    /// Couche qui ne peut rien montrer ici, même allumée : la couverture en « Tous »,
+    /// les prévus sans prévisionnel, les cellules sans cellules communautaires.
+    static func isUnavailable(_ kind: MapDisplayItem.Kind, in entry: MarketRegistryEntry?,
+                              operatorKey: String) -> Bool {
+        switch kind {
+        case .coverage: return operatorKey.uppercased() == "ALL"
+        case .planned: return entry?.capabilities.previsionnel != true
+        case .communitySite: return entry?.hasCommunityCells != true
+        default: return false
+        }
+    }
+
+    /// Couches que la pastille d'état compte, dans l'ordre de la feuille : allumées et
+    /// capables de montrer quelque chose ici (Amis demande un compte).
+    static func countedLayers(_ filters: Set<MapDisplayItem.Kind>, in entry: MarketRegistryEntry?,
+                              operatorKey: String, signedIn: Bool) -> [MapDisplayItem.Kind] {
+        layerOrder.filter {
+            filters.contains($0) && ($0 != .friend || signedIn)
+                && !isUnavailable($0, in: entry, operatorKey: operatorKey)
+        }
+    }
+
     private func isUnavailable(_ kind: MapDisplayItem.Kind) -> Bool {
-        (kind == .coverage && allOperators)
-            || (kind == .planned && !plannedAvailable)
-            || (kind == .communitySite && !communityAvailable)
+        Self.isUnavailable(kind, in: selectedEntry, operatorKey: operatorName)
     }
 
     private var subtitle: String {
-        let shown = layerOptions.filter { layers.contains($0.0) }.map(\.1)
+        let shown = layerOptions.filter { layers.contains($0.0) && !isUnavailable($0.0) }.map(\.1)
         let layersText = shown.isEmpty ? String(localized: "Aucune couche")
             : (ListFormatter.localizedString(byJoining: shown))
         return "\(operatorLabel(operatorName)) · \(layersText)"
