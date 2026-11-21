@@ -16,6 +16,15 @@ struct PostCardView: View {
     /// Vote sur le sondage attaché, s'il y en a un.
     var onPollVote: ((FeedPoll.Option) -> Void)? = nil
 
+    /// Première photo et sa taille d'affichage : le fil la précharge avec les mêmes valeurs,
+    /// donc dans la même entrée du cache (E5).
+    static let imageMaxDimension: CGFloat = 440
+
+    static func imageURL(for item: UnifiedSocialFeedItem) -> URL? {
+        guard let attachment = item.imageAttachments.first else { return nil }
+        return attachment.thumbnailUrl ?? attachment.url
+    }
+
     var body: some View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: SQSpace.md) {
@@ -50,8 +59,8 @@ struct PostCardView: View {
                 // chargeur d'image. Les autres photos sont signalées par une pastille.
                 let images = item.imageAttachments
                 if let attachment = images.first,
-                   let url = attachment.thumbnailUrl ?? attachment.url {
-                    RemoteImage(url: url, maxDimension: 440, contentMode: .fill, showsFailureUI: true) {
+                   let url = Self.imageURL(for: item) {
+                    RemoteImage(url: url, maxDimension: Self.imageMaxDimension, contentMode: .fill, showsFailureUI: true) {
                         Rectangle().fill(SQColor.surfaceMuted)
                     }
                     .frame(height: 220)

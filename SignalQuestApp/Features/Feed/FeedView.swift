@@ -266,6 +266,23 @@ final class FeedViewModel: ObservableObject {
     /// au plus quelques pages d'affilée.
     static let emptyPageHops = 5
 
+    /// La page suivante se demande dès qu'une des quatre dernières cartes apparaît, plus à
+    /// la toute dernière seulement : en défilant vite, on attendait la page en bas du fil
+    /// (audit du 21/11, E5). `loadMore` ignore les demandes pendant un chargement.
+    nonisolated static let loadMoreLead = 4
+    /// Cartes suivantes dont la photo se charge pendant qu'on lit la carte affichée.
+    nonisolated static let imagePrefetchLead = 3
+
+    nonisolated static func shouldLoadMore(appearing id: String, in items: [UnifiedSocialFeedItem]) -> Bool {
+        guard let index = items.lastIndex(where: { $0.id == id }) else { return false }
+        return index >= items.count - loadMoreLead
+    }
+
+    nonisolated static func upcoming(after id: String, in items: [UnifiedSocialFeedItem]) -> ArraySlice<UnifiedSocialFeedItem> {
+        guard let index = items.firstIndex(where: { $0.id == id }) else { return [] }
+        return items[(index + 1)..<min(items.count, index + 1 + imagePrefetchLead)]
+    }
+
     func loadMore() async {
         guard !isLoading, !isLoadingMore, let current = page,
               var cursor = current.nextCursor, !cursor.isEmpty, !AppEnvironment.usesDemoData else { return }
@@ -629,6 +646,7 @@ struct FeedView: View {
     @EnvironmentObject private var inAppNotifications: SQInAppNotificationCenter
     @EnvironmentObject private var session: AuthSessionViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.displayScale) private var displayScale
     private static let topAnchor = "feed.top"
 
     @State private var presentedSheet: FeedSheet?
@@ -1801,12 +1819,31 @@ struct FeedView: View {
             // déduplique, l'appeler à chaque réapparition de
             // cellule est donc sans effet de bord.
             Task { await services.feedSignals.didAppear(item.backendPostId) }
-            if item.id == model.page?.items.last?.id {
-                Task { await model.loadMore() }
+            if let items = model.page?.items {
+                if FeedViewModel.shouldLoadMore(appearing: item.id, in: items) {
+                    Task { await model.loadMore() }
+                }
+                prefetchImages(after: item.id, in: items)
             }
         }
         .onDisappear {
             Task { await services.feedSignals.didDisappear(item.backendPostId) }
+        }
+    }
+
+    /// Photos des cartes suivantes demandées d'avance (E5), au format de leur carte : même
+    /// clé de cache, la carte les trouve décodées en apparaissant. Un échec reste muet, la
+    /// carte retentera elle-même.
+    private func prefetchImages(after id: String, in items: [UnifiedSocialFeedItem]) {
+        let scale = displayScale
+        let targets = FeedViewModel.upcoming(after: id, in: items).compactMap(FeedItemCard.prefetchImage(for:))
+        guard !targets.isEmpty else { return }
+        Task.detached(priority: .utility) {
+            for target in targets {
+                let maxPixel = max(1, target.maxDimension * scale)
+                guard ImagePipeline.shared.cachedImage(for: target.url, maxPixel: maxPixel) == nil else { continue }
+                _ = try? await ImagePipeline.shared.image(for: target.url, maxPixel: maxPixel)
+            }
         }
     }
 

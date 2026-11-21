@@ -74,12 +74,19 @@ struct PhotoCardView: View {
         .buttonStyle(SQPressButtonStyle())
     }
 
+    /// Photo de tête et sa taille d'affichage : le fil la précharge avec les mêmes valeurs,
+    /// donc dans la même entrée du cache (E5).
+    static let heroMaxDimension: CGFloat = 460
+
+    static func heroURL(for item: UnifiedSocialFeedItem) -> URL? {
+        let first = item.imageAttachments.first
+        return first?.url ?? first?.thumbnailUrl
+    }
+
     @ViewBuilder
     private var heroImage: some View {
-        let first = item.imageAttachments.first
-        let url = first?.url ?? first?.thumbnailUrl
         ZStack {
-            RemoteImage(url: url, maxDimension: 460, contentMode: .fill, showsFailureUI: true) {
+            RemoteImage(url: Self.heroURL(for: item), maxDimension: Self.heroMaxDimension, contentMode: .fill, showsFailureUI: true) {
                 Rectangle().fill(SQColor.surfaceMuted)
                     .overlay(
                         Image(systemName: "antenna.radiowaves.left.and.right")

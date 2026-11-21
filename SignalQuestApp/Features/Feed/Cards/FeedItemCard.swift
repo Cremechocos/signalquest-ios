@@ -96,6 +96,20 @@ struct FeedItemCard: View {
         }
     }
 
+    /// Photo que la carte de `item` affichera, à sa taille d'affichage (E5) : le fil la
+    /// précharge quelques cartes avant. Seules les cartes photo et publication en montrent.
+    static func prefetchImage(for item: UnifiedSocialFeedItem) -> (url: URL, maxDimension: CGFloat)? {
+        guard FeedActivity(item: item) == nil else { return nil }
+        switch item.cardKind {
+        case "photo", "antenna_photo":
+            return PhotoCardView.heroURL(for: item).map { ($0, PhotoCardView.heroMaxDimension) }
+        case "speedtest", "experience", "validation", "coverage", "session", "drive_test", "outage", "rating":
+            return nil
+        default:
+            return PostCardView.imageURL(for: item).map { ($0, PostCardView.imageMaxDimension) }
+        }
+    }
+
     private var normalizedKind: String {
         // The backend sometimes returns the historical SocialPost type
         // ("antenna_photo") and sometimes the v2 kind ("photo"). We normalise

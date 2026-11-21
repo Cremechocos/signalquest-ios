@@ -256,6 +256,40 @@ final class FeedContextTests: XCTestCase {
         XCTAssertTrue(condition())
     }
 
+    /// E5 (audit du 21/11) : la page suivante se demande dès l'une des quatre dernières cartes,
+    /// et la photo des trois cartes suivantes se précharge à l'adresse et à la taille de sa carte.
+    func testNextPageStartsFourCardsBeforeTheEndAndUpcomingPhotosArePrefetched() throws {
+        let items = (0..<10).map { Self.item("p\($0)") }
+        XCTAssertFalse(FeedViewModel.shouldLoadMore(appearing: "p5", in: items))
+        XCTAssertTrue(FeedViewModel.shouldLoadMore(appearing: "p6", in: items))
+        XCTAssertTrue(FeedViewModel.shouldLoadMore(appearing: "p9", in: items))
+        XCTAssertFalse(FeedViewModel.shouldLoadMore(appearing: "absent", in: items))
+        XCTAssertTrue(FeedViewModel.shouldLoadMore(appearing: "p0", in: Array(items.prefix(3))))
+        XCTAssertEqual(FeedViewModel.upcoming(after: "p2", in: items).map(\.id), ["p3", "p4", "p5"])
+        XCTAssertEqual(FeedViewModel.upcoming(after: "p8", in: items).map(\.id), ["p9"])
+        XCTAssertTrue(FeedViewModel.upcoming(after: "p9", in: items).isEmpty)
+        XCTAssertTrue(FeedViewModel.upcoming(after: "absent", in: items).isEmpty)
+
+        let full = "https://cdn.example.invalid/full.webp", thumb = "https://cdn.example.invalid/thumb.webp"
+        func card(_ kind: String, attachment: String = "image") throws -> UnifiedSocialFeedItem {
+            let raw = #"{"id":"\#(kind)","kind":"\#(kind)","author":{"id":"qa-author","name":"Recette"},"text":"x","#
+                + #""attachments":[{"id":"a1","kind":"\#(attachment)","url":"\#(full)","thumbnailUrl":"\#(thumb)"}]}"#
+            return try JSONDecoder.signalQuest.decode(UnifiedSocialFeedItem.self, from: Data(raw.utf8))
+        }
+        // Même aiguillage que les cartes : la carte photo montre l'image pleine, la publication sa vignette.
+        let photo = FeedItemCard.prefetchImage(for: try card("photo"))
+        XCTAssertEqual(photo?.url.absoluteString, full)
+        XCTAssertEqual(photo?.maxDimension, PhotoCardView.heroMaxDimension)
+        XCTAssertEqual(PhotoCardView.heroMaxDimension, 460)
+        let post = FeedItemCard.prefetchImage(for: try card("post"))
+        XCTAssertEqual(post?.url.absoluteString, thumb)
+        XCTAssertEqual(post?.maxDimension, PostCardView.imageMaxDimension)
+        XCTAssertEqual(PostCardView.imageMaxDimension, 440)
+        XCTAssertNil(FeedItemCard.prefetchImage(for: try card("post", attachment: "video")))
+        XCTAssertNil(FeedItemCard.prefetchImage(for: try card("speedtest")))
+        XCTAssertNil(FeedItemCard.prefetchImage(for: Self.item("sans-photo")))
+    }
+
     nonisolated private static func queryValue(_ name: String, of request: URLRequest) -> String? {
         URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == name }?.value
     }
