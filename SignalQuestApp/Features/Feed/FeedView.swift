@@ -651,6 +651,9 @@ struct FeedView: View {
     @State private var showsDefaultVisibilityChoice = false
     /// Remonte en tête du fil (filtre par hashtag touché plus bas).
     @State private var scrollTopRequest = UUID()
+    /// Actualisation lancée en retouchant l'onglet Communauté : sans le geste de
+    /// tirer, rien d'autre ne montrerait que le fil se recharge.
+    @State private var isTabRefreshing = false
     @State private var showExplore = false
     @State private var showMessages = false
     // Destinations reprises du menu Profil : elles relèvent de la communauté,
@@ -754,8 +757,16 @@ struct FeedView: View {
         ScrollViewReader { proxy in
         ScrollView {
             LazyVStack(alignment: .leading, spacing: SQSpace.md) {
+                // La marge du haut appartient à l'ancre : revenir en tête
+                // retrouve la position de repos, pas 8 pt plus haut.
                 header
+                    .padding(.top, SQSpace.sm)
                     .id(Self.topAnchor)
+                if isTabRefreshing {
+                    HStack { Spacer(); SQSpinner().tint(SQColor.brandRed); Spacer() }
+                        .frame(maxWidth: .infinity)
+                        .transition(.opacity)
+                }
                 // Rail visible dès que la page est chargée, même sans story
                 // amie : « Ta story » reste le point d'entrée de création.
                 if let stories = visibleStories {
@@ -828,7 +839,6 @@ struct FeedView: View {
                 }
             }
             .padding(.horizontal, SQSpace.lg)
-            .padding(.top, SQSpace.sm)
             .padding(.bottom, SQSpace.xxl)
             .sqReadableWidth()
         }
@@ -849,6 +859,21 @@ struct FeedView: View {
         .onChangeCompat(of: scrollTopRequest) { _, _ in
             proxy.scrollTo(Self.topAnchor, anchor: .top)
         }
+        // Onglet Communauté retouché : retour en tête, puis la même
+        // actualisation que le geste de tirer.
+        .onChangeCompat(of: router.tabReselection) { _, reselection in
+            guard reselection?.tab == .community else { return }
+            withAnimation(SQMotion.resolve(SQMotion.smooth, reduceMotion)) {
+                proxy.scrollTo(Self.topAnchor, anchor: .top)
+            }
+            guard !model.isLoading, !isTabRefreshing else { return }
+            Task {
+                isTabRefreshing = true
+                await refreshFeed()
+                isTabRefreshing = false
+            }
+        }
+        .sqAnimation(SQMotion.snappy, value: isTabRefreshing)
         }
         // Directement sur le ScrollView (avant le ZStack de signalQuestBackground).
         .sqDockAutoMinimize()
@@ -892,10 +917,7 @@ struct FeedView: View {
                 if model.page == nil, !model.isLoading { Task { await model.load() } }
             } else { model.stopStream() }
         }
-        .refreshable {
-            await model.load()
-            await model.loadPulse(force: true)
-        }
+        .refreshable { await refreshFeed() }
         .navigationDestination(isPresented: $showExplore) {
             ExploreView(service: services.feed)
         }
@@ -1941,6 +1963,12 @@ struct FeedView: View {
                     .foregroundStyle(SQColor.labelSecondary)
             }
         }
+    }
+
+    /// Tirer pour actualiser, ou retoucher l'onglet : le fil et le pouls repartent.
+    private func refreshFeed() async {
+        await model.load()
+        await model.loadPulse(force: true)
     }
 
     /// Filtre le fil sur un hashtag touché dans une carte.

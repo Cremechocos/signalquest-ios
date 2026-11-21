@@ -102,6 +102,23 @@ final class AppRouter: ObservableObject {
     enum AppTab: String, Hashable { case home, map, speed, community, profile }
 
     @Published var selectedTab: AppTab
+    /// Onglet retouché alors qu'il était déjà affiché : son écran racine remonte
+    /// en tête et s'actualise. Un identifiant neuf à chaque toucher, pour que
+    /// deux touchers de suite soient deux signaux.
+    struct TabReselection: Equatable {
+        let tab: AppTab
+        let id = UUID()
+    }
+    @Published private(set) var tabReselection: TabReselection?
+    /// Sélection des barres d'onglets (native et dock). Une barre écrit l'onglet
+    /// touché même s'il est déjà affiché : ce toucher devient une re-sélection
+    /// au lieu de ne rien faire. Les routes du code écrivent `selectedTab`.
+    var tabBarSelection: AppTab {
+        get { selectedTab }
+        set {
+            if newValue == selectedTab { tabReselection = TabReselection(tab: newValue) } else { selectedTab = newValue }
+        }
+    }
     /// Set to request opening a specific conversation on the Messages tab.
     @Published var openConversationId: String?
     /// Message sur lequel s'ouvre `openConversationId` (messages enregistrés).

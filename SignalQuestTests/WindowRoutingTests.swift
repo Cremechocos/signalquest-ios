@@ -53,4 +53,28 @@ final class WindowRoutingTests: XCTestCase {
         XCTAssertTrue(store.router(claimingFrom: routing) === claimed)
         XCTAssertFalse(routing.claimWindowRouter() === claimed)
     }
+
+    /// Retoucher l'onglet affiché le signale (le fil remonte et s'actualise) ;
+    /// toucher un autre onglet en change seulement, et une route du code ne
+    /// signale rien.
+    func testTouchingTheShownTabSignalsAReselection() {
+        let router = AppRouter()
+
+        router.tabBarSelection = .community
+        XCTAssertEqual(router.selectedTab, .community)
+        XCTAssertNil(router.tabReselection)
+
+        router.tabBarSelection = .community
+        let first = router.tabReselection
+        XCTAssertEqual(first?.tab, .community)
+        XCTAssertEqual(router.selectedTab, .community)
+
+        router.tabBarSelection = .community
+        XCTAssertNotEqual(router.tabReselection, first)
+        let second = router.tabReselection
+
+        router.selectedTab = .community
+        router.selectedTab = .map
+        XCTAssertEqual(router.tabReselection, second)
+    }
 }

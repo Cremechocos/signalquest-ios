@@ -1345,7 +1345,7 @@ struct MainTabView: View {
 
     @available(iOS 26.0, *)
     private var glassTabView: some View {
-        TabView(selection: $router.selectedTab) {
+        TabView(selection: $router.tabBarSelection) {
             NavigationStack { SignalQuestHomeView(user: user) }
                 .tabItem { Label("Accueil", systemImage: "house") }
                 .tag(AppRouter.AppTab.home)
@@ -1393,7 +1393,7 @@ struct MainTabView: View {
     /// `SQDock`, barre Halo posée à ras de la safe area, dont les libellés se
     /// replient au scroll (`sqDockAutoMinimize` sur les racines, iOS 18+).
     private var dockTabView: some View {
-        TabView(selection: $router.selectedTab) {
+        TabView(selection: $router.tabBarSelection) {
             NavigationStack { SignalQuestHomeView(user: user).toolbar(.hidden, for: .tabBar) }
                 .sqDockSafeArea()
                 .tag(AppRouter.AppTab.home)
@@ -1430,7 +1430,7 @@ struct MainTabView: View {
             // seul le fond papier de la barre descend jusqu'au bord.
             if !router.isDockHidden {
                 SQDock(
-                    selection: $router.selectedTab,
+                    selection: $router.tabBarSelection,
                     communityBadge: user == nil ? 0 : services.unreadConversations,
                     minimized: router.isDockMinimized,
                     onExpand: {
