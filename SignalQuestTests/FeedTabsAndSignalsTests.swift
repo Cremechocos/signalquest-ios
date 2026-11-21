@@ -826,6 +826,67 @@ final class FeedDecodingRobustnessTests: XCTestCase {
         }
         XCTAssertNotNil(next)
     }
+
+    /// E6 (audit du 21/11) : deux fonds se dessinent à la fois, jamais trois, et les suivants
+    /// passent dès qu'une place se libère.
+    @MainActor
+    func testRouteBackgroundsRenderTwoAtATime() async {
+        let cache = RouteSnapshotCache.shared
+        let counter = RouteRenderCounter()
+        let renders = (0..<5).map { index in
+            Task { @MainActor in
+                await cache.inTurn(key: "test-pair-\(index)-\(UUID())") {
+                    counter.active += 1
+                    counter.peak = max(counter.peak, counter.active)
+                    try? await Task.sleep(for: .milliseconds(150))
+                    counter.active -= 1
+                    counter.done += 1
+                    return UIImage(systemName: "map")
+                }
+            }
+        }
+        for render in renders { _ = await render.value }
+        XCTAssertEqual(counter.done, 5)
+        XCTAssertEqual(RouteSnapshotCache.maxConcurrentRenders, 2)
+        XCTAssertEqual(counter.peak, 2)
+        XCTAssertEqual(counter.active, 0)
+    }
+
+    /// E6 : la copie disque d'un fond dépend du post, du thème, de la largeur et de l'échelle,
+    /// et se range dans le cache privé du compte, effacé à sa déconnexion.
+    func testRouteBackgroundDiskCopyIsKeyedAndAccountScoped() throws {
+        let light = try XCTUnwrap(RouteSnapshotCache.diskURL(key: "post-1|light|361", scale: 3))
+        let variants = [
+            light,
+            try XCTUnwrap(RouteSnapshotCache.diskURL(key: "post-1|dark|361", scale: 3)),
+            try XCTUnwrap(RouteSnapshotCache.diskURL(key: "post-1|light|361", scale: 2)),
+            try XCTUnwrap(RouteSnapshotCache.diskURL(key: "post-1|light|393", scale: 3)),
+            try XCTUnwrap(RouteSnapshotCache.diskURL(key: "post-2|light|361", scale: 3)),
+        ]
+        XCTAssertEqual(Set(variants.map(PrivateImageDiskCache.fileName(for:))).count, variants.count)
+        XCTAssertEqual(PrivateImageDiskCache.fileName(for: light),
+                       PrivateImageDiskCache.fileName(for: try XCTUnwrap(RouteSnapshotCache.diskURL(key: "post-1|light|361", scale: 3))))
+
+        let owner = "user:qa-route-\(UUID().uuidString)"
+        let namespace = LocalAccountScope.storageNamespace(for: owner)
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 40, height: 20)).image { context in
+            UIColor.systemTeal.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 40, height: 20))
+        }
+        let data = try XCTUnwrap(image.jpegData(compressionQuality: 0.8))
+        PrivateImageDiskCache.store(data, for: light, ownerNamespace: namespace)
+        XCTAssertEqual(PrivateImageDiskCache.data(for: light, ownerNamespace: namespace), data)
+        XCTAssertNil(PrivateImageDiskCache.data(for: variants[1], ownerNamespace: namespace))
+        PrivateImageDiskCache.purge(ownerScopeId: owner)
+        XCTAssertNil(PrivateImageDiskCache.data(for: light, ownerNamespace: namespace))
+    }
+}
+
+@MainActor
+private final class RouteRenderCounter {
+    var active = 0
+    var peak = 0
+    var done = 0
 }
 
 /// Post photo du fil (contrat social-photo-post v1, #827) : le lien vers la fiche

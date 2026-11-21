@@ -602,8 +602,10 @@ private struct RouteShape: Shape {
     }
 }
 
-/// Fonds de plan des miniatures de parcours : un rendu à la fois sur tout le fil, cache
-/// borné en octets (une miniature pleine largeur en @3x pèse environ 3 Mo).
+/// Fonds de plan des miniatures de parcours : deux rendus à la fois sur tout le fil, cache
+/// mémoire borné en octets (une miniature pleine largeur en @3x pèse environ 3 Mo), et copie
+/// JPEG sur disque dans le dossier du compte, effacé à la déconnexion (E6, audit du 21/11 :
+/// les fonds arrivaient un par un et tout se redessinait après un relancement).
 @MainActor
 final class RouteSnapshotCache {
     static let shared = RouteSnapshotCache()
@@ -614,8 +616,9 @@ final class RouteSnapshotCache {
         cache.totalCostLimit = Int(min(40_000_000, ProcessInfo.processInfo.physicalMemory / 100))
         return cache
     }()
-    /// Un instantané à la fois : les suivants attendent leur tour, dans l'ordre d'arrivée.
-    private var isRendering = false
+    /// Deux instantanés à la fois ; les suivants attendent leur tour, dans l'ordre d'arrivée.
+    static let maxConcurrentRenders = 2
+    private var rendering = 0
     private var waiting: [CheckedContinuation<Void, Never>] = []
     private let pathMonitor = NWPathMonitor()
     private var isConstrained = false
@@ -646,15 +649,25 @@ final class RouteSnapshotCache {
         options.mapType = .mutedStandard
         options.pointOfInterestFilter = .excludingAll
         options.traitCollection = UITraitCollection(userInterfaceStyle: dark ? .dark : .light)
-        return await inTurn(key: key) {
+        // Copie disque du compte d'abord : lue et décodée hors du fil principal, sans attendre un tour.
+        let account = LocalAccountScope.sessionSnapshot()
+        let diskURL = Self.diskURL(key: key, scale: scale)
+        if let account, let diskURL, let stored = await Self.storedImage(at: diskURL, scale: scale, account: account) {
+            guard !Task.isCancelled else { return nil }
+            remember(stored, key: key)
+            return stored
+        }
+        let image = await inTurn(key: key) {
             let snapshotter = SnapshotterBox(MKMapSnapshotter(options: options))
             return await Self.render(timeout: 15,
                                      start: { done in snapshotter.value.start(with: .main) { snapshot, _ in done(snapshot?.image) } },
                                      cancel: { snapshotter.value.cancel() })
         }
+        if let image, let account, let diskURL { Self.store(image, at: diskURL, account: account) }
+        return image
     }
 
-    /// Un rendu à la fois sur tout le fil ; le tour est rendu quoi qu'il arrive au rendu.
+    /// Deux rendus à la fois sur tout le fil ; le tour est rendu quoi qu'il arrive au rendu.
     func inTurn(key: String, _ work: () async -> UIImage?) async -> UIImage? {
         await takeTurn()
         defer { endTurn() }
@@ -662,8 +675,37 @@ final class RouteSnapshotCache {
         guard !Task.isCancelled else { return nil }
         if let image = cached(key) { return image }
         guard let image = await work(), !Task.isCancelled else { return nil }
-        images.setObject(image, forKey: key as NSString, cost: Int(image.size.width * image.scale * image.size.height * image.scale * 4))
+        remember(image, key: key)
         return image
+    }
+
+    private func remember(_ image: UIImage, key: String) {
+        images.setObject(image, forKey: key as NSString, cost: Int(image.size.width * image.scale * image.size.height * image.scale * 4))
+    }
+
+    /// Adresse fictive d'un fond (post, thème, largeur, échelle), qui le range dans le cache
+    /// disque privé du compte : effacé avec lui, borné avec ses photos.
+    nonisolated static func diskURL(key: String, scale: CGFloat) -> URL? {
+        var components = URLComponents()
+        components.scheme = "sq-route-snapshot"
+        components.host = "feed"
+        components.path = "/" + key + "@\(Int(scale.rounded()))x"
+        return components.url
+    }
+
+    nonisolated static func storedImage(at url: URL, scale: CGFloat, account: LocalAccountSession) async -> UIImage? {
+        await Task.detached(priority: .userInitiated) {
+            guard account.isCurrent,
+                  let data = PrivateImageDiskCache.data(for: url, ownerNamespace: account.ownerNamespace) else { return nil }
+            return UIImage(data: data, scale: scale)?.preparingForDisplay()
+        }.value
+    }
+
+    nonisolated static func store(_ image: UIImage, at url: URL, account: LocalAccountSession) {
+        Task.detached(priority: .utility) {
+            guard account.isCurrent, let data = image.jpegData(compressionQuality: 0.8) else { return }
+            PrivateImageDiskCache.store(data, for: url, ownerNamespace: account.ownerNamespace)
+        }
     }
 
     /// Reprise unique, quel que soit l'événement qui arrive le premier : plan rendu, délai
@@ -689,12 +731,13 @@ final class RouteSnapshotCache {
     }
 
     private func takeTurn() async {
-        guard isRendering else { isRendering = true; return }
+        guard rendering >= Self.maxConcurrentRenders else { rendering += 1; return }
         await withCheckedContinuation { waiting.append($0) }
     }
 
+    /// Le tour passe au premier en attente ; sinon une place se libère.
     private func endTurn() {
-        if waiting.isEmpty { isRendering = false } else { waiting.removeFirst().resume() }
+        if waiting.isEmpty { rendering -= 1 } else { waiting.removeFirst().resume() }
     }
 
     /// Emprise du tracé avec une marge, au moins 250 m de demi-côté autour du centre (sinon une
