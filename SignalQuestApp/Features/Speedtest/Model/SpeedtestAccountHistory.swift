@@ -42,7 +42,8 @@ extension SpeedtestAccountHistory {
     static func runResult(from detail: SpeedtestDetail, includesPrivateDetails: Bool = true) -> SpeedtestRunResult {
         let download = detail.averageSpeed ?? detail.downloadAvg ?? detail.downloadSpeed ?? 0
         let upload = detail.uploadAvg ?? detail.uploadSpeed
-        let technology = cellularTechnology(detail.networkType)
+        // La technologie est servie dans `connectionType` (voir `servedTechnology`).
+        let technology = cellularTechnology(detail.networkType) ?? cellularTechnology(detail.connectionType)
         let coordinate = includesPrivateDetails ? detail.latitude.flatMap { lat in
             detail.longitude.map { Coordinates(latitude: lat, longitude: $0) }
         } : nil
@@ -164,7 +165,7 @@ extension SpeedtestAccountHistory {
     /// d'Alexandre du 22/11). Une valeur hors plage, une sentinelle ou une
     /// mesure qui n'existe pas dans la technologie du test ne donne pas de ligne.
     static func servedRadio(from detail: SpeedtestDetail) -> SpeedtestServedRadio {
-        let technology = signalTechnology(detail.networkType)
+        let technology = signalTechnology(servedTechnology(detail))
         let measures: [(SQQualityScale.Signal.Measure, String, Double?, String)] = [
             (.rsrp, "RSRP", detail.rsrp, "dBm"),
             (.rsrq, "RSRQ", detail.rsrq, "dB"),
@@ -208,6 +209,20 @@ extension SpeedtestAccountHistory {
         case .fourG: return "4G"
         default: return raw
         }
+    }
+
+    /// Technologie d'un test servi. GET /api/speedtests/{id} la sert dans
+    /// `connectionType` (« 5G SA »), `networkType` valant « CELLULAR » (lu sur la
+    /// prod le 22/11) ; une forme plus ancienne la mettait dans `networkType`.
+    /// Le premier des deux champs qui nomme une 4G ou une 5G l'emporte.
+    static func servedTechnology(_ detail: SpeedtestDetail) -> String? {
+        let named = [detail.networkType, detail.connectionType].first { raw in
+            switch SQQualityScale.Generation(technology: raw) {
+            case .fiveG, .fourG: return true
+            default: return false
+            }
+        }
+        return named ?? detail.networkType
     }
 
     static func connectionKind(_ raw: String?, technology: CellularRadioTechnology?) -> NetworkConnectionKind {

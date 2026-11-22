@@ -272,6 +272,19 @@ final class AccountSpeedtestDetailTests: XCTestCase {
         XCTAssertEqual(sentinel.readings.map(\.label), ["SINR"])
         XCTAssertEqual(SpeedtestAccountHistory.servedRadio(from: try detail("{\(base),\"networkType\":\"5G SA\",\"rsrp\":-85}")).readings.first?.level,
                        .good, "« 5G SA » se lit en SS-RSRP")
+
+        // La forme lue sur la prod le 22/11 (test Android public) : la technologie est dans
+        // `connectionType`, `networkType` vaut « CELLULAR ». Le bloc garde ses trois mesures
+        // et la ligne Réseau sa technologie.
+        let production = try detail("""
+        {\(base),"connectionType":"5G SA","networkType":"CELLULAR","connectionKind":"CELLULAR_5G_SA",
+         "rsrp":-94,"rsrq":-10,"snr":12,"carriers":[{"tech":"NR","band":78,"role":"primary"}]}
+        """)
+        let productionRadio = SpeedtestAccountHistory.servedRadio(from: production)
+        XCTAssertEqual(productionRadio.bands, "n78")
+        XCTAssertEqual(productionRadio.readings.map(\.label), ["RSRP", "RSRQ", "SINR"])
+        XCTAssertEqual(productionRadio.readings.map(\.level), [.fair, .good, .fair])
+        XCTAssertEqual(SpeedtestAccountHistory.runResult(from: production).cellularTechnology, .fiveGSA)
     }
 }
 
