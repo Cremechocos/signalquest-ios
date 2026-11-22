@@ -173,6 +173,69 @@ final class QualityScaleContractTests: XCTestCase {
     }
 }
 
+/// Copie de `contracts/quality-scale-v3.json` (web, figé le 21/11) : octet pour
+/// octet, et ses vecteurs de qualité rejoués sur l'échelle de l'app. Le reste
+/// de la v3 est la v2, déjà couverte plus haut.
+final class QualityScaleContractV3Tests: XCTestCase {
+    private static let expectedSHA256 = "878cf104cf5af540263f1e8ef4872b8585162631b45a8b46fa19e2d93945fc29"
+
+    private func contract(_ name: String) throws -> [String: Any] {
+        let repository = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let data = try Data(contentsOf: repository.appendingPathComponent("contracts/\(name)"))
+        return try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+    }
+
+    func testTheCopyIsTheFrozenContract() throws {
+        let repository = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let data = try Data(contentsOf: repository.appendingPathComponent("contracts/quality-scale-v3.json"))
+        let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        XCTAssertEqual(digest, Self.expectedSHA256, "La copie doit être celle du web, octet pour octet")
+        let root = try contract("quality-scale-v3.json")
+        XCTAssertEqual(root["contract"] as? String, "quality-scale")
+        XCTAssertEqual(root["version"] as? String, "3")
+        XCTAssertEqual(root["status"] as? String, "frozen")
+    }
+
+    /// La v3 ne touche que le signal (qualité, règle de carte, gris plein) : le
+    /// débit, la génération, les bandes, les opérateurs et leurs vecteurs sont la v2.
+    func testOnlyTheSignalChangesSinceV2() throws {
+        let v3 = try contract("quality-scale-v3.json")
+        let v2 = try contract("quality-scale-v2.json")
+        for key in ["downloadSpeed", "generation", "bands", "operators", "outages"] {
+            XCTAssertEqual(v3[key] as? NSDictionary, v2[key] as? NSDictionary, key)
+        }
+        let vectors3 = try XCTUnwrap(v3["vectors"] as? [String: Any])
+        let vectors2 = try XCTUnwrap(v2["vectors"] as? [String: Any])
+        for key in ["signal", "downloadSpeed", "bands"] {
+            XCTAssertEqual(vectors3[key] as? NSArray, vectors2[key] as? NSArray, "vectors.\(key)")
+        }
+        let signal = try XCTUnwrap(v3["signal"] as? [String: Any])
+        let noService = try XCTUnwrap((signal["states"] as? [String: Any])?["noService"] as? [String: Any])
+        XCTAssertEqual(noService["pattern"] as? String, "solid")
+        XCTAssertEqual(noService["light"] as? String, String(format: "#%06X", SQQualityScale.noServiceHex))
+        XCTAssertFalse(CoverageQualityBand.noService.isHatched, "v3 : gris plein")
+    }
+
+    func testQualityVectorsPass() throws {
+        let vectors = try XCTUnwrap(((try contract("quality-scale-v3.json"))["vectors"] as? [String: Any])?["quality"] as? [[String: Any]])
+        XCTAssertEqual(vectors.count, 64)
+        for vector in vectors {
+            let axis = try XCTUnwrap(SQQualityScale.Signal.Measure(rawValue: try XCTUnwrap(vector["axis"] as? String)))
+            let technology = vector["technology"] as? String
+            let value = (vector["value"] as? NSNumber)?.doubleValue
+            let expected = try XCTUnwrap(vector["expected"] as? String)
+            let signal = SQQualityScale.Signal(
+                measure: axis,
+                rsrp: axis == .rsrp ? value : nil,
+                rsrq: axis == .rsrq ? value : nil,
+                sinr: axis == .sinr ? value : nil,
+                technology: technology
+            )
+            XCTAssertEqual(signal.contractKey, expected, "\(axis.rawValue) \(technology ?? "nil") \(value.map { String($0) } ?? "nil")")
+        }
+    }
+}
+
 /// Contrat v3 (21/11, choix d'Alexandre) : RSRQ et SINR sur les cinq niveaux,
 /// seulement en 4G et en 5G. Les plages viennent du code d'Android (AOSP) ; 0
 /// est une sentinelle pour les deux, comme pour le RSRP.
