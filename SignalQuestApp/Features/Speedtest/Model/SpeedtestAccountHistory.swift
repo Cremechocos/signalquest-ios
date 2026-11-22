@@ -37,8 +37,8 @@ extension SpeedtestAccountHistory {
     /// Détail serveur d'un test du compte, mis à la forme d'un test local pour
     /// réutiliser la même fiche. Les ordres de repli sont ceux de la carte : la
     /// moyenne d'abord, puis le débit brut, qu'Android remplit avec le pic.
-    /// `includesPrivateDetails` faux pour le test d'un autre membre : ni adresse,
-    /// ni position, ni modèle d'appareil (revue q34, constat 2).
+    /// `includesPrivateDetails` faux pour le test d'un autre membre : ni commune,
+    /// ni adresse, ni position, ni modèle d'appareil (revue q34, constat 2).
     static func runResult(from detail: SpeedtestDetail, includesPrivateDetails: Bool = true) -> SpeedtestRunResult {
         let download = detail.averageSpeed ?? detail.downloadAvg ?? detail.downloadSpeed ?? 0
         let upload = detail.uploadAvg ?? detail.uploadSpeed
@@ -76,11 +76,15 @@ extension SpeedtestAccountHistory {
             networkOperatorName: operatorName(of: detail),
             networkOperatorMcc: detail.mcc,
             networkOperatorMnc: detail.mnc,
+            city: includesPrivateDetails ? detail.city : nil,
             address: includesPrivateDetails ? detail.address : nil,
             coordinate: coordinate,
             serverName: detail.server,
             downloadServerName: detail.downloadServerName,
             downloadServerId: detail.downloadServerId,
+            downloadServerHost: detail.downloadServerHost,
+            downloadServerPort: detail.downloadServerPort,
+            engine: detail.engine,
             createdAt: detail.measuredAt ?? detail.timestamp ?? detail.createdAt ?? Date(),
             uploadMeasurementSource: detail.uploadMeasurementSource,
             deviceModel: includesPrivateDetails ? detail.deviceModel : nil,
@@ -156,6 +160,56 @@ extension SpeedtestAccountHistory {
         }
     }
 
+    /// Bandes et signal servis pour un test du compte (revue du détail, choix
+    /// d'Alexandre du 22/11). Une valeur hors plage, une sentinelle ou une
+    /// mesure qui n'existe pas dans la technologie du test ne donne pas de ligne.
+    static func servedRadio(from detail: SpeedtestDetail) -> SpeedtestServedRadio {
+        let technology = signalTechnology(detail.networkType)
+        let measures: [(SQQualityScale.Signal.Measure, String, Double?, String)] = [
+            (.rsrp, "RSRP", detail.rsrp, "dBm"),
+            (.rsrq, "RSRQ", detail.rsrq, "dB"),
+            (.sinr, "SINR", detail.snr, "dB"),
+        ]
+        let readings: [SpeedtestServedRadio.Reading] = measures.compactMap { measure, label, value, unit in
+            guard let value, value.isFinite else { return nil }
+            let level = SQQualityScale.Signal(measure: measure, rsrp: detail.rsrp, rsrq: detail.rsrq,
+                                              sinr: detail.snr, technology: technology)
+            guard level != .unknown, level != .noService else { return nil }
+            // Arrondi de l'échelle (Math.round) : la valeur et son niveau concordent.
+            let rounded = Int((value + 0.5).rounded(.down))
+            return SpeedtestServedRadio.Reading(label: label, value: "\(rounded) \(unit)", level: level)
+        }
+        return SpeedtestServedRadio(bands: bandsLine(detail.carriers ?? []), readings: readings)
+    }
+
+    /// « B3 + B7 · n78 » : dans l'ordre servi (la principale d'abord), une bande
+    /// vue deux fois n'est écrite qu'une fois, la 4G et la 5G séparées par « · ».
+    static func bandsLine(_ carriers: [SpeedtestServingCarrier]) -> String? {
+        var groups: [(tech: String, labels: [String])] = []
+        for carrier in carriers {
+            let tech = carrier.tech.uppercased()
+            guard tech == "LTE" || tech == "NR", (1...1024).contains(carrier.band) else { continue }
+            let label = SQUnits.band(carrier.band, isNR: tech == "NR")
+            if let index = groups.firstIndex(where: { $0.tech == tech }) {
+                if !groups[index].labels.contains(label) { groups[index].labels.append(label) }
+            } else {
+                groups.append((tech, [label]))
+            }
+        }
+        guard !groups.isEmpty else { return nil }
+        return groups.map { $0.labels.joined(separator: " + ") }.joined(separator: " · ")
+    }
+
+    /// « 5G SA », « NR » → « 5G » ; « LTE », « 4G+ » → « 4G » : la technologie
+    /// dans les termes de l'échelle, qui choisit la métrique et ses seuils.
+    static func signalTechnology(_ raw: String?) -> String? {
+        switch SQQualityScale.Generation(technology: raw) {
+        case .fiveG: return "5G"
+        case .fourG: return "4G"
+        default: return raw
+        }
+    }
+
     static func connectionKind(_ raw: String?, technology: CellularRadioTechnology?) -> NetworkConnectionKind {
         switch raw?.uppercased() {
         case "WIFI", "WI-FI": return .wifi
@@ -164,4 +218,22 @@ extension SpeedtestAccountHistory {
         default: return technology == nil ? .other : .cellular
         }
     }
+}
+
+/// Radio d'un test du compte telle que le serveur la sert : seul un test fait
+/// sur Android en porte, iOS ne lisant ni les bandes ni le signal.
+struct SpeedtestServedRadio: Equatable {
+    struct Reading: Equatable {
+        /// « RSRP », « RSRQ », « SINR ».
+        let label: String
+        /// « -95 dBm ».
+        let value: String
+        let level: SQQualityScale.Signal
+    }
+
+    /// « B3 + B7 · n78 », `nil` sans porteuse servie.
+    let bands: String?
+    let readings: [Reading]
+
+    var isEmpty: Bool { bands == nil && readings.isEmpty }
 }

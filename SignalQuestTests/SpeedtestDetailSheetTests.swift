@@ -212,4 +212,28 @@ final class SpeedtestDetailSheetTests: XCTestCase {
         XCTAssertEqual(SpeedtestDetailContent.plmn("302720"), "302-720")
         XCTAssertEqual(SpeedtestDetailContent.plmn("—"), "—")
     }
+
+    /// Revue du détail (22/11) : le bloc « Signal » et l'adresse ne s'affichent que
+    /// s'ils ont quelque chose à dire ; un résumé vide ne laisse pas de cadre.
+    func testSignalCardAndAddressShowOnlyWithData() throws {
+        func height(_ radio: SpeedtestServedRadio?, _ name: String) throws -> CGFloat {
+            let view = SpeedtestDetailContent(result: sample(), radio: radio)
+                .frame(width: 393)
+                .background(Color.white)
+                .environment(\.colorScheme, .light)
+            let renderer = ImageRenderer(content: view)
+            renderer.scale = 2
+            let image = try XCTUnwrap(renderer.uiImage)
+            try XCTUnwrap(image.pngData()).write(to: URL(fileURLWithPath: "/tmp/sq_detail_\(name).png"))
+            return image.size.height
+        }
+        let radio = SpeedtestServedRadio(bands: "B3 + B7 · n78", readings: [
+            .init(label: "RSRP", value: "-95 dBm", level: .fair),
+            .init(label: "RSRQ", value: "-11 dB", level: .good),
+            .init(label: "SINR", value: "14 dB", level: .good),
+        ])
+        let without = try height(nil, "nosignal")
+        XCTAssertEqual(try height(SpeedtestServedRadio(bands: nil, readings: []), "emptysignal"), without, accuracy: 1)
+        XCTAssertGreaterThan(try height(radio, "signal"), without + 120, "bandes et trois mesures : le bloc doit s'afficher")
+    }
 }

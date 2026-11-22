@@ -221,7 +221,11 @@ struct SpeedtestView: View {
             .id(item.id)
         }
         .sheet(item: $selectedAccountTest) { test in
-            AccountSpeedtestDetailSheet(testId: test.id) { [speedtest = services.speedtest] id in
+            AccountSpeedtestDetailSheet(testId: test.id, onShowOnMap: { coordinate in
+                router.pendingMapFocus = coordinate
+                router.pendingMapLayer = .speedtest
+                router.selectedTab = .map
+            }) { [speedtest = services.speedtest] id in
                 try await speedtest.details(id: id)
             }
         }

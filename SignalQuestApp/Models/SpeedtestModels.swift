@@ -1382,8 +1382,19 @@ struct SpeedtestDetail: Decodable, Identifiable, Equatable {
     let uploadServerHost: String?
     let uploadServerPort: Int?
     let uploadMeasurementSource: String?
+    /// Commune du point de mesure, moteur et serveur de réception : servis par le
+    /// détail, jusqu'ici non lus (revue du détail, choix d'Alexandre du 22/11).
+    let city: String?
+    let engine: String?
+    let downloadServerHost: String?
+    let downloadServerPort: Int?
+    /// Porteuses de la cellule servante (QA-045), la principale d'abord. Absent
+    /// d'un serveur antérieur ; `[]` en Wi-Fi ou sans relevé. Un test iOS n'en a
+    /// jamais : iOS ne lit pas les bandes radio.
+    let carriers: [SpeedtestServingCarrier]?
 
     enum CodingKeys: String, CodingKey {
+        case city, engine, downloadServerHost, downloadServerPort, carriers
         case measurementTrace, methodologyVersion, pingServerHost, pingServerPort, uploadServerHost, uploadServerPort, uploadMeasurementSource
         case id, timestamp, measuredAt, createdAt, downloadSpeed, maxSpeed, averageSpeed, downloadAvg, downloadP90, downloadP95, downloadMax, downloadPeakMbps, testDuration, streams, uploadSpeed, uploadAvg, uploadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, server, downloadServerId, downloadServerName, connectionType, connectionKind, networkType, mobileOperator, operatorDisplay, mcc, mnc, latitude, longitude, address, locationBlurred, deviceType, deviceModel, isPublic, isVisibleOnMap, shareExactLocation, isOwner, rsrp, rsrq, snr, timingAdvance
         case pingDl, jitterDl, pingUl, jitterUl
@@ -1454,7 +1465,21 @@ struct SpeedtestDetail: Decodable, Identifiable, Equatable {
         rsrq = try? c.decodeIfPresent(Double.self, forKey: .rsrq)
         snr = try? c.decodeIfPresent(Double.self, forKey: .snr)
         timingAdvance = try? c.decodeIfPresent(Double.self, forKey: .timingAdvance)
+        city = c.decodeFlexibleString(forKey: .city)
+        engine = c.decodeFlexibleString(forKey: .engine)
+        downloadServerHost = c.decodeFlexibleString(forKey: .downloadServerHost)
+        downloadServerPort = try? c.decodeIfPresent(Int.self, forKey: .downloadServerPort)
+        // Tolérant : une forme inattendue ne fait pas échouer tout le détail.
+        carriers = (try? c.decodeIfPresent([SpeedtestServingCarrier].self, forKey: .carriers)) ?? nil
     }
+}
+
+/// Une porteuse de la cellule servante (contrat QA-045, liste et détail) :
+/// `tech` LTE ou NR, `band` de 1 à 1024, `role` primary ou secondary.
+struct SpeedtestServingCarrier: Decodable, Equatable, Sendable {
+    let tech: String
+    let band: Int
+    let role: String
 }
 
 enum SpeedtestPhase: Equatable {

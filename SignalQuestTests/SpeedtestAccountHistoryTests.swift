@@ -224,5 +224,54 @@ final class AccountSpeedtestDetailTests: XCTestCase {
         XCTAssertNil(SpeedtestAccountHistory.connectionKind(served: "SATELLITE"))
         XCTAssertNil(SpeedtestAccountHistory.connectionKind(served: nil))
     }
+
+    /// Revue du détail (choix d'Alexandre du 22/11) : la commune, l'adresse, le moteur
+    /// et le serveur de réception servis remplissent la fiche de l'auteur ; les bandes
+    /// (QA-045) et le signal d'un test Android forment le bloc « Signal ».
+    func testServedPlaceBandsAndSignalFillTheAuthorsDetail() throws {
+        let served = try detail("""
+        {"id":"cksp2","timestamp":"2026-11-20T10:00:00.000Z","averageSpeed":212,"connectionType":"CELLULAR",
+         "networkType":"5G NSA","mobileOperator":"Orange","latitude":46.159,"longitude":-1.152,
+         "city":"La Rochelle","address":"Rue du Minage, 17000 La Rochelle","engine":"iperf3",
+         "downloadServerHost":"par.example.net","downloadServerPort":9210,
+         "rsrp":-95.4,"rsrq":-11,"snr":14,
+         "carriers":[{"tech":"LTE","band":3,"role":"primary"},{"tech":"LTE","band":7,"role":"secondary"},
+                     {"tech":"LTE","band":3,"role":"secondary"},{"tech":"NR","band":78,"role":"secondary"},
+                     {"tech":"GSM","band":900,"role":"secondary"},{"tech":"NR","band":2000,"role":"secondary"}]}
+        """)
+        let mine = SpeedtestAccountHistory.runResult(from: served)
+        XCTAssertEqual(mine.city, "La Rochelle")
+        XCTAssertEqual(mine.address, "Rue du Minage, 17000 La Rochelle")
+        XCTAssertEqual(mine.engine, "iperf3")
+        XCTAssertEqual(mine.downloadServerHost, "par.example.net")
+        XCTAssertEqual(mine.downloadServerPort, 9210)
+        let theirs = SpeedtestAccountHistory.runResult(from: served, includesPrivateDetails: false)
+        XCTAssertNil(theirs.city, "ni commune ni adresse pour le test d'un autre membre")
+        XCTAssertNil(theirs.address)
+
+        let radio = SpeedtestAccountHistory.servedRadio(from: served)
+        XCTAssertEqual(radio.bands, "B3 + B7 · n78", "principale d'abord, B3 une seule fois, GSM et n2000 écartés")
+        XCTAssertEqual(radio.readings.map(\.label), ["RSRP", "RSRQ", "SINR"])
+        XCTAssertEqual(radio.readings.map(\.value), ["-95 dBm", "-11 dB", "14 dB"])
+        XCTAssertEqual(radio.readings.map(\.level), [.fair, .good, .good], "seuils SS-RSRP, SS-RSRQ et SINR de l'échelle v3")
+
+        // Une 5G principale passe devant ; un ancien serveur ou un test Wi-Fi n'a pas de bandes.
+        XCTAssertEqual(SpeedtestAccountHistory.bandsLine([
+            SpeedtestServingCarrier(tech: "NR", band: 78, role: "primary"),
+            SpeedtestServingCarrier(tech: "LTE", band: 20, role: "secondary"),
+        ]), "n78 · B20")
+        XCTAssertNil(SpeedtestAccountHistory.bandsLine([]))
+        let base = #""id":"w","timestamp":"2026-11-20T10:00:00.000Z","averageSpeed":90"#
+        XCTAssertNil(try detail("{\(base),\"connectionType\":\"WIFI\",\"carriers\":[]}").carriers?.first)
+        XCTAssertNil(try detail("{\(base),\"carriers\":{\"tech\":\"LTE\"}}").carriers, "une forme inattendue ne casse pas le détail")
+
+        // Un test iOS (ni bandes ni signal) n'a pas de bloc ; une sentinelle ou une valeur
+        // hors plage ne donne pas de ligne.
+        XCTAssertTrue(SpeedtestAccountHistory.servedRadio(from: try detail("{\(base),\"networkType\":\"4G\"}")).isEmpty)
+        let sentinel = SpeedtestAccountHistory.servedRadio(from: try detail("{\(base),\"networkType\":\"LTE\",\"rsrp\":0,\"rsrq\":-60,\"snr\":8}"))
+        XCTAssertEqual(sentinel.readings.map(\.label), ["SINR"])
+        XCTAssertEqual(SpeedtestAccountHistory.servedRadio(from: try detail("{\(base),\"networkType\":\"5G SA\",\"rsrp\":-85}")).readings.first?.level,
+                       .good, "« 5G SA » se lit en SS-RSRP")
+    }
 }
 

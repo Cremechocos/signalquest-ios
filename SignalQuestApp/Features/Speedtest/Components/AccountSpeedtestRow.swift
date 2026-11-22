@@ -80,8 +80,11 @@ struct AccountSpeedtestRow: View {
 /// suit un test local par son identifiant client, que ce test n'a pas ici.
 struct AccountSpeedtestDetailSheet: View {
     let testId: String
+    /// Centre la carte sur le lieu du test, comme pour un test de ce téléphone.
+    var onShowOnMap: ((Coordinates) -> Void)? = nil
     let load: @Sendable (String) async throws -> SpeedtestDetail
     @State private var result: SpeedtestRunResult?
+    @State private var radio: SpeedtestServedRadio?
     @State private var errorMessage: String?
     @Environment(\.dismiss) private var dismiss
 
@@ -97,7 +100,12 @@ struct AccountSpeedtestDetailSheet: View {
                 .padding(.horizontal, SQSpace.lg)
                 .padding(.top, SQSpace.lg)
                 if let result {
-                    SpeedtestDetailContent(result: result, onDismiss: { dismiss() })
+                    // Bouton masqué sans position : on ne cadre pas la carte sur
+                    // un lieu qu'on ignore.
+                    SpeedtestDetailContent(result: result,
+                                           onShowOnMap: result.coordinate == nil ? nil : onShowOnMap,
+                                           onDismiss: { dismiss() },
+                                           radio: radio)
                         .padding(.bottom, SQSpace.xl)
                 } else if let errorMessage {
                     SQNotice(message: errorMessage, tone: .warning)
@@ -118,7 +126,9 @@ struct AccountSpeedtestDetailSheet: View {
 
     private func loadDetail() async {
         do {
-            result = SpeedtestAccountHistory.runResult(from: try await load(testId))
+            let detail = try await load(testId)
+            radio = SpeedtestAccountHistory.servedRadio(from: detail)
+            result = SpeedtestAccountHistory.runResult(from: detail)
         } catch {
             guard !error.isCancellation else { return }
             errorMessage = String(localized: "Le détail de ce test n’a pas pu être chargé. \(error.userFacingMessage)")

@@ -93,6 +93,8 @@ struct SpeedtestDetailContent: View {
     var onShowOnMap: ((Coordinates) -> Void)?
     var onDismiss: (() -> Void)?
     var visibilityStatus: SpeedtestVisibilityStatus? = nil
+    /// Bandes et signal servis pour un test du compte fait sur Android.
+    var radio: SpeedtestServedRadio? = nil
     @State private var graphDirection: GraphDirection = .download
     /// « Comment c'est mesuré » : serveurs, méthode et octets, repliés par défaut.
     @State private var showsMethod = false
@@ -114,6 +116,7 @@ struct SpeedtestDetailContent: View {
             // courbe ni latence en charge) : pas de cadre vide ni de « — ».
             if hasCurve { curveCard }
             if hasLatency { latencyCard }
+            if let radio, !radio.isEmpty { signalCard(radio) }
             measureCard
             actions
         }
@@ -143,6 +146,17 @@ struct SpeedtestDetailContent: View {
                 .foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
+            // L'adresse du point de mesure, pour l'auteur seulement : celle d'un
+            // autre membre n'arrive jamais jusqu'ici (`includesPrivateDetails`).
+            if let address = result.address?.trimmedNonEmptyDetail {
+                Text(verbatim: address)
+                    .font(SQType.subhead(.regular))
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityLabel(Text("Adresse"))
+                    .accessibilityValue(Text(verbatim: address))
+                    .accessibilityIdentifier("speedtest.detail.address")
+            }
             if visibilityStatus != nil || deviceModel != nil {
                 let pills = Group {
                     if let visibilityStatus {
@@ -443,6 +457,25 @@ struct SpeedtestDetailContent: View {
         return "\(String(localized: "gigue")) ±\(Self.jitterText(jitter))"
     }
 
+    // MARK: Signal — bandes et signal servis pour un test fait sur Android
+
+    /// Le niveau se lit dans le mot ; la pastille de l'échelle v3 le redit
+    /// sans porter seule l'information.
+    private func signalCard(_ radio: SpeedtestServedRadio) -> some View {
+        detailCard("Signal") {
+            VStack(spacing: SQSpace.xxs) {
+                if let bands = radio.bands {
+                    dotRow("Bandes", bands)
+                }
+                ForEach(radio.readings, id: \.label) { reading in
+                    dotRow(reading.label, reading.value, trailing: reading.level.label.lowercased(),
+                           dot: reading.level.color, localized: false)
+                }
+            }
+        }
+        .accessibilityIdentifier("speedtest.detail.signal")
+    }
+
     // MARK: Comment c'est mesuré — réseau, serveurs, appareil, méthode, octets
 
     /// Repliée par défaut : le résultat se lit sans le détail technique, qui
@@ -626,8 +659,16 @@ struct SpeedtestDetailContent: View {
 
     /// Ligne clé · · · valeur, comme le « Diagnostic radio » du web. Les très
     /// grands textes empilent la clé et la valeur plutôt que de les tronquer.
-    private func dotRow(_ label: String, _ value: String, trailing: String? = nil, localized: Bool = true) -> some View {
+    private func dotRow(_ label: String, _ value: String, trailing: String? = nil, dot: Color? = nil,
+                        localized: Bool = true) -> some View {
         let valueText = HStack(alignment: .firstTextBaseline, spacing: 4) {
+            if let dot {
+                Circle()
+                    .fill(dot)
+                    .frame(width: 8, height: 8)
+                    .alignmentGuide(.firstTextBaseline) { $0[.bottom] }
+                    .accessibilityHidden(true)
+            }
             Text(verbatim: value)
                 .font(SQFont.body(14, .bold, relativeTo: .subheadline))
                 .monospacedDigit()
