@@ -279,6 +279,18 @@ final class MapNativeViewportTests: XCTestCase {
         XCTAssertEqual(MapItemSheet.nrCellText(rows[0]), "n78 · -81 dBm · PCI 580")
     }
 
+    /// DEVICE-1 (22/11) : le modèle n'est servi qu'à l'auteur ; un autre membre lit
+    /// la plateforme seule, jamais le code d'outil MCP ni une ligne vide.
+    func testSpeedtestDeviceRowReadsTheModelThenThePlatform() {
+        XCTAssertEqual(MapItemSheet.speedtestDeviceLabel(type: "iPhone", model: "iPhone 17 Pro"), "iPhone 17 Pro",
+                       "plus de « iPhone iPhone 17 Pro »")
+        XCTAssertEqual(MapItemSheet.speedtestDeviceLabel(type: "Android", model: nil), "Android")
+        XCTAssertEqual(MapItemSheet.speedtestDeviceLabel(type: "android", model: " "), "Android")
+        XCTAssertEqual(MapItemSheet.speedtestDeviceLabel(type: "iPhone", model: nil), "iPhone")
+        XCTAssertNil(MapItemSheet.speedtestDeviceLabel(type: "mcp_submission", model: nil))
+        XCTAssertNil(MapItemSheet.speedtestDeviceLabel(type: nil, model: nil))
+    }
+
     func testVisibleSpeedtestBeyondOrnamentMarginRemainsAccessible() async throws {
         let fixture = try Fixture()
         defer { fixture.close() }

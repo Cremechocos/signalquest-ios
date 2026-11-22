@@ -5974,7 +5974,7 @@ struct MapItemSheet: View {
                 ("Serveur de mesure", detail?.downloadServerName ?? detail?.server),
                 ("Flux simultanés", detail?.streams.map(String.init)),
                 ("Durée", SignalFormatters.duration(detail?.testDuration)),
-                ("Appareil", [detail?.deviceType, detail?.deviceModel].compactMap { $0 }.joined(separator: " ")),
+                ("Appareil", Self.speedtestDeviceLabel(type: detail?.deviceType, model: detail?.deviceModel)),
                 ("Position", coordinatesText(lat: detail?.latitude ?? item.coordinate.latitude, lon: detail?.longitude ?? item.coordinate.longitude))
             ])
             if let detailError {
@@ -6185,6 +6185,24 @@ struct MapItemSheet: View {
         case .antenna: String(localized: "Antenne")
         case .communitySite: String(localized: "Site communautaire")
         case .customSite: String(localized: "Site ajouté par un membre")
+        }
+    }
+
+    /// Ligne « Appareil » d'un speedtest de la carte (DEVICE-1, 22/11) : le modèle,
+    /// que le serveur ne sert plus qu'à l'auteur ; sinon la plateforme envoyée par
+    /// l'app (« iPhone », « Android », texte libre côté serveur), jamais le code
+    /// d'outil « mcp_submission » ; rien si aucune des deux n'est lisible.
+    static func speedtestDeviceLabel(type: String?, model: String?) -> String? {
+        if let model = model?.trimmingCharacters(in: .whitespacesAndNewlines), !model.isEmpty {
+            return model
+        }
+        guard let type = type?.trimmingCharacters(in: .whitespacesAndNewlines), !type.isEmpty,
+              type.lowercased() != "mcp_submission" else { return nil }
+        switch type.lowercased() {
+        case "android": return "Android"
+        case "iphone": return "iPhone"
+        case "ipad": return "iPad"
+        default: return type
         }
     }
 
