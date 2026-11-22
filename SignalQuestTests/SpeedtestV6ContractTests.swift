@@ -891,3 +891,78 @@ extension SpeedtestV6ContractTests {
         XCTAssertEqual(try XCTUnwrap(phase.averageSeries.last).mbps, 100, accuracy: 0.001)
     }
 }
+
+/// QA-063 : médiane de débit et courbe du détail, découpées comme Android (cas repris de
+/// SpeedtestResultPresentationTest, ad325893e et sa suite : reçu serveur, chevauchement).
+extension SpeedtestV6ContractTests {
+    @MainActor
+    func testThroughputMedianAndCurveSegmentsFollowTheAndroidRule() throws {
+        func interval(_ start: Int64, _ end: Int64, _ bytes: Int64) -> SpeedtestMeasurementInterval {
+            .init(startMs: start, endMs: end, bytes: bytes)
+        }
+        func intervals(_ times: Int64...) -> [SpeedtestMeasurementInterval] {
+            zip(times, times.dropFirst()).map { interval($0, $1, ($1 - $0) * 1000) }
+        }
+        func phase(_ samples: [SpeedtestMeasurementInterval], receipt: SpeedtestFinalMeasurement? = nil) -> SpeedtestPhaseTrace {
+            let bytes = samples.reduce(Int64(0)) { $0 + $1.bytes }
+            return SpeedtestPhaseTrace(phase: "download", attemptId: "attempt", startOffsetMs: 0, warmupEndOffsetMs: 0,
+                measurementEndOffsetMs: samples.last?.endMs ?? 4000, totalEndOffsetMs: samples.last?.endMs ?? 4000,
+                measuredBytes: bytes, totalTransferredBytes: bytes, byteSource: "client-received",
+                sampleByteSource: "client-received", liveWindowMs: 1000, peakWindowMs: 1000,
+                samples: samples, finalMeasurement: receipt)
+        }
+        func receipt(_ samples: [SpeedtestMeasurementInterval]) -> SpeedtestFinalMeasurement {
+            SpeedtestFinalMeasurement(bytes: 10_000_000, durationMs: 4000, source: "server-received",
+                averageMbps: 20, maxMbps: nil, peakWindowMs: 1200, samples: samples)
+        }
+
+        // La médiane des secondes de la courbe, distincte de la moyenne (octets ÷ durée utile).
+        let curve = phase([interval(0, 1000, 1_000_000), interval(1000, 2000, 2_000_000),
+                           interval(2000, 3000, 3_000_000), interval(3000, 4000, 10_000_000)])
+        XCTAssertEqual(curve.curveSegments.map { $0.map(\.mbps) }, [[8, 16, 24, 80]])
+        XCTAssertEqual(try XCTUnwrap(curve.throughputMedianMbps), 20, accuracy: 1e-9)
+        // Une trace iOS est contiguë : la courbe découpée reste `recentSeries`, en un segment.
+        XCTAssertEqual(curve.curveSegments, [curve.recentSeries])
+        XCTAssertEqual(SpeedtestDetailContent.segmentStarts(curve.curveSegments), [])
+
+        // Les trous d'Android : deux segments de deux fenêtres à 8 Mb/s.
+        let androidGaps = phase(intervals(0, 1000, 2000) + intervals(4000, 5000, 6000))
+        XCTAssertEqual(try XCTUnwrap(androidGaps.throughputMedianMbps), 8, accuracy: 1e-9)
+        // Un trou qui ne tombe pas sur une seconde : aucune fenêtre ne le traverse. Sans la
+        // coupure, la fenêtre 2000→3000 compterait le trou pour zéro (16 Mb/s, médiane 16).
+        let gap = phase(intervals(0, 1000, 2000)
+            + [interval(2500, 3000, 2_000_000), interval(3000, 3500, 2_000_000), interval(3500, 4000, 2_000_000)])
+        XCTAssertEqual(gap.curveSegments.map { $0.map(\.elapsedMs) }, [[1000, 2000], [3500, 4000]])
+        XCTAssertEqual(gap.curveSegments.map { $0.map(\.mbps) }, [[8, 8], [32, 32]])
+        XCTAssertEqual(try XCTUnwrap(gap.throughputMedianMbps), 20, accuracy: 1e-9)
+        // Le graphique coupe la courbe au même endroit.
+        XCTAssertEqual(SpeedtestDetailContent.segmentStarts(gap.curveSegments), [2])
+        XCTAssertEqual(SpeedtestShareGraph.pieces(count: 4, starts: [2]), [0..<2, 2..<4])
+        XCTAssertEqual(SpeedtestShareGraph.pieces(count: 4, starts: []), [0..<4])
+        XCTAssertEqual(SpeedtestShareGraph.pieces(count: 0, starts: []), [0..<0])
+
+        // Une seule fenêtre ne fait pas de courbe, donc pas de médiane.
+        XCTAssertNil(phase(intervals(0, 1000)).throughputMedianMbps)
+
+        // Un reçu serveur qui a ses intervalles l'emporte, sur son axe : 20, la courbe du
+        // téléphone restant à 8.
+        let served = [interval(0, 1000, 2_000_000), interval(1000, 2000, 2_000_000),
+                      interval(2000, 3000, 3_000_000), interval(3000, 4000, 3_000_000)]
+        let phone = phase(intervals(0, 1000, 2000, 3000, 4000), receipt: receipt(served))
+        XCTAssertEqual(phone.curveSegments.map { $0.map(\.mbps) }, [[8, 8, 8, 8]])
+        XCTAssertEqual(try XCTUnwrap(phone.throughputMedianMbps), 20, accuracy: 1e-9)
+        // Les mêmes règles sur le reçu : un intervalle hors du reçu et un chevauchement sont écartés.
+        let noisy = phase(intervals(0, 1000, 2000, 3000, 4000),
+                          receipt: receipt(served + [interval(3500, 4500, 9_000_000), interval(2500, 3200, 9_000_000)]))
+        XCTAssertEqual(try XCTUnwrap(noisy.throughputMedianMbps), 20, accuracy: 1e-9)
+        // Un reçu sans intervalles laisse la médiane à la courbe.
+        let bare = phase(intervals(0, 1000, 2000, 3000, 4000), receipt: receipt([]))
+        XCTAssertEqual(try XCTUnwrap(bare.throughputMedianMbps), 8, accuracy: 1e-9)
+
+        // La dernière phase de chaque nom, comme Android et le site.
+        let trace = SpeedtestMeasurementTrace(runId: "run", phases: [phase(intervals(0, 1000, 2000)), curve], abandonedAttempts: [])
+        XCTAssertEqual(SpeedtestDetailContent.phaseTrace(trace, "download"), curve)
+        XCTAssertNil(SpeedtestDetailContent.phaseTrace(trace, "upload"))
+        XCTAssertNil(SpeedtestDetailContent.phaseTrace(nil, "download"))
+    }
+}

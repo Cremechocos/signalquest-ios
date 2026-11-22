@@ -342,7 +342,7 @@ struct SpeedtestDetailContent: View {
                     maxValue: result.downloadMaxMbps,
                     series: result.downloadSeriesMbps,
                     graceCount: result.downloadGraceWindowCount,
-                    trace: result.measurementTrace?.phases.first { $0.phase == "download" }
+                    trace: Self.phaseTrace(result.measurementTrace, "download")
                 )
             case .upload:
                 curve(
@@ -352,7 +352,7 @@ struct SpeedtestDetailContent: View {
                     maxValue: result.uploadMaxMbps,
                     series: result.uploadSeriesMbps,
                     graceCount: result.uploadGraceWindowCount,
-                    trace: result.measurementTrace?.phases.first { $0.phase == "upload" }
+                    trace: Self.phaseTrace(result.measurementTrace, "upload")
                 )
             }
         }
@@ -377,6 +377,8 @@ struct SpeedtestDetailContent: View {
                 .monospacedDigit()
                 .foregroundStyle(SQColor.label)
         }
+        // Courbe découpée comme Android (QA-063) : un trou de mesure n'est pas relié.
+        let segments = trace?.curveSegments ?? []
         SpeedtestShareGraph(
             series: (series ?? []).filter { $0.isFinite && $0 >= 0 },
             averageMbps: average ?? 0,
@@ -385,9 +387,10 @@ struct SpeedtestDetailContent: View {
             plotBackground: SQColor.surfaceMuted,
             gridColor: SQColor.separator,
             labelColor: SQColor.labelSecondary,
-            timedSeries: trace?.recentSeries,
+            timedSeries: trace == nil ? nil : segments.flatMap { $0 },
             timedAverageSeries: trace?.averageSeries,
             timeOriginMs: trace?.sampleStartMs,
+            timedSegmentStarts: Self.segmentStarts(segments),
             unitLabel: SQUnits.throughputUnit(mbps: 0),
             showsPeakLabel: false
         )
@@ -406,6 +409,16 @@ struct SpeedtestDetailContent: View {
             Text("Mesure indisponible")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
+        }
+        // Médiane des secondes mesurées (QA-063), sur le compteur de la moyenne et du MAX ;
+        // un test sans courbe n'en a pas, et rien ne la remplace.
+        if let median = trace?.throughputMedianMbps, median.isFinite, median > 0 {
+            let parts = Self.formatSpeedParts(median)
+            Text("Médiane \(parts.value) \(parts.unit)")
+                .font(SQFont.body(13, .semibold, relativeTo: .footnote))
+                .monospacedDigit()
+                .foregroundStyle(SQColor.label)
+                .accessibilityIdentifier("speedtest.detail.median")
         }
     }
 
@@ -565,13 +578,36 @@ struct SpeedtestDetailContent: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, SQSpace.xs)
             }
+            // La même phrase qu'Android et le site (QA-063), dès qu'une médiane est affichée.
+            if methodPhases.contains(where: { ($0.throughputMedianMbps ?? 0) > 0 }) {
+                Text("Médiane : la moitié des secondes mesurées est au-dessus, l’autre moitié au-dessous.")
+                    .font(.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, SQSpace.xs)
+            }
         }
     }
 
+    /// Les phases de la courbe : la méthode décrit celles qui sont dessinées.
     private var methodPhases: [SpeedtestPhaseTrace] {
-        ["download", "upload"].compactMap { name in
-            result.measurementTrace?.phases.first { $0.phase == name }
+        ["download", "upload"].compactMap { Self.phaseTrace(result.measurementTrace, $0) }
+    }
+
+    /// Phase lue par la courbe, la médiane et leur méthode : la dernière de son nom,
+    /// comme Android et le site (QA-063).
+    static func phaseTrace(_ trace: SpeedtestMeasurementTrace?, _ name: String) -> SpeedtestPhaseTrace? {
+        trace?.phases.last { $0.phase == name }
+    }
+
+    /// Indices de la série aplatie où un segment de la courbe commence après un trou.
+    static func segmentStarts(_ segments: [[SpeedtestTimedRate]]) -> [Int] {
+        var starts: [Int] = [], index = 0
+        for segment in segments.dropLast() {
+            index += segment.count
+            starts.append(index)
         }
+        return starts
     }
 
     /// « 20801 » → « 208-01 » ; laissé tel quel s'il n'a pas la forme attendue.

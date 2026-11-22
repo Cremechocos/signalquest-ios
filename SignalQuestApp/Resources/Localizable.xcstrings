@@ -124738,6 +124738,38 @@
           }
         }
       }
+    },
+    "Médiane %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Median %1$@ %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Médiane %1$@ %2$@"
+          }
+        }
+      }
+    },
+    "Médiane : la moitié des secondes mesurées est au-dessus, l’autre moitié au-dessous." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Median: half of the measured seconds are above it, half below."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Médiane : la moitié des secondes mesurées est au-dessus, l’autre moitié au-dessous."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

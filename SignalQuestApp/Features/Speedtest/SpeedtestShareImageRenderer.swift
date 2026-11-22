@@ -170,6 +170,9 @@ struct SpeedtestShareGraph: View {
     var timedSeries: [SpeedtestTimedRate]? = nil
     var timedAverageSeries: [SpeedtestTimedRate]? = nil
     var timeOriginMs: Int64? = nil
+    /// Indices de `timedSeries` qui ouvrent un segment après un trou de mesure (QA-063) :
+    /// la courbe n'y est pas reliée. Vide : une seule courbe, comme avant.
+    var timedSegmentStarts: [Int] = []
     /// Unité de l'axe dans l'app (« Mbit/s », « Mbps » en anglais) ; `nil` retombe sur
     /// la même unité (`SQUnits`), jamais sur un « Mbps » figé.
     var unitLabel: String? = nil
@@ -285,13 +288,31 @@ struct SpeedtestShareGraph: View {
             points.append(CGPoint(x: x(i), y: y(pts[i])))
         }
 
-        let tangents = monotoneTangents(points)
+        // Morceaux d'un seul tenant : un trou de mesure coupe la courbe et son remplissage,
+        // et les tangentes ne regardent pas de l'autre côté du trou. Un seul morceau sans trou.
+        let pieces = Self.pieces(count: points.count, starts: timedSeries == nil ? [] : timedSegmentStarts)
+        var tangents = [CGFloat](repeating: 0, count: points.count)
+        for piece in pieces {
+            for (offset, value) in monotoneTangents(Array(points[piece])).enumerated() {
+                tangents[piece.lowerBound + offset] = value
+            }
+        }
+        let piecewise: (Range<Int>, Bool) -> Path = { segments, closed in
+            Path { path in
+                for piece in pieces {
+                    let lower = max(segments.lowerBound, piece.lowerBound)
+                    let upper = min(segments.upperBound, piece.upperBound - 1)
+                    guard upper > lower else { continue }
+                    path.addPath(hermitePath(points: points, tangents: tangents, height: h, closed: closed, segments: lower..<upper))
+                }
+            }
+        }
         // Frontière : le point d'indice `grace` est le 1er point utile ; les
         // segments 0..<grace forment la montée en charge (pointillé atténué).
         let boundary = min(max(0, grace), max(0, points.count - 1))
-        let graceLine = hermitePath(points: points, tangents: tangents, height: h, closed: false, segments: 0..<boundary)
-        let mainLine = hermitePath(points: points, tangents: tangents, height: h, closed: false, segments: boundary..<max(boundary, points.count - 1))
-        let fill = hermitePath(points: points, tangents: tangents, height: h, closed: true, segments: 0..<max(0, points.count - 1))
+        let graceLine = piecewise(0..<boundary, false)
+        let mainLine = piecewise(boundary..<max(boundary, points.count - 1), false)
+        let fill = piecewise(0..<max(0, points.count - 1), true)
 
         let grid = Path { p in
             for i in 1...3 {
@@ -351,6 +372,17 @@ struct SpeedtestShareGraph: View {
                 }
             }
         }
+    }
+
+    /// Plages de points d'un seul tenant ; `starts` liste les indices qui ouvrent un segment.
+    static func pieces(count: Int, starts: [Int]) -> [Range<Int>] {
+        var result: [Range<Int>] = [], lower = 0
+        for cut in Set(starts.filter { $0 > 0 && $0 < count }).sorted() {
+            result.append(lower..<cut)
+            lower = cut
+        }
+        result.append(lower..<max(lower, count))
+        return result
     }
 
     private func monotoneTangents(_ points: [CGPoint]) -> [CGFloat] {

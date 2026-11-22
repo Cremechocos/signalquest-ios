@@ -42,6 +42,26 @@ struct SpeedtestPhaseTrace: Codable, Equatable, Sendable {
             return SpeedtestTimedRate(elapsedMs: sample.endMs, mbps: SpeedtestTraceMath.mbps(bytes: Double(bytes), durationMs: sample.endMs - sampleStartMs))
         }
     }
+    /// Courbe du détail, découpée comme celle d'Android (`presentTrace`, QA-063) : un trou
+    /// de mesure n'est pas relié. Sur une trace iOS (un seul compteur, échantillons contigus
+    /// depuis `sampleStartMs`), c'est `recentSeries` en un seul segment.
+    var curveSegments: [[SpeedtestTimedRate]] {
+        guard sampleStartMs >= 0, sampleEndMs > sampleStartMs else { return [] }
+        return SpeedtestTraceMath.segments(samples, startMs: sampleStartMs, endMs: sampleEndMs)
+    }
+    /// Médiane de débit (QA-063), règle commune avec Android et le site : elle suit le
+    /// compteur de la moyenne et du MAX affichés à côté. Un reçu final qui a ses intervalles
+    /// l'emporte, sur son axe (0 → durée du reçu) ; sinon, les fenêtres de la courbe.
+    /// p50 interpolé sur toutes les fenêtres gardées ; `nil` s'il n'en reste aucune.
+    var throughputMedianMbps: Double? {
+        let segments: [[SpeedtestTimedRate]]
+        if let receipt = finalMeasurement, !receipt.samples.isEmpty {
+            segments = SpeedtestTraceMath.segments(receipt.samples, startMs: 0, endMs: receipt.durationMs)
+        } else {
+            segments = curveSegments
+        }
+        return SpeedtestTraceMath.percentile(segments.flatMap { $0 }.map(\.mbps), 0.5)
+    }
 }
 
 struct SpeedtestFinalMeasurement: Codable, Equatable, Sendable {
@@ -101,6 +121,27 @@ enum SpeedtestTraceMath {
             guard start >= first else { return nil }
             return SpeedtestTimedRate(elapsedMs: end, mbps: mbps(bytes: integral.bytes(start: start, end: end), durationMs: end - start))
         }
+    }
+
+    /// Découpe commune avec Android (`measuredSegments`, QA-063) : échantillons valides compris
+    /// dans [startMs, endMs], triés par début ; un échantillon qui commence avant la fin du
+    /// précédent gardé est écarté ; un trou (début ≠ fin du précédent) ouvre un segment, et
+    /// aucune fenêtre de 1 s ne le traverse ; un segment de moins de deux fenêtres est écarté.
+    static func segments(_ samples: [SpeedtestMeasurementInterval], startMs: Int64, endMs: Int64) -> [[SpeedtestTimedRate]] {
+        let ordered = samples.enumerated()
+            .filter { $0.element.startMs >= startMs && $0.element.endMs <= endMs
+                && $0.element.endMs > $0.element.startMs && $0.element.bytes >= 0 }
+            .sorted { ($0.element.startMs, $0.offset) < ($1.element.startMs, $1.offset) }
+            .map(\.element)
+        var groups: [[SpeedtestMeasurementInterval]] = []
+        var previousEnd: Int64?
+        for sample in ordered {
+            if let end = previousEnd, sample.startMs < end { continue }
+            if sample.startMs != previousEnd { groups.append([]) }
+            groups[groups.count - 1].append(sample)
+            previousEnd = sample.endMs
+        }
+        return groups.map { windows($0, windowMs: 1000) }.filter { $0.count >= 2 }
     }
 
     static func percentile(_ values: [Double], _ percentage: Double) -> Double? {

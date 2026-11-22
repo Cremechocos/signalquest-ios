@@ -236,4 +236,41 @@ final class SpeedtestDetailSheetTests: XCTestCase {
         XCTAssertEqual(try height(SpeedtestServedRadio(bands: nil, readings: []), "emptysignal"), without, accuracy: 1)
         XCTAssertGreaterThan(try height(radio, "signal"), without + 120, "bandes et trois mesures : le bloc doit s'afficher")
     }
+
+    /// QA-063 : la médiane s'écrit sous la courbe quand la trace en donne une, et rien ne
+    /// la remplace sinon. Les deux textes existent dans la langue du test.
+    func testThroughputMedianShowsUnderTheCurveOnlyWhenMeasured() throws {
+        func result(_ samples: [SpeedtestMeasurementInterval], _ name: String) throws -> CGFloat {
+            let phase = SpeedtestPhaseTrace(phase: "download", attemptId: "median", startOffsetMs: 0, warmupEndOffsetMs: 0,
+                measurementEndOffsetMs: 4000, totalEndOffsetMs: 4000, measuredBytes: 16_000_000,
+                totalTransferredBytes: 16_000_000, byteSource: "client-received", sampleByteSource: "client-received",
+                liveWindowMs: 1000, peakWindowMs: 1200, samples: samples)
+            let trace = SpeedtestMeasurementTrace(runId: "median-run", phases: [phase], abandonedAttempts: [])
+            let run = SpeedtestRunResult(label: "median", downloadMbps: 32, downloadAverageMbps: 32,
+                downloadMaxMbps: 80, uploadAverageMbps: nil, uploadMaxMbps: nil, durationSeconds: 4,
+                connectionType: .wifi, measurementTrace: trace, methodologyVersion: 7)
+            let view = SpeedtestDetailContent(result: run)
+                .frame(width: 393)
+                .background(Color.white)
+                .environment(\.colorScheme, .light)
+            let renderer = ImageRenderer(content: view)
+            renderer.scale = 2
+            let image = try XCTUnwrap(renderer.uiImage)
+            try XCTUnwrap(image.pngData()).write(to: URL(fileURLWithPath: "/tmp/sq_detail_\(name).png"))
+            return image.size.height
+        }
+        let measured = try result([
+            .init(startMs: 0, endMs: 1000, bytes: 1_000_000), .init(startMs: 1000, endMs: 2000, bytes: 2_000_000),
+            .init(startMs: 2000, endMs: 3000, bytes: 3_000_000), .init(startMs: 3000, endMs: 4000, bytes: 10_000_000),
+        ], "median")
+        // Un seul échantillon : une fenêtre, pas de courbe découpée, pas de médiane.
+        let single = try result([.init(startMs: 0, endMs: 4000, bytes: 16_000_000)], "nomedian")
+        XCTAssertGreaterThan(measured, single + 10, "la ligne Médiane doit s'afficher sous la courbe")
+
+        let english = Bundle.main.preferredLocalizations.first?.hasPrefix("en") == true
+        XCTAssertEqual(String(localized: "Médiane \("20") \("Mb/s")"), english ? "Median 20 Mb/s" : "Médiane 20 Mb/s")
+        XCTAssertEqual(String(localized: "Médiane : la moitié des secondes mesurées est au-dessus, l’autre moitié au-dessous."),
+                       english ? "Median: half of the measured seconds are above it, half below."
+                               : "Médiane : la moitié des secondes mesurées est au-dessus, l’autre moitié au-dessous.")
+    }
 }
