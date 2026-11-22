@@ -1105,14 +1105,13 @@ extension PushNotificationService {
         }
     }
 
-    /// Réseau ou époque à synchroniser : la file reprend la réponse plus tard, comme en clair.
+    /// Réseau ou époque à synchroniser : la reprise renvoie la réponse seule (QA-066).
     /// Tout autre refus (membre à vérifier ou à mettre à jour, demande en attente) attend
-    /// l'utilisateur : le texte revient « Non envoyé » dans le fil, et l'écran verrouillé le dit.
+    /// l'utilisateur : le texte revient dans le fil ou son brouillon, et l'écran verrouillé le dit.
     nonisolated static func replyNeedsFailureNotice(_ result: E2EEV2MessageSendResultV2) -> Bool {
-        switch result {
-        case .sent, .alreadyAccepted, .needsEpoch, .needsRotation: return false
-        case .failure(let failure) where failure.kind == .retryable && !MessageRequestLimitError.isPending(failure): return false
-        default: return true
+        switch E2EEV2PendingSendDisposition(result) {
+        case .delivered, .transient: return false
+        case .awaitingUpdate, .refused: return true
         }
     }
 }

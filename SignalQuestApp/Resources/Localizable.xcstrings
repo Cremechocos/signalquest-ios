@@ -124770,6 +124770,40 @@
           }
         }
       }
+    },
+    "Service indisponible. L’envoi repartira tout seul quand il répondra." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Service unavailable. It will be sent automatically once the service responds."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Service indisponible. L’envoi repartira tout seul quand il répondra."
+          }
+        }
+      }
+    },
+    "Pas de connexion internet. L’envoi repartira tout seul au retour du réseau." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No internet connection. It will be sent automatically once the connection is back."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas de connexion internet. L’envoi repartira tout seul au retour du réseau."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

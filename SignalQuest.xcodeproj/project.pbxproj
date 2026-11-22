@@ -575,6 +575,7 @@
 		8CE47F480EED071BDBAA8A56 /* SupportedNetworkRequiredTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02157A71BB1824BEF2B916FE /* SupportedNetworkRequiredTests.swift */; };
 		8D6A1FFFCEC4DF3C5D0246A9 /* SignalQuestWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 2A5251F96893CB76BAAC1239 /* SignalQuestWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		8DFAAE9EED690BB0A8D45D29 /* PlannedDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 610EE8D2CB67E2741D6E1701 /* PlannedDetailSheet.swift */; };
+		8E7BF37696CE69AF953B69D9 /* E2EEV2PendingSendRetryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 545D1AE0C9DF2A58B46AD17F /* E2EEV2PendingSendRetryTests.swift */; };
 		8EDEC985C78861A0BFE4ED1A /* UserProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E03418AAFBEEEBDF356739B /* UserProfileView.swift */; };
 		8F10B534F109ADE518378C9E /* MapFilterCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 846A05DBDA256496DC1A6AFF /* MapFilterCatalog.swift */; };
 		8F7B904F932F0DFB126BFD79 /* VersionPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DD37884E4B468579B8A6FA7 /* VersionPolicyTests.swift */; };
@@ -666,6 +667,7 @@
 		A4EB1763313209E92A2BE6FE /* SQDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = A18D917B1DC35A8836A55F56 /* SQDiagnostics.swift */; };
 		A4F8148B96E61570205EB24C /* VoiceNoteCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AE84C13713BE5521854F4EF /* VoiceNoteCacheTests.swift */; };
 		A520A04B888E2E2DD3CB176C /* E2EEAutoHistoryVectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8521CC0A027DA12FE7738211 /* E2EEAutoHistoryVectorTests.swift */; };
+		A5A2CF07DBC69E729E526525 /* E2EEV2PendingSendRetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = F243B1F5E8E4D62A014EA75E /* E2EEV2PendingSendRetry.swift */; };
 		A5AA3462F22A107D8665BAEC /* MapAntennaProfileQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 194141CF034F3B9465D599B8 /* MapAntennaProfileQATests.swift */; };
 		A693008A5292B10B93B41825 /* MediaLocationStripperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1880CF88BC14FCCEC5042920 /* MediaLocationStripperTests.swift */; };
 		A6B29F7CFFF85405D3972A10 /* E2EEAutoHistoryKeyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35F81A90CD5159E6AB1813BA /* E2EEAutoHistoryKeyStore.swift */; };
@@ -1395,6 +1397,7 @@
 		53482F595BA7C9973BE76955 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		536973ED113D17A7567C639B /* SpeedtestTemplateBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestTemplateBuilder.swift; sourceTree = "<group>"; };
 		53842ADB5CE6AC861978B14B /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
+		545D1AE0C9DF2A58B46AD17F /* E2EEV2PendingSendRetryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEV2PendingSendRetryTests.swift; sourceTree = "<group>"; };
 		551B7C118FD22A527E98C238 /* Figtree-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Figtree-Bold.ttf"; sourceTree = "<group>"; };
 		5536589482E8FCA7F50D5797 /* AppRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
 		554B78FC0A0A68C411BAD689 /* LeaderboardModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardModels.swift; sourceTree = "<group>"; };
@@ -1994,6 +1997,7 @@
 		F2015AC272F9D96F13C28D48 /* SQNetworkColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQNetworkColors.swift; sourceTree = "<group>"; };
 		F21195FC7BA83172FF32A3CC /* SignalFormatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalFormatters.swift; sourceTree = "<group>"; };
 		F23ED8BD3711812342EC5C19 /* EntitlementsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntitlementsTests.swift; sourceTree = "<group>"; };
+		F243B1F5E8E4D62A014EA75E /* E2EEV2PendingSendRetry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEV2PendingSendRetry.swift; sourceTree = "<group>"; };
 		F29E5F20774A2755469467DA /* ISEDChangesMapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ISEDChangesMapTests.swift; sourceTree = "<group>"; };
 		F2B897546130656652D9717D /* BricolageGrotesque-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "BricolageGrotesque-SemiBold.ttf"; sourceTree = "<group>"; };
 		F2BDADB697C23558E9CC6B44 /* SQQuickActionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQQuickActionsTests.swift; sourceTree = "<group>"; };
@@ -3084,6 +3088,7 @@
 				B1E7A9EA6E54935466169B88 /* E2EEV2MessageStoreV2.swift */,
 				3EA0F4928A4EE54E1DA290E5 /* E2EEV2MessagingRuntime.swift */,
 				51021B01C023E3F2933BFD1A /* E2EEV2NotificationMirrorWriter.swift */,
+				F243B1F5E8E4D62A014EA75E /* E2EEV2PendingSendRetry.swift */,
 				A2898E29783C5009058CCEAC /* E2EEV2ReportingV2.swift */,
 				5D404DFE27EC08D9B2F3B585 /* E2EEV2TrustDirectory.swift */,
 				510C718208A0F0CD33A6405E /* EntitlementsService.swift */,
@@ -3283,6 +3288,7 @@
 				37523E0389BE8DF2667B2264 /* E2EEV2MessagingRuntimeTests.swift */,
 				4BE53EEE947C2972D69947B0 /* E2EEV2NotificationMirrorWriterTests.swift */,
 				9527CF7BC5A3B9F6DA2DEC71 /* E2EEV2NotificationProcessorTests.swift */,
+				545D1AE0C9DF2A58B46AD17F /* E2EEV2PendingSendRetryTests.swift */,
 				032235535FD3F83D7CD6CFBF /* E2EEV2ReportSenderV2Tests.swift */,
 				24FD7F46C63A1733CA825E36 /* E2EEV2ThreadPresentationTests.swift */,
 				3B0F809D4CB770501A61B432 /* E2EEV2TrustDirectoryTests.swift */,
@@ -4171,6 +4177,7 @@
 				42DF36F3C62971576D88B99F /* E2EEV2NotificationPreviewNotice.swift in Sources */,
 				BE48B9E02BAA795888F875B6 /* E2EEV2NotificationProcessor.swift in Sources */,
 				E853423BB6F0620F8970399F /* E2EEV2NotificationRuntime.swift in Sources */,
+				A5A2CF07DBC69E729E526525 /* E2EEV2PendingSendRetry.swift in Sources */,
 				C2E7EE8CB6DA2CFE7D65D51C /* E2EEV2ReportingV2.swift in Sources */,
 				BC2AEE9944B4879798825D01 /* E2EEV2ThreadPresentation.swift in Sources */,
 				BCA1E0D2C64BFF82270F63C5 /* E2EEV2TrustDirectory.swift in Sources */,
@@ -4745,6 +4752,7 @@
 				17C80EADD96F5E76C237268F /* E2EEV2MessagingRuntimeTests.swift in Sources */,
 				9349A9C390B52EC5C70B8748 /* E2EEV2NotificationMirrorWriterTests.swift in Sources */,
 				E5843F42151B296385A9B784 /* E2EEV2NotificationProcessorTests.swift in Sources */,
+				8E7BF37696CE69AF953B69D9 /* E2EEV2PendingSendRetryTests.swift in Sources */,
 				6C98D1F291E62F4785CF6862 /* E2EEV2ReportSenderV2Tests.swift in Sources */,
 				027E3130C3FF0E1E4C1FC6FC /* E2EEV2ThreadPresentationTests.swift in Sources */,
 				371ABAFDA51D821594C0E3BF /* E2EEV2TrustDirectoryTests.swift in Sources */,

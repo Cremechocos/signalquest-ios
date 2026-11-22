@@ -102,6 +102,19 @@ actor MessageDraftStore {
         Self.announce()
     }
 
+    /// Texte refusé par le serveur après coup (QA-066) : il revient en tête du brouillon de sa
+    /// conversation, sans effacer ce qui y était déjà écrit.
+    func prependToDraft(_ text: String, conversationId: String, ownerScopeId: String, now: Date = Date()) throws {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let existing = self.text(conversationId: conversationId, ownerScopeId: ownerScopeId) ?? ""
+        try save(Self.merged(text, before: existing), conversationId: conversationId, ownerScopeId: ownerScopeId, now: now)
+    }
+
+    /// Le texte rendu, puis ce qui était déjà dans le champ, une ligne plus bas.
+    nonisolated static func merged(_ text: String, before existing: String) -> String {
+        existing.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? text : "\(text)\n\(existing)"
+    }
+
     /// Garde un texte v2 à rejouer ; le même identifiant remplace l'entrée existante.
     func stageV2Send(_ send: PendingV2Send, ownerScopeId: String) throws {
         var file = (try? read(ownerScopeId: ownerScopeId)) ?? DraftFile()

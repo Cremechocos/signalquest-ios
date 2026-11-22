@@ -163,6 +163,8 @@ struct ConversationDetailView: View {
     /// Données pour rejouer un envoi échoué sans doublon : la même
     /// Idempotency-Key est réutilisée d'une tentative à l'autre.
     @State private var pendingSends: [String: PendingSend] = [:]
+    /// Textes chiffrés v2 en panne passagère (QA-066) : bulle « En attente », la reprise les renvoie seule.
+    @State private var queuedSends: Set<String> = []
     /// Photos et notes vocales en cours d'envoi, ou restées dans la file durable :
     /// leur bulle locale porte Renvoyer / Supprimer comme un texte non envoyé.
     @State private var pendingAttachmentSends: [String: PendingAttachmentSend] = [:]
@@ -1289,6 +1291,11 @@ struct ConversationDetailView: View {
             if let request = MessageRequestEvents.request(in: note, conversationId: conversation.id) { requestState = request }
         }
         .onChangeCompat(of: conversation.request) { _, request in requestState = request }
+        .onReceive(NotificationCenter.default.publisher(for: E2EEV2PendingSendScheduler.didResolve)) { note in
+            guard let resolution = note.object as? E2EEV2PendingSendScheduler.Resolution,
+                  resolution.conversationId == conversation.id else { return }
+            Task { await applyV2SendResolution(resolution) }
+        }
         .onReceive(NotificationCenter.default.publisher(for: PushNotificationService.e2eeV2EnvelopeReceived)) { _ in
             guard usesV2, isOnScreen else { return }
             Task {
@@ -1853,6 +1860,8 @@ struct ConversationDetailView: View {
                 bubbleBody(for: message, mine: mine, isGroupStart: isGroupStart, showsTime: showsTime, photoOnly: photoOnly, reactions: reactions)
                 if sendStatus[message.id] == .failed {
                     failedRetryRow(for: message)
+                } else if queuedSends.contains(message.id) {
+                    discardUnsentButton(for: message)
                 }
                 threadReplyBadge(for: message)
             }
@@ -2296,7 +2305,9 @@ struct ConversationDetailView: View {
             if message.editedAt != nil { parts.append(String(localized: "modifié")) }
             if message.expiresAt != nil { parts.append(String(localized: "Message éphémère")) }
         }
-        if sendStatus[message.id] == .sending { parts.append(String(localized: "Envoi en cours")) }
+        if sendStatus[message.id] == .sending {
+            parts.append(queuedSends.contains(message.id) ? String(localized: "En attente") : String(localized: "Envoi en cours"))
+        }
         return parts.joined(separator: ", ")
     }
 
@@ -2398,7 +2409,13 @@ struct ConversationDetailView: View {
     @ViewBuilder
     private func sendStatusIndicator(for message: MessageItem) -> some View {
         if sendStatus[message.id] == .sending {
-            if networkPath.isOnline {
+            if networkPath.isOnline, queuedSends.contains(message.id) {
+                // La reprise le renverra seule (QA-066) : pas un spinner qui tourne des minutes.
+                Label("En attente", systemImage: "clock")
+                    .font(SQType.micro(.regular))
+                    .foregroundStyle(SQColor.onInk)
+                    .accessibilityIdentifier("message.queued")
+            } else if networkPath.isOnline {
                 SQSpinner()
                     .controlSize(.mini)
                     .tint(SQColor.onInk.opacity(0.8))
@@ -2453,20 +2470,25 @@ struct ConversationDetailView: View {
             .accessibilityLabel("Message non envoyé. Renvoyer.")
             // Un message qui ne partira plus (exclu du groupe, conversation
             // supprimée) doit pouvoir s'effacer (SOC-04).
-            Button {
-                Haptics.selection()
-                Task { await discardFailed(localId: message.id) }
-            } label: {
-                Text("Supprimer")
-                    .font(SQType.micro.weight(.semibold))
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .padding(.horizontal, SQSpace.sm)
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Supprimer le message non envoyé")
+            discardUnsentButton(for: message)
         }
+    }
+
+    /// « Supprimer » d'un message non envoyé, ou en attente de la reprise (QA-066).
+    private func discardUnsentButton(for message: MessageItem) -> some View {
+        Button {
+            Haptics.selection()
+            Task { await discardFailed(localId: message.id) }
+        } label: {
+            Text("Supprimer")
+                .font(SQType.micro.weight(.semibold))
+                .foregroundStyle(SQColor.labelSecondary)
+                .padding(.horizontal, SQSpace.sm)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Supprimer le message non envoyé")
     }
 
     /// Indicateur « N réponses » affiché sous une bulle qui a des réponses de
@@ -3564,6 +3586,7 @@ struct ConversationDetailView: View {
             for (localId, pending) in pendingSends where accepted.contains(pending.idempotencyKey) {
                 pendingSends[localId] = nil
                 sendStatus[localId] = nil
+                queuedSends.remove(localId)
             }
             let localPending = messages.filter {
                 pendingSends[$0.id] != nil || pendingAttachmentSends[$0.id] != nil || pendingE2EEMedia[$0.id] != nil
@@ -3659,8 +3682,110 @@ struct ConversationDetailView: View {
         await MessageDraftStore.shared.removeV2Send(clientRequestId: clientRequestId, ownerScopeId: scope)
     }
 
-    /// Textes v2 restés dans la file durable (envoi refusé, appli quittée) : ils reviennent en bulles
-    /// « Non envoyé » avec Renvoyer / Supprimer. Ceux que le serveur a déjà acceptés quittent la file.
+    /// Texte chiffré v2, gardé sur l'appareil avant l'envoi (B02) puis sous le même clientRequestId
+    /// à chaque essai : l'enveloppe gardée repart à l'octet. Issues (QA-066, règle d'Android) :
+    /// remis, la bulle attend la relève ; panne passagère, elle reste « En attente » et la reprise
+    /// le renvoie seule ; refusé au premier envoi, elle part et le texte revient dans le champ ;
+    /// refusé à un renvoi, ou mise à jour attendue, elle reste « Non envoyé » avec la cause.
+    private func performV2TextSend(localId: String, pending: PendingSend, firstAttempt: Bool) async {
+        let retry = services.v2SendRetry
+        // La reprise l'envoie déjà : son issue mettra la bulle à jour.
+        guard retry.reserve(pending.idempotencyKey) else { return }
+        await stageV2Send(pending)
+        let result = await services.e2eeV2Messaging.send(
+            .init(body: .text(pending.text), replyToRef: pending.replyToId, mentions: [], ttlSeconds: pending.ttlSeconds),
+            clientRequestId: pending.idempotencyKey, conversationId: conversation.id, isGroup: conversation.isGroup,
+            participantIds: conversation.participants.map(\.userId)
+        )
+        retry.release(pending.idempotencyKey)
+        if case .sent(let receipt, _) = result, let block = receipt.request {
+            // DM-REQ-1 : le premier message d'une demande est parti ; la suite attend l'acceptation.
+            requestState = block.messageRequest
+        }
+        if case .failure(let failure) = result, MessageRequestLimitError.isPending(failure) {
+            requestState = .senderSent
+        }
+        let reason = EncryptedConversationSurfaces.v2SendFailureMessage(result)
+            ?? String(localized: "Ce message chiffré n’a pas pu être envoyé.")
+        switch E2EEV2PendingSendDisposition(result) {
+        case .delivered:
+            // La bulle locale reste jusqu'à ce que la relève apporte celle du serveur
+            // (même clientRequestId) : `loadV2Once` les échange dans la même mise à
+            // jour. La retirer ici la faisait disparaître puis revenir (09/11).
+            queuedSends.remove(localId)
+            withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = nil }
+            await removeV2Send(clientRequestId: pending.idempotencyKey)
+            await loadV2()
+        case .transient:
+            queuedSends.insert(localId)
+            pendingSends[localId]?.failureReason = nil
+            sendStatus[localId] = .sending
+            retry.scheduleRetry()
+            if firstAttempt, case .failure = result {
+                inAppNotifications.show(SQInAppNotificationItem(
+                    body: networkPath.isOnline
+                        ? String(localized: "Service indisponible. L’envoi repartira tout seul quand il répondra.")
+                        : String(localized: "Pas de connexion internet. L’envoi repartira tout seul au retour du réseau."),
+                    variant: .info
+                ))
+            }
+        case .refused where firstAttempt:
+            queuedSends.remove(localId)
+            await removeV2Send(clientRequestId: pending.idempotencyKey)
+            pendingSends[localId] = nil
+            sendStatus[localId] = nil
+            withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { messages.removeAll { $0.id == localId } }
+            returnToComposer(pending.text)
+            showActionError(reason)
+            Haptics.error()
+        case .refused, .awaitingUpdate:
+            // Plus rejoué par la reprise : « Renvoyer » le garde de nouveau.
+            queuedSends.remove(localId)
+            if let scope = LocalAccountScope.sessionSnapshot()?.ownerScopeId {
+                await MessageDraftStore.shared.markV2SendFailed(
+                    clientRequestId: pending.idempotencyKey, reason: reason, ownerScopeId: scope
+                )
+            }
+            pendingSends[localId]?.failureReason = reason
+            withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = .failed }
+            if firstAttempt { showActionError(reason) }
+            Haptics.error()
+        }
+    }
+
+    /// Issue d'un renvoi fait par la reprise en arrière-plan (QA-066).
+    private func applyV2SendResolution(_ resolution: E2EEV2PendingSendScheduler.Resolution) async {
+        let localId = pendingSends.first { $0.value.idempotencyKey == resolution.clientRequestId }?.key
+        if let localId { queuedSends.remove(localId) }
+        switch resolution.outcome {
+        case .delivered:
+            if let localId { withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = nil } }
+            await loadV2()
+        case .awaitingUpdate(let reason):
+            guard let localId else { return }
+            pendingSends[localId]?.failureReason = reason
+            withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = .failed }
+        case .refused(let reason):
+            if let localId {
+                pendingSends[localId] = nil
+                sendStatus[localId] = nil
+                withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { messages.removeAll { $0.id == localId } }
+            }
+            returnToComposer(resolution.text)
+            showActionError(reason)
+        }
+    }
+
+    /// Texte refusé (QA-066) : il revient dans le champ, avant ce qui y a été écrit depuis.
+    private func returnToComposer(_ text: String) {
+        let merged = MessageDraftStore.merged(text, before: draftAutosaver?.text ?? "")
+        draftAutosaver?.textChanged(merged)
+        if editTarget == nil { seedComposer(merged) }
+    }
+
+    /// Textes v2 restés dans la file durable (appli quittée, panne passagère) : ils reviennent en bulles
+    /// « En attente », renvoyées tout de suite par la reprise (QA-066) ; ceux qu'elle ne rejoue plus
+    /// reviennent « Non envoyé » avec Renvoyer / Supprimer. Ceux que le serveur a déjà acceptés quittent la file.
     private func restoredV2Messages(accepted: Set<String>) async -> [MessageItem] {
         guard let scope = LocalAccountScope.sessionSnapshot()?.ownerScopeId else { return [] }
         let known = Set(pendingSends.values.map(\.idempotencyKey))
@@ -3676,11 +3801,20 @@ struct ConversationDetailView: View {
                 text: record.text, replyToId: record.replyToRef, idempotencyKey: record.clientRequestId,
                 ttlSeconds: record.ttlSeconds, restored: true, failureReason: record.failureReason
             )
-            sendStatus[localId] = .failed
+            if record.failureReason == nil {
+                sendStatus[localId] = .sending
+                queuedSends.insert(localId)
+            } else {
+                sendStatus[localId] = .failed
+            }
             restored.append(makeOptimisticMessage(
                 id: localId, text: record.text, replyToId: record.replyToRef,
                 createdAt: Date(timeIntervalSince1970: Double(record.createdAtMs) / 1_000)
             ))
+        }
+        if restored.contains(where: { queuedSends.contains($0.id) }) {
+            let retry = services.v2SendRetry
+            Task { await retry.runNow() }
         }
         return restored
     }
@@ -4558,13 +4692,13 @@ struct ConversationDetailView: View {
         clearComposer()
         replyTarget = nil
         Haptics.light()
-        await performSend(localId: localId)
+        await performSend(localId: localId, firstAttempt: true)
     }
 
     /// Réalise (ou rejoue) l'envoi d'une bulle optimiste. Réutilise la même
     /// Idempotency-Key à chaque tentative pour qu'un rejeu après échec réseau ne
     /// crée jamais de doublon côté serveur.
-    private func performSend(localId: String) async {
+    private func performSend(localId: String, firstAttempt: Bool = false) async {
         if pendingE2EEMedia[localId] != nil {
             await performE2EEMediaSend(localId: localId)
             return
@@ -4580,20 +4714,7 @@ struct ConversationDetailView: View {
         }
         sendStatus[localId] = .sending
         if usesV2 {
-            // Gardé sur l'appareil avant l'envoi (B02), puis même clientRequestId à chaque essai :
-            // l'enveloppe gardée repart à l'octet.
-            await stageV2Send(pending)
-            if await sendV2(.text(pending.text), replyToId: pending.replyToId, ttlSeconds: pending.ttlSeconds,
-                            clientRequestId: pending.idempotencyKey) {
-                // La bulle locale reste jusqu'à ce que la relève apporte celle du serveur
-                // (même clientRequestId) : `loadV2Once` les échange dans la même mise à
-                // jour. La retirer ici la faisait disparaître puis revenir (09/11).
-                withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = nil }
-                await removeV2Send(clientRequestId: pending.idempotencyKey)
-            } else {
-                withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = .failed }
-                Haptics.error()
-            }
+            await performV2TextSend(localId: localId, pending: pending, firstAttempt: firstAttempt)
             return
         }
         do {
@@ -4631,7 +4752,7 @@ struct ConversationDetailView: View {
                 pendingSends[localId] = PendingSend(
                     text: pending.text, replyToId: nil, idempotencyKey: pending.idempotencyKey, ttlSeconds: pending.ttlSeconds
                 )
-                await performSend(localId: localId)
+                await performSend(localId: localId, firstAttempt: firstAttempt)
                 return
             }
             // On conserve la bulle et les données de rejeu : l'utilisateur peut
@@ -4712,6 +4833,7 @@ struct ConversationDetailView: View {
         pendingSends[localId] = nil
         pendingAttachmentSends[localId] = nil
         sendStatus[localId] = nil
+        queuedSends.remove(localId)
         withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { messages.removeAll { $0.id == localId } }
     }
 

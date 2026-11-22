@@ -172,6 +172,14 @@ final class AppServices: ObservableObject {
     lazy var experienceHistory = ExperienceHistoryModel(environment: .live(experienceTests))
     /// Renvoi groupé des envois en attente, au retour du réseau et au premier plan.
     lazy var pendingQueues: PendingQueueFlusher = makePendingQueues()
+    /// Reprise automatique des textes chiffrés v2 en panne passagère (QA-066).
+    lazy var v2SendRetry: E2EEV2PendingSendScheduler = makeV2SendRetry()
+
+    private func makeV2SendRetry() -> E2EEV2PendingSendScheduler {
+        E2EEV2PendingSendScheduler { [weak self] scheduler in
+            await self?.retryPendingV2Sends(reservingWith: scheduler) ?? false
+        }
+    }
 
     /// Construit dans une méthode : Swift 6 refuse des fermetures `@MainActor`
     /// asynchrones écrites directement dans l'initialiseur d'une `lazy var`.
@@ -181,7 +189,7 @@ final class AppServices: ObservableObject {
             { [weak self] in await self?.feed.retryPendingPosts() },
             { [weak self] in await self?.retryPendingTextMessages() },
             { [weak self] in await self?.messages.retryPendingAttachments() },
-            { [weak self] in await self?.retryPendingV2Sends() },
+            { [weak self] in await self?.v2SendRetry.runNow() },
             { [weak self] in await self?.retryPendingMediaSends() },
             { [weak self] in await self?.customSites.retryPending() },
             { [weak self] in await self?.experienceTests.retryPending() },
@@ -370,41 +378,74 @@ final class AppServices: ObservableObject {
 
     /// Rejoue les textes chiffrés v2 restés dans la file durable (B02), sous leur identifiant
     /// d'origine : l'enveloppe déjà signée repart telle quelle, jamais deux signatures pour un
-    /// message. Un texte accepté (ou déjà accepté) quitte la file ; les autres issues le gardent.
-    func retryPendingV2Sends(store: MessageDraftStore = .shared, now: Date = Date()) async {
+    /// message. Rend vrai sur une panne passagère : la reprise réessaie plus tard (QA-066).
+    @discardableResult
+    func retryPendingV2Sends(
+        reservingWith scheduler: E2EEV2PendingSendScheduler? = nil,
+        store: MessageDraftStore = .shared, now: Date = Date()
+    ) async -> Bool {
         guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent,
-              e2eeV2Messaging.writesEnabled else { return }
-        let nowMs = Int64(now.timeIntervalSince1970 * 1_000)
-        for pending in await store.pendingV2Sends(ownerScopeId: session.ownerScopeId) {
-            guard session.isCurrent else { return }
-            if nowMs - pending.createdAtMs > Self.pendingV2MaxAgeMs {
-                await store.removeV2Send(clientRequestId: pending.clientRequestId, ownerScopeId: session.ownerScopeId)
-                continue
-            }
-            // Refus définitif déjà connu (demande de message pas encore acceptée) : jamais rejoué seul.
-            if pending.failureReason != nil { continue }
-            let result = await e2eeV2Messaging.send(
+              e2eeV2Messaging.writesEnabled else { return false }
+        let messaging = e2eeV2Messaging
+        return await Self.replayPendingV2Sends(
+            store: store, ownerScopeId: session.ownerScopeId, now: now,
+            reservations: scheduler ?? v2SendRetry, isCurrent: { session.isCurrent }
+        ) { pending in
+            await messaging.send(
                 .init(body: .text(pending.text), replyToRef: pending.replyToRef, mentions: [], ttlSeconds: pending.ttlSeconds),
                 clientRequestId: pending.clientRequestId, conversationId: pending.conversationId,
                 isGroup: pending.isGroup, participantIds: pending.participantIds
             )
-            switch result {
-            case .sent, .alreadyAccepted:
-                await store.removeV2Send(clientRequestId: pending.clientRequestId, ownerScopeId: session.ownerScopeId)
-            case .failure(let failure) where MessageRequestLimitError.isPending(failure):
-                // DM-REQ-1 : 403 `MESSAGE_REQUEST_PENDING`, terminal. Le texte reste affiché « Non envoyé ».
-                await store.markV2SendFailed(
-                    clientRequestId: pending.clientRequestId,
-                    reason: String(localized: "Ta demande de message n’a pas encore été acceptée."),
-                    ownerScopeId: session.ownerScopeId
-                )
-            case .failure(let failure) where failure.statusCode == 429:
-                // N1-6 : le serveur limite le compte ; les textes suivants attendent le prochain passage.
-                return
-            default:
-                break
-            }
         }
+    }
+
+    /// Un passage sur la file (QA-066, règle d'Android), dans l'ordre d'écriture : un texte remis
+    /// la quitte ; une panne passagère arrête le passage, les suivants attendent l'essai suivant ;
+    /// un refus (limite de demandes comprise) n'arrête rien, le texte quitte la file et revient en
+    /// tête du brouillon de sa conversation. Un texte réservé par un écran qui l'envoie est sauté.
+    static func replayPendingV2Sends(
+        store: MessageDraftStore, ownerScopeId: String, now: Date,
+        reservations: E2EEV2PendingSendScheduler, isCurrent: () -> Bool,
+        send: (MessageDraftStore.PendingV2Send) async -> E2EEV2MessageSendResultV2
+    ) async -> Bool {
+        let nowMs = Int64(now.timeIntervalSince1970 * 1_000)
+        for pending in await store.pendingV2Sends(ownerScopeId: ownerScopeId) {
+            guard isCurrent() else { return false }
+            if nowMs - pending.createdAtMs > Self.pendingV2MaxAgeMs {
+                await store.removeV2Send(clientRequestId: pending.clientRequestId, ownerScopeId: ownerScopeId)
+                continue
+            }
+            // Laissé « Non envoyé » (mise à jour attendue, renvoi refusé) : jamais rejoué seul.
+            if pending.failureReason != nil { continue }
+            guard reservations.reserve(pending.clientRequestId) else { continue }
+            let result = await send(pending)
+            reservations.release(pending.clientRequestId)
+            let outcome: E2EEV2PendingSendScheduler.Resolution.Outcome
+            switch E2EEV2PendingSendDisposition(result) {
+            case .transient:
+                return true
+            case .delivered:
+                await store.removeV2Send(clientRequestId: pending.clientRequestId, ownerScopeId: ownerScopeId)
+                outcome = .delivered
+            case .awaitingUpdate:
+                let reason = EncryptedConversationSurfaces.v2SendFailureMessage(result) ?? ""
+                await store.markV2SendFailed(clientRequestId: pending.clientRequestId, reason: reason, ownerScopeId: ownerScopeId)
+                outcome = .awaitingUpdate(reason: reason)
+            case .refused:
+                await store.removeV2Send(clientRequestId: pending.clientRequestId, ownerScopeId: ownerScopeId)
+                try? await store.prependToDraft(pending.text, conversationId: pending.conversationId, ownerScopeId: ownerScopeId)
+                outcome = .refused(reason: EncryptedConversationSurfaces.v2SendFailureMessage(result)
+                    ?? String(localized: "Ce message chiffré n’a pas pu être envoyé."))
+            }
+            NotificationCenter.default.post(
+                name: E2EEV2PendingSendScheduler.didResolve,
+                object: E2EEV2PendingSendScheduler.Resolution(
+                    clientRequestId: pending.clientRequestId, conversationId: pending.conversationId,
+                    text: pending.text, outcome: outcome
+                )
+            )
+        }
+        return false
     }
 
     /// Pièces jointes chiffrées restées dans leur file durable (E2EE-AUTO §7.4, §7.7), puis
@@ -422,9 +463,10 @@ final class AppServices: ObservableObject {
     }
 
     /// Texte chiffré v2 écrit hors du fil (réponse depuis une notification, Siri, réponse à une
-    /// story) : gardé dans la file durable avant l'envoi, comme depuis le fil (B02). Un échec
-    /// passager repart avec la reprise et revient en bulle « Non envoyé » ; rien ne part jamais
-    /// en clair. Un réessai qui garde son `clientRequestId` ne crée pas de second message.
+    /// story) : gardé dans la file durable avant l'envoi, comme depuis le fil (B02). Une panne
+    /// passagère repart seule avec la reprise (QA-066) ; un refus laisse le texte dans le brouillon
+    /// de la conversation ; rien ne part jamais en clair. Un réessai qui garde son `clientRequestId`
+    /// ne crée pas de second message.
     func sendV2TextOutsideThread(
         _ text: String, to conversation: MessageConversation, ttlSeconds: Int,
         clientRequestId: String = UUID().uuidString, store: MessageDraftStore = .shared
@@ -438,22 +480,30 @@ final class AppServices: ObservableObject {
             ttlSeconds: ttlSeconds, createdAtMs: Int64(Date().timeIntervalSince1970 * 1_000)
         )
         try? await store.stageV2Send(pending, ownerScopeId: session.ownerScopeId)
+        // Réservé pendant l'envoi : la reprise ne le rejoue pas en même temps.
+        let reserved = v2SendRetry.reserve(pending.clientRequestId)
         let result = await e2eeV2Messaging.send(
             .init(body: .text(text), replyToRef: nil, mentions: [], ttlSeconds: ttlSeconds),
             clientRequestId: pending.clientRequestId, conversationId: conversation.id,
             isGroup: conversation.isGroup, participantIds: pending.participantIds
         )
-        switch result {
-        case .sent, .alreadyAccepted:
+        if reserved { v2SendRetry.release(pending.clientRequestId) }
+        switch E2EEV2PendingSendDisposition(result) {
+        case .delivered:
             await store.removeV2Send(clientRequestId: pending.clientRequestId, ownerScopeId: session.ownerScopeId)
-        case .failure(let failure) where MessageRequestLimitError.isPending(failure):
+        case .transient:
+            // QA-066 : il repartira seul, 15 s plus tard puis à délai croissant.
+            v2SendRetry.scheduleRetry()
+        case .awaitingUpdate:
+            // Bulle « Non envoyé » dans la conversation, avec Renvoyer une fois la mise à jour faite.
             await store.markV2SendFailed(
                 clientRequestId: pending.clientRequestId,
-                reason: String(localized: "Ta demande de message n’a pas encore été acceptée."),
-                ownerScopeId: session.ownerScopeId
+                reason: EncryptedConversationSurfaces.v2SendFailureMessage(result) ?? "", ownerScopeId: session.ownerScopeId
             )
-        default:
-            break
+        case .refused:
+            // Comme un refus de la reprise : le texte attend dans le brouillon de la conversation.
+            await store.removeV2Send(clientRequestId: pending.clientRequestId, ownerScopeId: session.ownerScopeId)
+            try? await store.prependToDraft(text, conversationId: conversation.id, ownerScopeId: session.ownerScopeId)
         }
         return result
     }
