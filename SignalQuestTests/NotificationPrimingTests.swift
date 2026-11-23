@@ -68,4 +68,12 @@ final class NotificationPrimingTests: XCTestCase {
         XCTAssertFalse(result)
         XCTAssertFalse(presented)
     }
+
+    /// IOS-015 : l'accord des notifications allume « Messages privés », et lui seul.
+    func testGrantTurnsOnPrivateMessagesOnly() throws {
+        let body = try JSONEncoder().encode(PushNotificationService.messagePushAfterGrant)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(object.count, 1, "Aucun autre réglage dans le PATCH : \(object.keys.sorted())")
+        XCTAssertEqual(object["notifyMessagesPush"] as? Bool, true)
+    }
 }

@@ -630,9 +630,31 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
             logger.info("Notification permission granted=\(granted, privacy: .public)")
             if granted {
                 await registerForRemoteNotifications()
+                await enableMessagePushAfterGrant()
             }
         } catch {
             logger.error("Permission error: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// « Messages privés » est créé coupé côté serveur, et tous les pushs de message en
+    /// dépendent : accepter les notifications depuis l'app l'allume, sinon la promesse de
+    /// la feuille (« te prévenir quand on te répond ») n'est pas tenue (IOS-015, choix
+    /// d'Alexandre du 23/11). Seulement au moment de l'accord : un réglage coupé ensuite
+    /// dans Réglages n'est jamais rallumé ici.
+    static var messagePushAfterGrant: NotificationPreferences {
+        var patch = NotificationPreferences.empty
+        patch.notifyMessagesPush = true
+        return patch
+    }
+
+    @MainActor
+    private func enableMessagePushAfterGrant() async {
+        guard !AppEnvironment.usesDemoData, LocalAccountScope.sessionSnapshot() != nil else { return }
+        do {
+            _ = try await UserService(api: api).updateNotificationPreferences(Self.messagePushAfterGrant)
+        } catch {
+            logger.error("Message push preference not saved: \(error.localizedDescription, privacy: .public)")
         }
     }
 

@@ -312,6 +312,8 @@ struct NotificationSettingsView: View {
                     Task {
                         await services.push.requestAuthorizationAndRegister()
                         await refreshAuthorization()
+                        // L'accord allume « Messages privés » côté serveur (IOS-015) : relu ici.
+                        await model.load()
                     }
                 }
                 .accessibilityIdentifier("notifications.enable")
