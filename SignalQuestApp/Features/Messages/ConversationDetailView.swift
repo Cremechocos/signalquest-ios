@@ -3718,6 +3718,9 @@ struct ConversationDetailView: View {
             withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = nil }
             await removeV2Send(clientRequestId: pending.idempotencyKey)
             await loadV2()
+            // Comme l'envoi en clair : premier message remis, on propose d'être prévenu
+            // des réponses (TRX-01), une seule fois par appareil (IOS-014).
+            Task { await services.notificationPriming.considerPriming(after: .messageSent) }
         case .transient:
             queuedSends.insert(localId)
             pendingSends[localId]?.failureReason = nil
@@ -5373,6 +5376,7 @@ struct ConversationDetailView: View {
             pendingE2EEMedia[localId] = nil
             sendStatus[localId] = nil
             withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { messages.removeAll { $0.id == localId } }
+            Task { await services.notificationPriming.considerPriming(after: .messageSent) }
         case .retry, .throttled:
             withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = .failed }
             Haptics.error()
