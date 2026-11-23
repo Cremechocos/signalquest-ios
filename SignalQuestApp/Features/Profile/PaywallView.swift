@@ -123,7 +123,7 @@ struct SubscriptionStatusPresentation: Equatable {
     let tone: Tone
     let management: Management
 
-    static func make(serverState: ServerEntitlementState) -> SubscriptionStatusPresentation {
+    static func make(serverState: ServerEntitlementState, now: Date = Date()) -> SubscriptionStatusPresentation {
         switch serverState {
         case .idle, .loading:
             return SubscriptionStatusPresentation(
@@ -138,7 +138,7 @@ struct SubscriptionStatusPresentation: Equatable {
                 tone: .warning, management: .none
             )
         case .available(let snapshot):
-            var presentation = make(snapshot: snapshot)
+            var presentation = make(snapshot: snapshot, now: now)
             if snapshot.warnings.contains("DUPLICATE_PAID_SUBSCRIPTION") {
                 presentation = SubscriptionStatusPresentation(
                     title: presentation.title, tag: presentation.tag,
@@ -150,9 +150,20 @@ struct SubscriptionStatusPresentation: Equatable {
         }
     }
 
-    private static func make(snapshot: EntitlementSnapshot) -> SubscriptionStatusPresentation {
+    private static func make(snapshot: EntitlementSnapshot, now: Date) -> SubscriptionStatusPresentation {
         if let subscription = snapshot.subscription ?? snapshot.blockingSubscription {
             return make(subscription: subscription)
+        }
+        // Premium offert (contrat v1.23) : l'offre est masquée, la carte dit pourquoi. Textes
+        // communs aux trois apps.
+        if let grant = snapshot.grant, grant.isActivePremiumGift(at: now) {
+            let detail = grant.expiresAt.map {
+                String(localized: "Tes fonctionnalités Premium sont offertes jusqu’au \(day($0)).")
+            } ?? String(localized: "Tes fonctionnalités Premium sont offertes, sans date de fin.")
+            return SubscriptionStatusPresentation(
+                title: String(localized: "Premium offert"), tag: nil,
+                details: [detail], tone: .positive, management: .none
+            )
         }
         if let grant = snapshot.grant, grant.tier != .free {
             let detail = grant.expiresAt.map {
@@ -445,11 +456,18 @@ struct PaywallView: View {
         return false
     }
 
+    /// Premium offert en cours (contrat v1.23) : rien à acheter tant que le don dure.
+    private var isGifted: Bool {
+        if case .premiumGifted = store.eligibility { return true }
+        return false
+    }
+
     /// Une offre en cours se gère, elle ne se rachète pas : la carte d'achat
-    /// disparaît tant qu'un abonnement court (contrat v1 §6, double abonnement).
+    /// disparaît tant qu'un abonnement court (contrat v1 §6, double abonnement)
+    /// ou qu'un Premium offert dure (v1.23).
     private var showsOffer: Bool {
         switch store.eligibility {
-        case .managedByAppStore, .managedElsewhere: return false
+        case .managedByAppStore, .managedElsewhere, .premiumGifted: return false
         default: return true
         }
     }
@@ -661,8 +679,8 @@ struct PaywallView: View {
     /// conditions et la confidentialité.
     private var legalFooter: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
-            // Abonnement payé sur le web : ni l'achat ni la résiliation ne passent par Apple.
-            if !isManagedElsewhere {
+            // Abonnement payé sur le web ou Premium offert : aucun achat ni résiliation par Apple.
+            if !isManagedElsewhere, !isGifted {
                 Text("Premium est un abonnement mensuel ou annuel à renouvellement automatique, payé avec ton identifiant Apple à la confirmation de l’achat. Il se renouvelle au même prix, sauf résiliation au moins 24 heures avant la fin de la période en cours, depuis les réglages de ton compte Apple. Pas de partage familial. Le prix affiché par Apple au moment de l’achat fait foi.")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)

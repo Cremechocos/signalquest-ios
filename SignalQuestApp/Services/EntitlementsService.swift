@@ -361,6 +361,15 @@ struct EntitlementSubscription: Decodable, Equatable, Sendable {
 struct EntitlementGrant: Equatable, Sendable {
     let tier: SupporterTier
     let expiresAt: Date?
+    /// Échéance servie mais illisible : ni absente ni à venir (contrat v1.23).
+    var unreadableExpiry = false
+
+    /// Premium offert en cours (contrat v1.23) : rien n'est proposé à l'achat tant qu'il dure.
+    /// L'échéance passée compte tout de suite, sans attendre la tâche quotidienne du serveur.
+    func isActivePremiumGift(at now: Date = Date()) -> Bool {
+        guard tier == .premium, !unreadableExpiry else { return false }
+        return expiresAt.map { $0 > now } ?? true
+    }
 }
 
 /// Essai gratuit, commun aux trois canaux (contrat v1 §6, D3).
@@ -494,9 +503,12 @@ struct BillingSubscriptionResponse: Decodable, Sendable {
         warnings = c.decodeLossyArray([String].self, forKey: .warnings)
 
         if let g = try? c.nestedContainer(keyedBy: GrantKeys.self, forKey: .grant) {
+            let expiresAt = try? g.decodeIfPresent(Date.self, forKey: .expiresAt)
+            let servesExpiry = g.contains(.expiresAt) && (try? g.decodeNil(forKey: .expiresAt)) == false
             grant = EntitlementGrant(
                 tier: SupporterTier(serverValue: try? g.decodeIfPresent(String.self, forKey: .tier)),
-                expiresAt: try? g.decodeIfPresent(Date.self, forKey: .expiresAt)
+                expiresAt: expiresAt,
+                unreadableExpiry: servesExpiry && expiresAt == nil
             )
         } else {
             grant = nil
@@ -651,6 +663,8 @@ enum PurchaseEligibility: Equatable, Sendable {
     /// Abonnement App Store présent sur cet identifiant Apple, mais pas encore
     /// rattaché à ce compte SignalQuest.
     case existingLocalAppStoreEntitlement(SupporterTier)
+    /// Premium offert en cours (contrat v1.23) : aucun achat tant que le don dure.
+    case premiumGifted(EntitlementGrant)
     case serverVerificationUnavailable
 
     var canPurchase: Bool { self == .allowed }
@@ -679,6 +693,8 @@ enum PurchaseEligibility: Equatable, Sendable {
             return String(localized: "Abonnement souscrit sur un autre appareil : il se gère là où il a été souscrit. Aucun achat n’est proposé ici, pour éviter un double paiement.")
         case .existingLocalAppStoreEntitlement:
             return String(localized: "Un abonnement App Store est actif sur cet identifiant Apple, mais pas encore sur ce compte. Touche « Restaurer mes achats » pour le rattacher.")
+        case .premiumGifted:
+            return String(localized: "Premium est déjà offert sur ce compte.")
         case .serverVerificationUnavailable:
             return String(localized: "Les achats ne sont pas disponibles dans cette version de l’app.")
         }
@@ -689,28 +705,35 @@ struct PurchaseEligibilityPolicy {
     /// Décision lue dans la réponse du serveur, seule source des droits :
     /// - un abonnement en cours (même résilié, en grâce, suspendu ou en pause)
     ///   renvoie vers sa gestion, selon son canal ;
-    /// - un accès offert ou un abonnement terminé n'empêchent pas d'acheter ;
     /// - un abonnement App Store local que le serveur ne connaît pas encore
-    ///   bloque l'achat : Apple le refuserait, il faut le rattacher.
+    ///   bloque l'achat : Apple le refuserait, il faut le rattacher ;
+    /// - un Premium offert en cours masque l'offre tant qu'il dure (contrat v1.23) ;
+    ///   un accès Basic offert ou un abonnement terminé n'empêchent pas d'acheter.
     static func evaluate(
         serverState: ServerEntitlementState,
         localTier: SupporterTier,
         purchasesEnabled: Bool,
-        serverVerificationReady: Bool
+        serverVerificationReady: Bool,
+        now: Date = Date()
     ) -> PurchaseEligibility {
+        let snapshot: EntitlementSnapshot
         switch serverState {
         case .idle, .loading:
             return .checkingServer
         case .unavailable:
             return .backendUnavailable
-        case .available(let snapshot):
-            if let blocking = snapshot.blockingSubscription {
+        case .available(let served):
+            if let blocking = served.blockingSubscription {
                 return blocking.channel == .appStore ? .managedByAppStore(blocking) : .managedElsewhere(blocking)
             }
+            snapshot = served
         }
 
         if localTier != .free {
             return .existingLocalAppStoreEntitlement(localTier)
+        }
+        if let grant = snapshot.grant, grant.isActivePremiumGift(at: now) {
+            return .premiumGifted(grant)
         }
         guard purchasesEnabled, serverVerificationReady else {
             return .serverVerificationUnavailable

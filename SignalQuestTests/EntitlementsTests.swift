@@ -279,7 +279,7 @@ final class EntitlementsTests: XCTestCase {
     }
 
     /// M1 : une offre en cours renvoie vers sa gestion, un abonnement terminé ou
-    /// un accès offert laissent acheter.
+    /// un accès Basic offert laissent acheter ; un Premium offert, non (v1.23).
     func testEligibilityFollowsSubscriptionStateAndChannel() throws {
         func eligibility(_ channel: String, _ state: String, tier: String = "premium") throws -> PurchaseEligibility {
             let snapshot = EntitlementSnapshot(response: try decodeResponse("""
@@ -306,11 +306,22 @@ final class EntitlementsTests: XCTestCase {
         XCTAssertEqual(granted.source, .manual)
         XCTAssertEqual(granted.grant?.tier, .premium)
         XCTAssertNotNil(granted.expiresAt)
+        let now = Date(timeIntervalSince1970: 1_795_000_000)
         XCTAssertEqual(
             PurchaseEligibilityPolicy.evaluate(serverState: .available(granted), localTier: .free,
-                                               purchasesEnabled: true, serverVerificationReady: true),
+                                               purchasesEnabled: true, serverVerificationReady: true, now: now),
+            .premiumGifted(try XCTUnwrap(granted.grant)),
+            "Un Premium offert masque l'offre tant qu'il dure (v1.23)"
+        )
+        let basic = EntitlementSnapshot(response: try decodeResponse("""
+        { "version": 1, "tier": "basic", "subscription": null,
+          "grant": { "source": "promo", "tier": "basic", "expiresAt": "2026-12-01T00:00:00Z" } }
+        """))
+        XCTAssertEqual(
+            PurchaseEligibilityPolicy.evaluate(serverState: .available(basic), localTier: .free,
+                                               purchasesEnabled: true, serverVerificationReady: true, now: now),
             .allowed,
-            "Un accès offert n'empêche pas de s'abonner pour la suite"
+            "Un accès Basic offert n'empêche pas de s'abonner à Premium"
         )
     }
 
@@ -322,6 +333,43 @@ final class EntitlementsTests: XCTestCase {
         if case .managedElsewhere = PurchaseEligibilityPolicy.evaluate(
             serverState: .available(snapshot), localTier: .free, purchasesEnabled: true, serverVerificationReady: true
         ) {} else { XCTFail("Un abonnement payé ailleurs doit bloquer l'achat") }
+    }
+
+    /// Avenant v1.23 : un Premium offert masque l'offre tant qu'il dure. Un abonnement payé garde
+    /// la priorité (il se gère), un achat App Store à rattacher aussi (« Restaurer mes achats »).
+    func testPremiumGiftHidesTheOfferWhileItLasts() throws {
+        let now = Date(timeIntervalSince1970: 1_795_000_000)
+        func eligibility(_ grant: String, subscription: String = "null",
+                         localTier: SupporterTier = .free) throws -> PurchaseEligibility {
+            let snapshot = EntitlementSnapshot(response: try decodeResponse("""
+            { "version": 1, "tier": "premium", "subscription": \(subscription), "grant": \(grant) }
+            """))
+            return PurchaseEligibilityPolicy.evaluate(serverState: .available(snapshot), localTier: localTier,
+                                                       purchasesEnabled: true, serverVerificationReady: true, now: now)
+        }
+        func isGifted(_ eligibility: PurchaseEligibility) -> Bool {
+            if case .premiumGifted = eligibility { return true }
+            return false
+        }
+
+        XCTAssertTrue(isGifted(try eligibility(#"{ "source": "admin", "tier": "premium", "expiresAt": null }"#)))
+        XCTAssertTrue(isGifted(try eligibility(#"{ "source": "promo", "tier": "premium" }"#)))
+        XCTAssertTrue(isGifted(try eligibility(#"{ "source": "promo", "tier": "premium", "expiresAt": "2027-01-12T00:00:00Z" }"#)))
+        // Don échu (avant la tâche quotidienne du serveur), Basic ou échéance illisible : l'offre reste.
+        XCTAssertEqual(try eligibility(#"{ "source": "promo", "tier": "premium", "expiresAt": "2026-11-01T00:00:00Z" }"#), .allowed)
+        XCTAssertEqual(try eligibility(#"{ "source": "admin", "tier": "basic", "expiresAt": null }"#), .allowed)
+        XCTAssertEqual(try eligibility(#"{ "source": "admin", "tier": "premium", "expiresAt": "demain" }"#), .allowed)
+        XCTAssertEqual(try eligibility("null"), .allowed)
+
+        let gift = #"{ "source": "admin", "tier": "premium", "expiresAt": null }"#
+        if case .managedByAppStore = try eligibility(
+            gift, subscription: #"{ "channel": "app_store", "state": "active", "tier": "premium" }"#
+        ) {} else { XCTFail("Un abonnement App Store payé se gère, même avec un don") }
+        if case .managedElsewhere = try eligibility(
+            gift, subscription: #"{ "channel": "stripe", "state": "active", "tier": "premium" }"#
+        ) {} else { XCTFail("Un abonnement web payé se gère, même avec un don") }
+        XCTAssertEqual(try eligibility(gift, localTier: .premium), .existingLocalAppStoreEntitlement(.premium))
+        XCTAssertFalse(PurchaseEligibility.premiumGifted(EntitlementGrant(tier: .premium, expiresAt: nil)).canPurchase)
     }
 
     /// Règles 2.3.10 et 3.1.1 : aucun message ne nomme une autre plateforme ni
@@ -338,6 +386,7 @@ final class EntitlementsTests: XCTestCase {
         messages += [
             PurchaseEligibility.allowed, .checkingServer, .backendUnavailable,
             .existingLocalAppStoreEntitlement(.premium), .serverVerificationUnavailable,
+            .premiumGifted(EntitlementGrant(tier: .premium, expiresAt: nil)),
         ].map(\.userMessage)
         messages += [EntitlementSource.googlePlay, .stripe, .unknown].map(\.displayName)
         for message in messages {
@@ -609,7 +658,8 @@ final class EntitlementsTests: XCTestCase {
         let all: [PurchaseEligibility] = [
             .allowed, .checkingServer, .backendUnavailable,
             .managedByAppStore(subscription), .managedElsewhere(subscription),
-            .existingLocalAppStoreEntitlement(.premium), .serverVerificationUnavailable
+            .existingLocalAppStoreEntitlement(.premium), .serverVerificationUnavailable,
+            .premiumGifted(EntitlementGrant(tier: .premium, expiresAt: nil))
         ]
         for case let eligibility in all {
             XCTAssertFalse(eligibility.userMessage.contains("snapshot."), "\(eligibility)")
@@ -760,8 +810,8 @@ final class SubscriptionStatusPresentationTests: XCTestCase {
 
     func testGrantAndFreeTierWithoutSubscription() {
         let granted = SubscriptionStatusPresentation.make(serverState: .available(EntitlementSnapshot(
-            tier: .premium, source: .manual, period: nil, status: .active, expiresAt: end,
-            grant: EntitlementGrant(tier: .premium, expiresAt: end)
+            tier: .basic, source: .manual, period: nil, status: .active, expiresAt: end,
+            grant: EntitlementGrant(tier: .basic, expiresAt: end)
         )))
         XCTAssertEqual(granted.tag, String(localized: "Offert"))
         XCTAssertEqual(granted.management, .none)
@@ -775,6 +825,35 @@ final class SubscriptionStatusPresentationTests: XCTestCase {
         let down = SubscriptionStatusPresentation.make(serverState: .unavailable("x"))
         XCTAssertEqual(down.tone, .warning)
         XCTAssertEqual(down.management, .none)
+    }
+
+    /// Avenant v1.23 : le Premium offert se dit avec les textes communs aux trois apps ; un accès
+    /// Basic offert garde l'ancien texte, puisque l'offre Premium lui reste proposée.
+    func testPremiumGiftCardUsesTheSharedText() {
+        let now = Date(timeIntervalSince1970: 1_795_000_000)
+        func card(_ grant: EntitlementGrant) -> SubscriptionStatusPresentation {
+            SubscriptionStatusPresentation.make(serverState: .available(EntitlementSnapshot(
+                tier: grant.tier, source: .manual, period: nil, status: .active, expiresAt: grant.expiresAt, grant: grant
+            )), now: now)
+        }
+        let dated = card(EntitlementGrant(tier: .premium, expiresAt: end))
+        XCTAssertEqual(dated.title, String(localized: "Premium offert"))
+        XCTAssertNil(dated.tag)
+        XCTAssertEqual(dated.details, [
+            String(localized: "Tes fonctionnalités Premium sont offertes jusqu’au \(SubscriptionStatusPresentation.day(end)).")
+        ])
+        XCTAssertEqual(dated.management, .none)
+
+        let french = Bundle.main.preferredLocalizations.first?.hasPrefix("fr") == true
+        let open = card(EntitlementGrant(tier: .premium, expiresAt: nil))
+        XCTAssertEqual(open.title, french ? "Premium offert" : "Premium gifted")
+        XCTAssertEqual(open.details, [french
+            ? "Tes fonctionnalités Premium sont offertes, sans date de fin."
+            : "Your Premium features are free, with no end date."])
+
+        let basic = card(EntitlementGrant(tier: .basic, expiresAt: nil))
+        XCTAssertEqual(basic.tag, String(localized: "Offert"))
+        XCTAssertEqual(basic.details, [String(localized: "Accès offert, sans date de fin.")])
     }
 
     /// Unité mineure (contrat v1.8) : 799 centimes d'euro, 1 200 yens sans décimale.
@@ -1243,6 +1322,9 @@ final class PaywallRenderingHarness: XCTestCase {
         ("3-resilie-app-store", #"{"version":1,"tier":"premium","subscription":{"channel":"app_store","state":"active","tier":"premium","period":"month","autoRenew":false,"currentPeriodEnd":"2026-12-14T10:00:00Z","price":{"unitAmount":799,"currency":"EUR"}}}"#),
         ("4-paiement-a-regulariser", #"{"version":1,"tier":"premium","subscription":{"channel":"app_store","state":"grace","tier":"premium","period":"month","autoRenew":true,"currentPeriodEnd":"2026-11-10T10:00:00Z","graceEndsAt":"2026-11-26T10:00:00Z"}}"#),
         ("5-autre-canal-doublon", #"{"version":1,"tier":"premium","subscription":{"channel":"stripe","state":"active","tier":"premium","period":"month","autoRenew":true,"currentPeriodEnd":"2026-12-01T10:00:00Z"},"otherSubscriptions":[{"channel":"google_play","state":"active","tier":"premium","period":"year","autoRenew":true}],"warnings":["DUPLICATE_PAID_SUBSCRIPTION"]}"#),
+        // Avenant v1.23 : Premium offert, sans puis avec date de fin.
+        ("6-premium-offert", #"{"version":1,"tier":"premium","tierSource":"admin","subscription":null,"grant":{"source":"admin","tier":"premium","expiresAt":null},"trial":{"eligible":true,"days":7}}"#),
+        ("7-premium-offert-date", #"{"version":1,"tier":"premium","tierSource":"promo","subscription":null,"grant":{"source":"promo","tier":"premium","expiresAt":"2027-01-12T10:00:00Z"},"trial":{"eligible":true,"days":7}}"#),
     ]
 
     func testRenderPaywallStates() async throws {

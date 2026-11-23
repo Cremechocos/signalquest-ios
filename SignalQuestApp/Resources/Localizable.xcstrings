@@ -124804,6 +124804,94 @@
           }
         }
       }
+    },
+    "Premium offert" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium gifted"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium offert"
+          }
+        }
+      }
+    },
+    "Tes fonctionnalités Premium sont offertes jusqu’au %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your Premium features are free until %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes fonctionnalités Premium sont offertes jusqu’au %@."
+          }
+        }
+      }
+    },
+    "Tes fonctionnalités Premium sont offertes, sans date de fin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your Premium features are free, with no end date."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes fonctionnalités Premium sont offertes, sans date de fin."
+          }
+        }
+      }
+    },
+    "Premium est déjà offert sur ce compte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium is already gifted on this account."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium est déjà offert sur ce compte."
+          }
+        }
+      }
+    },
+    "SQFormal|Tes fonctionnalités Premium sont offertes jusqu’au %@." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vos fonctionnalités Premium sont offertes jusqu’au %@."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SQFormal|Tes fonctionnalités Premium sont offertes, sans date de fin." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vos fonctionnalités Premium sont offertes, sans date de fin."
+          }
+        }
+      },
+      "shouldTranslate" : false
     }
   },
   "version" : "1.0"
