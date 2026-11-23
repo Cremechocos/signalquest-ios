@@ -439,6 +439,12 @@ struct PaywallView: View {
         SubscriptionStatusPresentation.make(serverState: store.serverState)
     }
 
+    /// Abonnement payé hors de l'App Store (web) : ni l'achat ni la résiliation ne passent par Apple.
+    private var isManagedElsewhere: Bool {
+        if case .managedElsewhere = store.eligibility { return true }
+        return false
+    }
+
     /// Une offre en cours se gère, elle ne se rachète pas : la carte d'achat
     /// disparaît tant qu'un abonnement court (contrat v1 §6, double abonnement).
     private var showsOffer: Bool {
@@ -655,10 +661,13 @@ struct PaywallView: View {
     /// conditions et la confidentialité.
     private var legalFooter: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text("Premium est un abonnement mensuel ou annuel à renouvellement automatique, payé avec ton identifiant Apple à la confirmation de l’achat. Il se renouvelle au même prix, sauf résiliation au moins 24 heures avant la fin de la période en cours, depuis les réglages de ton compte Apple. Pas de partage familial. Le prix affiché par Apple au moment de l’achat fait foi.")
-                .font(SQType.caption)
-                .foregroundStyle(SQColor.labelSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+            // Abonnement payé sur le web : ni l'achat ni la résiliation ne passent par Apple.
+            if !isManagedElsewhere {
+                Text("Premium est un abonnement mensuel ou annuel à renouvellement automatique, payé avec ton identifiant Apple à la confirmation de l’achat. Il se renouvelle au même prix, sauf résiliation au moins 24 heures avant la fin de la période en cours, depuis les réglages de ton compte Apple. Pas de partage familial. Le prix affiché par Apple au moment de l’achat fait foi.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if showsOffer, SignalQuestSubscriptionProduct.allCases.contains(where: { store.freeTrialOffer(for: $0) != nil }) {
                 Text("Pendant l’essai gratuit, rien n’est prélevé. Sans résiliation au moins 24 heures avant sa fin, l’abonnement démarre et le premier paiement est prélevé.")
                     .font(SQType.caption)
