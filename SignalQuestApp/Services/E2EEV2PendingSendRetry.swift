@@ -8,7 +8,8 @@ enum E2EEV2PendingSendDisposition: Equatable, Sendable {
     /// (5xx), délai (408, 425), frein (429), rejeu en conflit, ou époque encore à synchroniser
     /// après les tours de l'envoi : le même envoi repartira seul.
     case transient
-    /// Un membre doit mettre à jour SignalQuest : la bulle reste « Non envoyé », l'enveloppe gardée.
+    /// Un membre doit mettre à jour SignalQuest, ou cette app (426) : la bulle reste « Non envoyé »,
+    /// l'enveloppe gardée, renvoyable d'un toucher.
     case awaitingUpdate
     /// Tout le reste, dont la limite quotidienne de demandes (429 `MESSAGE_REQUEST_LIMIT`) et la
     /// demande pas encore acceptée : réessayer n'y changerait rien, le texte revient à l'auteur.
@@ -18,15 +19,23 @@ enum E2EEV2PendingSendDisposition: Equatable, Sendable {
         switch result {
         case .sent, .alreadyAccepted: self = .delivered
         case .capabilityMissing: self = .awaitingUpdate
+        case .failure(let failure) where failure.statusCode == 426: self = .awaitingUpdate
         case .failure(let failure): self = Self.isTransient(failure) ? .transient : .refused
-        // Écart assumé avec Android, qui les rend à l'auteur : « synchroniser, puis réessayer ».
+        // « Synchroniser, puis réessayer » ; Android s'aligne (22/11).
         case .needsEpoch, .needsRotation, .compromisedEpoch: self = .transient
         case .membersNotTrusted: self = .refused
         }
     }
 
+    /// L'annuaire des appareils illisible ou une liste encore périmée sont déjà `.retryable` ;
+    /// une synchronisation de la conversation en attente est un état local qui se lève seul
+    /// (Android, 5d353dddd). Les autres états locaux (illisibles, invalides) restent des refus.
     static func isTransient(_ failure: E2EEV2TransportFailure) -> Bool {
-        failure.kind == .retryable && failure.code != MessageRequestLimitError.code
+        switch failure.kind {
+        case .retryable: return failure.code != MessageRequestLimitError.code
+        case .localState: return failure.message == "e2ee-membership-behind"
+        default: return false
+        }
     }
 }
 

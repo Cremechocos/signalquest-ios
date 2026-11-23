@@ -3705,9 +3705,11 @@ struct ConversationDetailView: View {
         if case .failure(let failure) = result, MessageRequestLimitError.isPending(failure) {
             requestState = .senderSent
         }
-        let reason = EncryptedConversationSurfaces.v2SendFailureMessage(result)
-            ?? String(localized: "Ce message chiffré n’a pas pu être envoyé.")
-        switch E2EEV2PendingSendDisposition(result) {
+        let disposition = E2EEV2PendingSendDisposition(result)
+        let reason = disposition == .awaitingUpdate
+            ? EncryptedConversationSurfaces.v2AwaitingUpdateReason(result)
+            : EncryptedConversationSurfaces.v2SendFailureMessage(result) ?? String(localized: "Ce message chiffré n’a pas pu être envoyé.")
+        switch disposition {
         case .delivered:
             // La bulle locale reste jusqu'à ce que la relève apporte celle du serveur
             // (même clientRequestId) : `loadV2Once` les échange dans la même mise à
@@ -3721,13 +3723,17 @@ struct ConversationDetailView: View {
             pendingSends[localId]?.failureReason = nil
             sendStatus[localId] = .sending
             retry.scheduleRetry()
-            if firstAttempt, case .failure = result {
-                inAppNotifications.show(SQInAppNotificationItem(
-                    body: networkPath.isOnline
+            if firstAttempt {
+                // Époque encore à synchroniser : l'avis d'Android, pas « Service indisponible ».
+                let body: String
+                if case .failure = result {
+                    body = networkPath.isOnline
                         ? String(localized: "Service indisponible. L’envoi repartira tout seul quand il répondra.")
-                        : String(localized: "Pas de connexion internet. L’envoi repartira tout seul au retour du réseau."),
-                    variant: .info
-                ))
+                        : String(localized: "Pas de connexion internet. L’envoi repartira tout seul au retour du réseau.")
+                } else {
+                    body = String(localized: "En attente de la clé de cette conversation chiffrée.")
+                }
+                inAppNotifications.show(SQInAppNotificationItem(body: body, variant: .info))
             }
         case .refused where firstAttempt:
             queuedSends.remove(localId)

@@ -43,9 +43,18 @@ final class E2EEV2PendingSendRetryTests: XCTestCase {
         XCTAssertEqual(D(failure(429, MessageRequestLimitError.code, kind: .retryable)), .refused)
         XCTAssertEqual(D(failure(403, MessageRequestLimitError.pendingCode)), .refused)
         XCTAssertEqual(D(failure(401)), .refused)
-        XCTAssertEqual(D(failure(426)), .refused)
+        // Cette app doit se mettre à jour : la bulle reste renvoyable, comme sur Android.
+        XCTAssertEqual(D(failure(426, "E2EE_UPDATE_REQUIRED")), .awaitingUpdate)
+        XCTAssertEqual(EncryptedConversationSurfaces.v2AwaitingUpdateReason(failure(426, "E2EE_UPDATE_REQUIRED")),
+                       String(localized: "Mise à jour requise"))
+        XCTAssertEqual(D(failure(403, "E2EE_V2_PREVIEW_REQUIRED")), .refused)
         XCTAssertEqual(D(failure(400, "E2EE_INVALID")), .refused)
         XCTAssertEqual(D(failure(nil, kind: .localState)), .refused)
+        // Pendant une panne : annuaire des appareils illisible, liste périmée, synchronisation en attente.
+        XCTAssertEqual(D(.failure(E2EEV2TransportFailure(kind: .retryable, message: "e2ee-v2-device-directory-unavailable"))), .transient)
+        XCTAssertEqual(D(.failure(E2EEV2DeviceListReread.failure(["u2"]))), .transient)
+        XCTAssertEqual(D(.failure(E2EEV2TransportFailure(kind: .localState, message: "e2ee-membership-behind"))), .transient)
+        XCTAssertEqual(D(.failure(E2EEV2TransportFailure(kind: .localState, message: "e2ee-sync-state-unavailable"))), .refused)
         XCTAssertEqual(D(.membersNotTrusted(["u2"])), .refused)
         XCTAssertEqual(D(.capabilityMissing(["reactions"])), .awaitingUpdate)
         // L'avis de l'écran verrouillé suit la même règle.

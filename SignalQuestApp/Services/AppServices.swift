@@ -428,7 +428,7 @@ final class AppServices: ObservableObject {
                 await store.removeV2Send(clientRequestId: pending.clientRequestId, ownerScopeId: ownerScopeId)
                 outcome = .delivered
             case .awaitingUpdate:
-                let reason = EncryptedConversationSurfaces.v2SendFailureMessage(result) ?? ""
+                let reason = EncryptedConversationSurfaces.v2AwaitingUpdateReason(result)
                 await store.markV2SendFailed(clientRequestId: pending.clientRequestId, reason: reason, ownerScopeId: ownerScopeId)
                 outcome = .awaitingUpdate(reason: reason)
             case .refused:
@@ -498,7 +498,7 @@ final class AppServices: ObservableObject {
             // Bulle « Non envoyé » dans la conversation, avec Renvoyer une fois la mise à jour faite.
             await store.markV2SendFailed(
                 clientRequestId: pending.clientRequestId,
-                reason: EncryptedConversationSurfaces.v2SendFailureMessage(result) ?? "", ownerScopeId: session.ownerScopeId
+                reason: EncryptedConversationSurfaces.v2AwaitingUpdateReason(result), ownerScopeId: session.ownerScopeId
             )
         case .refused:
             // Comme un refus de la reprise : le texte attend dans le brouillon de la conversation.

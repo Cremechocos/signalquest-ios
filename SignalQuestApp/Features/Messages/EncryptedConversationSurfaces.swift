@@ -110,6 +110,15 @@ enum EncryptedConversationSurfaces {
         }
     }
 
+    /// Cause sous une bulle laissée « Non envoyé » faute de mise à jour (QA-066) : celle d'un
+    /// membre, ou de cette app (426).
+    static func v2AwaitingUpdateReason(_ result: E2EEV2MessageSendResultV2) -> String {
+        if case .failure(let failure) = result, failure.statusCode == 426 {
+            return String(localized: "Mise à jour requise")
+        }
+        return v2SendFailureMessage(result) ?? String(localized: "Mise à jour requise")
+    }
+
     /// Programmé chiffré (E2EE-AUTO §7.8 F) : les textes de l'envoi, sans file de reprise,
     /// plus les refus propres aux programmés.
     static func scheduleFailureMessage(_ result: E2EEV2ScheduleResultV2) -> String? {
