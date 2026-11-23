@@ -123,7 +123,6 @@ run_debug() {
     -parallel-testing-enabled NO \
     -collect-test-diagnostics never \
     -testLanguage fr \
-    -skip-testing:SignalQuestTests/LocalizationBundleTests \
     -skip-testing:SignalQuestTests/SpeedtestVisibilityViewModelTests/testOwnerVisibilityControlsRenderOnSmallEnglishPhone \
     ${scope_args[@]+"${scope_args[@]}"} \
     CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=YES CODE_SIGN_IDENTITY=-
