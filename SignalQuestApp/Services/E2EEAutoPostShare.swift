@@ -193,3 +193,49 @@ enum E2EEAutoPostShare {
         return result.isEmpty ? nil : result
     }
 }
+
+/// Photo de la galerie partagée dans une conversation v2 (IOS-001, choix d'Alexandre du 23/11) :
+/// pièce jointe chiffrée, par la même file durable que depuis le fil. L'image publique est relue
+/// puis réencodée en JPEG de 1 280 px au plus, donc sans métadonnée ; rien ne part en clair.
+enum E2EEAutoPhotoShare {
+    /// Les deux conditions de la carte de publication : conversation v2 vue ici, écriture v2 ouverte.
+    static func applies(
+        to conversation: MessageConversation, writesEnabled: Bool,
+        ownerNamespace: String = LocalAccountScope.storageNamespace,
+        stateStore: E2EEV2ConversationStateStore = E2EEV2ConversationStateStore()
+    ) -> Bool {
+        writesEnabled && EncryptedConversationSurfaces.isV2(conversation, ownerNamespace: ownerNamespace, stateStore: stateStore)
+    }
+
+    static func send(
+        imageURL: URL, caption: String, to conversation: MessageConversation, ttlSeconds: Int,
+        messaging: E2EEV2MessagingRuntime
+    ) async -> Bool {
+        guard let scope = LocalAccountScope.sessionSnapshot()?.ownerScopeId,
+              let (client, ownerScopeId) = messaging.blobClient(), ownerScopeId == scope,
+              let image = try? await ImagePipeline.shared.image(for: imageURL, maxPixel: 1_280),
+              let jpeg = image.jpegData(compressionQuality: 1),
+              let source = await Task.detached(priority: .userInitiated, operation: { E2EEAutoMediaPreparation.photo(jpeg) }).value,
+              let record = try? await E2EEAutoMediaOutbox.shared.stage(
+                  [source], caption: E2EEAutoPostShare.bounded(caption, maxBytes: E2EEAutoContentR17.maxCaptionBytes),
+                  replyToRef: nil, ttlSeconds: ttlSeconds, conversationId: conversation.id,
+                  isGroup: conversation.isGroup, participantIds: conversation.participants.map(\.userId), ownerScopeId: scope
+              ) else { return false }
+        let outcome = await E2EEAutoMediaOutbox.shared.process(
+            clientRequestId: record.key, ownerScopeId: scope, client: client, cache: .shared
+        ) { draft, record in
+            await messaging.send(
+                draft, clientRequestId: record.clientRequestId, conversationId: record.conversationId,
+                isGroup: record.isGroup, participantIds: record.participantIds
+            )
+        }
+        switch outcome {
+        case .sent:
+            return true
+        case .retry, .throttled, .failed:
+            // Comme la carte de publication : rien ne reste dans la file, la feuille affiche l'échec.
+            await E2EEAutoMediaOutbox.shared.remove(record.clientRequestId, ownerScopeId: scope)
+            return false
+        }
+    }
+}

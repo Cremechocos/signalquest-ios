@@ -95,6 +95,25 @@ final class EncryptedConversationSurfacesTests: XCTestCase {
         XCTAssertNotNil(Surfaces.v2SendFailureMessage(.membersNotTrusted(["u"])))
     }
 
+    /// IOS-001 : une photo de la galerie part chiffrée vers une conversation v2, écriture v2
+    /// ouverte ; partout ailleurs, la feuille garde ses chemins (clair, ou ligne grisée).
+    func testPhotoShareGoesEncryptedOnlyToAV2ConversationWithWritesOpen() throws {
+        let states = E2EEV2ConversationStateStore(tokenStore: InMemoryTokenStore(), allowsOwner: { _ in true })
+        let plain = conversation("conversation_plain_0001J7AB", encrypted: false)
+        let encrypted = conversation("conversation_photo_01J7AB", encrypted: true)
+        func applies(_ conversation: MessageConversation, writesEnabled: Bool) -> Bool {
+            E2EEAutoPhotoShare.applies(to: conversation, writesEnabled: writesEnabled, ownerNamespace: namespace, stateStore: states)
+        }
+        XCTAssertFalse(applies(plain, writesEnabled: true))
+        XCTAssertFalse(applies(encrypted, writesEnabled: true), "Chiffrée v1, sans genèse : ligne grisée")
+        try states.record(.init(
+            conversationId: encrypted.id, creatorUserId: "user_creator_01J7ABCD2345", creatorDeviceId: "device_creator_01J7ABCD",
+            manifestDigest: "digest", membershipChangeNumber: 2, membershipDigest: "membership", recordedAtMs: 1
+        ), ownerNamespace: namespace)
+        XCTAssertTrue(applies(encrypted, writesEnabled: true))
+        XCTAssertFalse(applies(encrypted, writesEnabled: false), "Écriture v2 fermée : rien ne part")
+    }
+
     private func conversation(_ id: String, encrypted: Bool) -> MessageConversation {
         MessageConversation(
             id: id, title: "Fixture", isGroup: false, e2eeEnabled: encrypted, groupPhotoUrl: nil, createdAt: nil,

@@ -291,6 +291,27 @@ final class PhotosViewModel: ObservableObject {
         }
     }
 
+    /// Conversation v2 : la photo part en pièce jointe chiffrée, jamais par les deux chemins
+    /// en clair ci-dessus (IOS-001). Une conversation éphémère garde sa durée.
+    func shareEncrypted(
+        _ photo: Photo,
+        to conversation: MessageConversation,
+        messaging: E2EEV2MessagingRuntime,
+        messagesService: MessagesServicing
+    ) async -> Bool {
+        guard let url = photo.imageUrl ?? photo.thumbnailUrl else {
+            Haptics.error()
+            return false
+        }
+        let policy = await ConversationSecretPolicyCache.resolved(conversationId: conversation.id, service: messagesService)
+        let sent = await E2EEAutoPhotoShare.send(
+            imageURL: url, caption: photo.displayCaption, to: conversation,
+            ttlSeconds: policy?.backgroundSendTTLSeconds ?? 0, messaging: messaging
+        )
+        if sent { Haptics.success() } else { Haptics.error() }
+        return sent
+    }
+
     /// Renvoie `nil` si l'envoi a réussi, sinon le message à afficher dans la feuille
     /// (session expirée, fichier trop gros, trop de requêtes… ne sont pas la même panne).
     func upload(data: Data, siteId: String, market: String?, description: String, operatorName: String?, exifMetadata: String?) async -> String? {
@@ -444,8 +465,16 @@ struct PhotosView: View {
                     onLike: { Task { await model.like(model.selectedPhoto ?? selected) } },
                     onSend: { Task { await model.sendComment() } },
                     onShareToConversation: { conversation in
-                        await model.share(
-                            model.selectedPhoto ?? selected,
+                        let photo = model.selectedPhoto ?? selected
+                        let messaging = services.e2eeV2Messaging
+                        if !AppEnvironment.usesDemoData,
+                           E2EEAutoPhotoShare.applies(to: conversation, writesEnabled: messaging.writesEnabled) {
+                            return await model.shareEncrypted(
+                                photo, to: conversation, messaging: messaging, messagesService: services.messages
+                            )
+                        }
+                        return await model.share(
+                            photo,
                             to: conversation,
                             messagesService: services.messages,
                             feedService: services.feed
@@ -849,7 +878,11 @@ struct PhotoDetailView: View {
                 ReportSheet(target: .photoComment(comment.id), service: services.reports)
             }
             .sheet(isPresented: $showShareSheet) {
-                PhotoShareSheet(photo: photo, messagesService: services.messages, onShare: onShareToConversation)
+                PhotoShareSheet(
+                    photo: photo, messagesService: services.messages,
+                    sharesEncrypted: { E2EEAutoPhotoShare.applies(to: $0, writesEnabled: services.e2eeV2Messaging.writesEnabled) },
+                    onShare: onShareToConversation
+                )
             }
             .sheet(isPresented: $showNativeShare) {
                 let shareText = String(localized: "\(photo.displayCaption) — Partagé via SignalQuest")
@@ -1504,6 +1537,8 @@ struct PhotoUploadView: View {
 struct PhotoShareSheet: View {
     let photo: Photo
     let messagesService: MessagesServicing
+    /// Vrai pour une conversation v2 : la photo y part en pièce jointe chiffrée (IOS-001).
+    var sharesEncrypted: (MessageConversation) -> Bool = { _ in false }
     let onShare: (MessageConversation) async -> Bool
 
     @Environment(\.dismiss) private var dismiss
@@ -1553,11 +1588,12 @@ struct PhotoShareSheet: View {
                             .listRowBackground(SQColor.surface)
                     }
                     ForEach(conversations) { conversation in
-                        // Partage indisponible vers une conversation chiffrée : soit la
-                        // carte de partage passerait en clair (SEC-1), soit l'envoi de
-                        // pièce jointe échouerait en E2EE (UX-3). On désactive plutôt
-                        // qu'échouer après coup sous un badge « Chiffrée ».
-                        let isE2EE = conversation.e2eeEnabled == true
+                        // En v2, la photo part chiffrée par l'app (IOS-001). Vers une autre
+                        // conversation chiffrée, le partage reste indisponible : la carte
+                        // passerait en clair (SEC-1), la pièce jointe échouerait (UX-3).
+                        // On désactive plutôt qu'échouer après coup sous un badge « Chiffrée ».
+                        let encrypted = sharesEncrypted(conversation)
+                        let isE2EE = conversation.e2eeEnabled == true && !encrypted
                         Button {
                             Task { await share(conversation) }
                         } label: {
@@ -1571,7 +1607,8 @@ struct PhotoShareSheet: View {
                                     Text(conversation.displayTitle.isEmpty ? String(localized: "Conversation") : conversation.displayTitle)
                                         .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
                                         .foregroundStyle(SQColor.label)
-                                    Text(isE2EE ? String(localized: "Chiffrée · partage indisponible") : String(localized: "Conversation"))
+                                    Text(isE2EE ? String(localized: "Chiffrée · partage indisponible")
+                                        : encrypted ? String(localized: "Conversation chiffrée") : String(localized: "Conversation"))
                                         .font(SQType.caption)
                                         .foregroundStyle(SQColor.labelSecondary)
                                 }
