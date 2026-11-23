@@ -40,6 +40,8 @@ struct LoginView: View {
     @State private var code = ""
     /// Code de secours tel que tapé (contrat 2FA r3, §1) : le serveur le normalise.
     @State private var backupCode = ""
+    /// Code parti à la vérification : les cases restent en lecture seule jusqu'à la réponse (2FA-CASES).
+    @State private var submittedCode: String?
     @State private var usesBackupCode = false
     @State private var showSignup = false
     @State private var showForgotPassword = false
@@ -93,9 +95,15 @@ struct LoginView: View {
                 #endif
             }
             .onChangeCompat(of: code) { _, value in
+                if let submittedCode {
+                    if value != submittedCode { code = submittedCode }
+                    return
+                }
                 // Six chiffres saisis : le code part seul, le bouton reste pour réessayer.
-                let digits = String(value.filter(\.isNumber).prefix(6))
+                let digits = AuthCodeBoxes.digits(value)
                 if digits != value { code = digits; return }
+                // Le message d'erreur s'efface au premier chiffre retapé.
+                if !digits.isEmpty, !usesBackupCode, session.errorMessage != nil { session.errorMessage = nil }
                 if digits.count == 6, !usesBackupCode { submitCode() }
             }
             .onChangeCompat(of: backupCode) { _, value in
@@ -349,7 +357,7 @@ struct LoginView: View {
                         } onTap: { focus = .backupCode }
                     }
                 } else {
-                    AuthCodeBoxes(code: $code, isFocused: focus == .code)
+                    AuthCodeBoxes(code: $code, isFocused: focus == .code, isError: session.errorMessage != nil)
                         .focused($focus, equals: .code)
                 }
                 if let error = session.errorMessage {
@@ -391,7 +399,18 @@ struct LoginView: View {
     private func submitCode() {
         let proof = twoFactorProof
         guard isTwoFactor, TwoFactorEnrollmentService.isReady(proof), !session.isBusy else { return }
-        Task { await session.verify2FA(proof: proof) }
+        if case .app(let value) = proof { submittedCode = value }
+        Task {
+            await session.verify2FA(proof: proof)
+            guard case .app = proof else { return }
+            submittedCode = nil
+            // Toute erreur (code faux, 429, réseau, session expirée) : les six cases se vident
+            // et la saisie reprend à la première (2FA-CASES).
+            if isTwoFactor, session.errorMessage != nil {
+                code = ""
+                focus = .code
+            }
+        }
     }
 
     private var isTwoFactor: Bool {
@@ -854,6 +873,18 @@ struct AuthPasswordInput: View {
 struct AuthCodeBoxes: View {
     @Binding var code: String
     var isFocused = false
+    /// Après une erreur, jusqu'au premier chiffre retapé.
+    var isError = false
+
+    /// Chiffres décimaux de toute écriture ramenés en ASCII (« ١٢٣ », « １２３ » → 123) ; le reste
+    /// (« ² », lettres, espaces, tirets) est écarté, six au plus (2FA-CASES r0.1, comme Android).
+    nonisolated static func digits(_ value: String) -> String {
+        String(value.unicodeScalars.compactMap { scalar -> Character? in
+            guard scalar.properties.generalCategory == .decimalNumber,
+                  let digit = scalar.properties.numericValue, (0...9).contains(digit) else { return nil }
+            return Character(String(Int(digit)))
+        }.prefix(6))
+    }
 
     var body: some View {
         ZStack {
@@ -869,14 +900,14 @@ struct AuthCodeBoxes: View {
                         .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                         .overlay {
                             RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                                .strokeBorder(isCurrent ? SQColor.brandRed : SQColor.separator,
-                                              lineWidth: isCurrent ? 1.5 : 1)
+                                .strokeBorder(isError ? SQColor.dangerInk : isCurrent ? SQColor.brandRed : SQColor.separator,
+                                              lineWidth: isError || isCurrent ? 1.5 : 1)
                         }
                 }
             }
             .accessibilityHidden(true)
             // Sans texte indicatif : le champ est invisible, seules les cases se voient.
-            TextField("Code à 6 chiffres", text: $code, prompt: Text(verbatim: ""))
+            codeField
                 .textContentType(.oneTimeCode)
                 .keyboardType(.numberPad)
                 .autocorrectionDisabled()
@@ -886,6 +917,32 @@ struct AuthCodeBoxes: View {
                 .accessibilityLabel("Code à 6 chiffres")
                 .accessibilityIdentifier("login.twoFactor.code")
         }
+    }
+
+    @ViewBuilder private var codeField: some View {
+        if #available(iOS 18.0, *) {
+            AuthCodeEndCaretField(code: $code)
+        } else {
+            TextField("Code à 6 chiffres", text: $code, prompt: Text(verbatim: ""))
+        }
+    }
+}
+
+/// Saisie cachée des six cases dont le curseur reste après le dernier chiffre : un toucher sur
+/// une case ne permet jamais d'éditer au milieu (2FA-CASES, règle 3). Avant iOS 18, SwiftUI
+/// n'expose pas la sélection d'un champ.
+@available(iOS 18.0, *)
+private struct AuthCodeEndCaretField: View {
+    @Binding var code: String
+    @State private var selection: TextSelection?
+
+    var body: some View {
+        TextField("Code à 6 chiffres", text: $code, selection: $selection, prompt: Text(verbatim: ""))
+            .onChange(of: selection) { _, value in
+                guard value != nil else { return }
+                let end = TextSelection(insertionPoint: code.endIndex)
+                if value != end { selection = end }
+            }
     }
 }
 

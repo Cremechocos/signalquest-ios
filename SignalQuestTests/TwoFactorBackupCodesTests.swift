@@ -16,6 +16,16 @@ final class MemoryBackupCodesMarkers: @unchecked Sendable {
 
 /// Codes de secours (contrat 2FA r3.3) : saisie, règle A, textes du §8 et corps des requêtes.
 final class TwoFactorBackupCodesTests: XCTestCase {
+    /// 2FA-CASES r0.1 : chiffres décimaux de toute écriture en ASCII, le reste écarté, six au plus.
+    func testLoginCodeBoxesKeepDecimalDigitsOfAnyScriptAsASCII() {
+        XCTAssertEqual(AuthCodeBoxes.digits("123 456"), "123456")
+        XCTAssertEqual(AuthCodeBoxes.digits("١٢٣٤٥٦"), "123456")
+        XCTAssertEqual(AuthCodeBoxes.digits("１２３-４５６"), "123456")
+        XCTAssertEqual(AuthCodeBoxes.digits("²³1a 2-3"), "123")
+        XCTAssertEqual(AuthCodeBoxes.digits("12345678"), "123456")
+        XCTAssertEqual(AuthCodeBoxes.digits(""), "")
+    }
+
     private let generatedAt = "2026-11-15T21:37:00.000Z"
 
     func testValidateIsEnabledFromTenCharactersWithoutSpacesAndDashes() {
