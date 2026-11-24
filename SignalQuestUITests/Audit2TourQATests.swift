@@ -173,8 +173,15 @@ final class Audit2TourQATests: XCTestCase {
             .matching(NSPredicate(format: "identifier BEGINSWITH 'feed.item.'"))
             .firstMatch
         if tapIfExists(firstPost, in: app) {
-            pause(3)
+            // La feuille peut mettre plusieurs secondes à monter sur une machine
+            // chargée : on attend son bouton de fermeture avant de la photographier.
+            let closer = [app.buttons["Fermer"].firstMatch, app.buttons["Close"].firstMatch]
+            _ = closer[0].waitForExistence(timeout: 10) || closer[1].waitForExistence(timeout: 1)
+            pause(1.5)
             snap("publication-detail")
+            // Le détail s'ouvre en feuille depuis le fil : un retour seul la laissait
+            // ouverte et tout le reste du tour tombait dessus.
+            dismissSheet(app)
             back(app)
         }
         let firstStory = identified("feed.story.name", in: app)
