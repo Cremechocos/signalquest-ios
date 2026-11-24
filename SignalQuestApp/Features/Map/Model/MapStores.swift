@@ -299,6 +299,19 @@ enum MapMarketStore {
 
 /// Persiste le choix « photos de mes amis seulement ». Absence de clé = toutes
 /// les photos.
+/// Métrique de la couche Débits (IOS-037), propre à l'appareil comme le choix d'Android.
+enum MapSpeedtestMetricStore {
+    static let key = "map.speedtestMetric.v1"
+
+    static func load() -> SpeedtestMapMetric {
+        UserDefaults.standard.string(forKey: key).flatMap(SpeedtestMapMetric.init(rawValue:)) ?? .download
+    }
+
+    static func save(_ metric: SpeedtestMapMetric) {
+        UserDefaults.standard.set(metric.rawValue, forKey: key)
+    }
+}
+
 enum MapPhotosFriendsOnlyStore {
     static let key = "map.photosFriendsOnly.v1"
 

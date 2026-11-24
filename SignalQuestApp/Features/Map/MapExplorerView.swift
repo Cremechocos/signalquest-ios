@@ -147,6 +147,10 @@ final class MapExplorerViewModel: ObservableObject {
     /// La vue la remet à faux sans compte.
     @Published var photosFriendsOnly = MapPhotosFriendsOnlyStore.load()
     @Published var speedtestDays = 0
+    /// Métrique de la couche Débits (IOS-037) ; recolore les points sans rien recharger.
+    @Published var speedtestMetric = MapSpeedtestMetricStore.load() {
+        didSet { if speedtestMetric != oldValue { MapSpeedtestMetricStore.save(speedtestMetric) } }
+    }
     @Published var coverageDays = 0
     @Published var searchQuery: String = ""
     @Published var searchResults: [MapSearchResult] = []
@@ -2054,6 +2058,7 @@ struct MapExplorerView: View {
                 byGeneration: $coverageByGeneration,
                 coverageMeasure: Binding(get: { coverageMeasure }, set: { coverageMeasureRaw = $0.rawValue }),
                 azimuthStyle: $model.azimuthStyle,
+                speedtestMetric: $model.speedtestMetric,
                 allMarkets: model.registryMarkets,
                 showsFriendsLayer: services.auth.hasStoredCredentials(),
                 operatorOptions: model.operatorOptions,
@@ -2497,6 +2502,7 @@ struct MapExplorerView: View {
             } ?? renderedAnnotations,
             coverageHeatFeatures: sessionFocus == nil ? renderedCoverageFeatures : [],
             speedtestFeatures: sessionFocus == nil ? renderedSpeedtestFeatures : [],
+            speedtestMetric: model.speedtestMetric,
             // Paire hors trajet, impaire en trajet : la version des couches du trajet
             // fait passer ses speedtests, chargés après le tracé.
             renderVersion: sessionFocus.map { $0.layerRevision &* 2 &+ 1 } ?? renderVersion &* 2,

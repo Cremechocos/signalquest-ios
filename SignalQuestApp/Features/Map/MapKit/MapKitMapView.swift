@@ -270,6 +270,8 @@ struct MapKitMapView: UIViewRepresentable {
     let annotations: [MapAnnotationPayload]
     let coverageHeatFeatures: [CoverageHeatFeature]   // Phase 2
     let speedtestFeatures: [SpeedtestFeature]          // Phase 2
+    /// Métrique qui colore les points de débit (IOS-037).
+    var speedtestMetric: SpeedtestMapMetric = .download
     /// Incrémenté à chaque reconstruction des couches `rendered*` (PERF-MAP-03).
     /// Permet à `updateUIView` de distinguer « les données ont changé » de « seule la
     /// caméra a bougé » et d'éviter le hash/compare O(n) des couches à chaque pan.
@@ -357,11 +359,16 @@ struct MapKitMapView: UIViewRepresentable {
         // PERF-MAP-03 : ne resynchroniser les couches que si les données ont changé.
         // Un simple déplacement caméra (pan/zoom) réévalue `updateUIView` mais ne doit
         // plus re-hasher/comparer des milliers d'éléments — seule la caméra est appliquée.
+        let metricChanged = context.coordinator.speedtestMetric != speedtestMetric
+        context.coordinator.speedtestMetric = speedtestMetric
         if context.coordinator.lastRenderVersion != renderVersion {
             context.coordinator.lastRenderVersion = renderVersion
             context.coordinator.setCoverage(coverageHeatFeatures, on: map)
-            context.coordinator.setSpeedtest(speedtestFeatures, on: map)
+            context.coordinator.setSpeedtest(speedtestFeatures, on: map, force: metricChanged)
             context.coordinator.apply(annotations: annotations, on: map)
+        } else if metricChanged {
+            // Seule la métrique change : mêmes points, autres couleurs.
+            context.coordinator.setSpeedtest(speedtestFeatures, on: map, force: true)
         }
         context.coordinator.applyCameraIfNeeded(center: center, zoom: zoom, on: map)
         if context.coordinator.lastViewportRefreshID != viewportRefreshID {
@@ -543,8 +550,10 @@ struct MapKitMapView: UIViewRepresentable {
             map.addOverlay(overlay, level: .aboveLabels)
         }
 
-        func setSpeedtest(_ features: [SpeedtestFeature], on map: MKMapView) {
-            guard features != latestSpeedtestFeatures else { return }
+        var speedtestMetric: SpeedtestMapMetric = .download
+
+        func setSpeedtest(_ features: [SpeedtestFeature], on map: MKMapView, force: Bool = false) {
+            guard force || features != latestSpeedtestFeatures else { return }
             latestSpeedtestFeatures = features
             if let old = speedtestOverlay { map.removeOverlay(old); speedtestOverlay = nil }
             guard !features.isEmpty else {
@@ -552,7 +561,8 @@ struct MapKitMapView: UIViewRepresentable {
                 return
             }
             let dots = features.map { f -> SQMapKitDotsOverlay.Dot in
-                .init(point: MKMapPoint(f.coordinate), color: Self.speedColor(f.downloadMbps).withAlphaComponent(0.9).cgColor)
+                .init(point: MKMapPoint(f.coordinate),
+                      color: UIColor(hex: speedtestMetric.hex(for: f)).withAlphaComponent(0.9).cgColor)
             }
             let overlay = SQMapKitDotsOverlay(dots: dots)
             speedtestOverlay = overlay

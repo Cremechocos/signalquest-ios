@@ -535,3 +535,30 @@ private struct LocatedFilterMarkets: MarketRegistryServicing {
     nonisolated func marketAreaContainsLocation(marketCode: String?, latitude: Double, longitude: Double) -> Bool { false }
     nonisolated func franceHysteresisContains(latitude: Double, longitude: Double) -> Bool { false }
 }
+
+/// IOS-037 lot 3 : la couche Débits se colore selon la métrique choisie, avec les seuils
+/// d'Android et les six teintes du contrat ; une métrique absente est grise, jamais une autre.
+final class SpeedtestMapMetricTests: XCTestCase {
+    private func feature(download: Double = 120, upload: Double? = 30, ping: Double? = 12) -> SpeedtestFeature {
+        SpeedtestFeature(id: "m", coordinate: .init(latitude: 48.85, longitude: 2.35), downloadMbps: download,
+                         uploadMbps: upload, pingMs: ping, tech: nil, band: nil, frequency: nil, timestamp: nil)
+    }
+
+    func testEachMetricUsesItsOwnValueAndThresholds() {
+        XCTAssertEqual(SpeedtestMapMetric.download.tier(for: feature(download: 120)), .good)
+        XCTAssertEqual(SpeedtestMapMetric.upload.tier(for: feature(upload: 30)), .veryGood)
+        XCTAssertEqual(SpeedtestMapMetric.upload.tier(for: feature(upload: 1.5)), .verySlow)
+        XCTAssertEqual(SpeedtestMapMetric.upload.tier(for: feature(upload: 50)), .exceptional)
+        XCTAssertEqual(SpeedtestMapMetric.ping.tier(for: feature(ping: 12)), .exceptional)
+        XCTAssertEqual(SpeedtestMapMetric.ping.tier(for: feature(ping: 20)), .veryGood)
+        XCTAssertEqual(SpeedtestMapMetric.ping.tier(for: feature(ping: 150)), .verySlow)
+        XCTAssertEqual(SpeedtestMapMetric.upload.hex(for: feature(upload: nil)), SQQualityScale.unknownHex)
+        XCTAssertEqual(SpeedtestMapMetric.ping.hex(for: feature(ping: nil)), SQQualityScale.unknownHex)
+        let contractHexes = Set(SQQualityScale.Throughput.allCases.map(\.hex))
+        for metric in SpeedtestMapMetric.allCases {
+            XCTAssertEqual(metric.legendRows.count, 6, "\(metric)")
+            XCTAssertTrue(metric.legendRows.allSatisfy { contractHexes.contains($0.hex) }, "jamais de cyan ni de bleu : \(metric)")
+        }
+        XCTAssertEqual(SpeedtestMapMetric.ping.legendRows.first?.hex, SQQualityScale.Throughput.exceptional.hex)
+    }
+}

@@ -72,6 +72,7 @@ struct MapLayersSheet: View {
     /// Mesure de la couverture hors génération : RSRP, RSRQ ou SINR (contrat v3).
     @Binding var coverageMeasure: SQQualityScale.Signal.Measure
     @Binding var azimuthStyle: AzimuthStyle
+    @Binding var speedtestMetric: SpeedtestMapMetric
     let allMarkets: [MarketRegistryEntry]
     /// Sans compte, la couche Amis ne peut rien afficher : on ne la propose pas.
     let showsFriendsLayer: Bool
@@ -99,6 +100,7 @@ struct MapLayersSheet: View {
          byGeneration: Binding<Bool> = .constant(false),
          coverageMeasure: Binding<SQQualityScale.Signal.Measure> = .constant(.rsrp),
          azimuthStyle: Binding<AzimuthStyle> = .constant(.lobes),
+         speedtestMetric: Binding<SpeedtestMapMetric> = .constant(.download),
          allMarkets: [MarketRegistryEntry], showsFriendsLayer: Bool = true,
          operatorOptions: [String] = ["ALL"],
          operatorLabel: @escaping (String) -> String = { $0 },
@@ -115,6 +117,7 @@ struct MapLayersSheet: View {
         _byGeneration = byGeneration
         _coverageMeasure = coverageMeasure
         _azimuthStyle = azimuthStyle
+        _speedtestMetric = speedtestMetric
         self.allMarkets = allMarkets
         self.showsFriendsLayer = showsFriendsLayer
         self.operatorOptions = operatorOptions
@@ -231,6 +234,7 @@ struct MapLayersSheet: View {
                     operatorSection
                     layerSection
                     if layers.contains(.coverage) && !allOperators { coverageSection }
+                    if layers.contains(.speedtest) { speedtestSection }
                     if layers.contains(.antenna) { antennaSection }
                     backdropSection
                     moreRows
@@ -283,6 +287,16 @@ struct MapLayersSheet: View {
             MapSegmented(selection: coloring, options: CoverageColoring.allCases.map { ($0, $0.title) },
                          identifier: "map.layers.coverage.mode")
             CoverageScaleStrip(coloring: coloring.wrappedValue, marketCode: market)
+        }
+    }
+
+    /// Couche Débits (IOS-037, comme Android) : la métrique qui colore les points et son échelle.
+    private var speedtestSection: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text("Débits").sqKicker().accessibilityAddTraits(.isHeader)
+            MapSegmented(selection: $speedtestMetric, options: SpeedtestMapMetric.allCases.map { ($0, $0.title) },
+                         identifier: "map.layers.speedtest.metric")
+            SpeedtestMetricScale(metric: speedtestMetric)
         }
     }
 
@@ -473,7 +487,8 @@ struct MapLayersSheet: View {
             Divider().overlay(SQColor.separator)
             NavigationLink {
                 MapLegendPage(byGeneration: $byGeneration, measure: $coverageMeasure, marketCode: market,
-                              operators: antennaOperators, showsCoverage: layers.contains(.coverage))
+                              operators: antennaOperators, showsCoverage: layers.contains(.coverage),
+                              speedtestMetric: layers.contains(.speedtest) ? speedtestMetric : nil)
             } label: {
                 MapSheetRow(title: String(localized: "Légende")) {
                     Image(systemName: "info.circle").font(.system(size: 17, weight: .medium))
@@ -774,6 +789,8 @@ struct MapLegendPage: View {
     let marketCode: String?
     let operators: [MapAntennaLegendOperator]
     let showsCoverage: Bool
+    /// Couche Débits active : sa métrique et son échelle (IOS-037) ; `nil` sinon.
+    var speedtestMetric: SpeedtestMapMetric? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -783,6 +800,15 @@ struct MapLegendPage: View {
             VStack(alignment: .leading, spacing: SQSpace.xl) {
                 MapSheetPageHeader(title: String(localized: "Légende"), backIdentifier: "map.legend.back") { dismiss() }
                 coverageSection
+                if let speedtestMetric {
+                    VStack(alignment: .leading, spacing: SQSpace.md) {
+                        Text("Débits · \(speedtestMetric.title)").sqKicker().accessibilityAddTraits(.isHeader)
+                        ForEach(Array(speedtestMetric.legendRows.enumerated()), id: \.offset) { _, row in
+                            swatchEntry(row.label, color: Color(hex: row.hex))
+                        }
+                        swatchEntry(String(localized: "Pas de mesure"), color: Color(hex: SQQualityScale.unknownHex))
+                    }
+                }
                 if !operators.isEmpty {
                     VStack(alignment: .leading, spacing: SQSpace.md) {
                         Text("Opérateurs").sqKicker().accessibilityAddTraits(.isHeader)
@@ -913,6 +939,38 @@ struct MapLegendPage: View {
         }
         // Niveau et bornes lus d'une traite ; sans bornes, rien ne change.
         .accessibilityElement(children: detail == nil ? .contain : .combine)
+    }
+}
+
+/// Échelle de la couche Débits en une ligne, comme celle de la couverture : les teintes
+/// de la métrique choisie, du meilleur palier au pire, et les deux extrêmes. Les bornes
+/// de chaque palier et le gris « Pas de mesure » sont dans la légende.
+struct SpeedtestMetricScale: View {
+    let metric: SpeedtestMapMetric
+
+    var body: some View {
+        let rows = metric.legendRows
+        let best = rows.first?.label ?? ""
+        let worst = rows.last?.label ?? ""
+        VStack(alignment: .leading, spacing: SQSpace.xs) {
+            HStack(spacing: 3) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                    RoundedRectangle(cornerRadius: 3).fill(Color(hex: row.hex)).frame(height: 8)
+                }
+            }
+            HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
+                Text(verbatim: best)
+                Spacer(minLength: 0)
+                Text(verbatim: worst).multilineTextAlignment(.trailing)
+            }
+            .font(SQType.caption)
+            .monospacedDigit()
+            .foregroundStyle(SQColor.labelSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: "\(best), \(worst)"))
+        .accessibilityIdentifier("map.layers.speedtest.scale")
     }
 }
 
