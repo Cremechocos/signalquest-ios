@@ -327,6 +327,17 @@ final class E2EEV2CallPushRegistrar: @unchecked Sendable {
     private let lock = NSLock()
     private var latestVoipToken: String?
     private var chain: Task<Bool, Never>?
+    /// Dernier envoi réussi pendant ce processus. Le jeton APNs, le jeton VoIP et
+    /// la reconnexion de session le demandaient chacun au lancement : trois PUT
+    /// identiques (audit IOS-047). Une autre session, un autre appareil ou d'autres
+    /// jetons repartent tout de suite.
+    private var lastRegistered: Registration?
+
+    private struct Registration: Equatable {
+        let sessionId: String
+        let deviceId: String
+        let body: Data?
+    }
 
     init(
         api: APIClient,
@@ -363,14 +374,20 @@ final class E2EEV2CallPushRegistrar: @unchecked Sendable {
         // attente reçoit 403 E2EE_DEVICE_NOT_APPROVED, sans autre effet.
         let transport = E2EEV2APITransport(api: api, identityStore: identityStore).bound(to: session)
         let voip = lock.withLock { latestVoipToken }
-        guard let body = E2EEV2CallPushTokens.body(voipToken: voip, apnsToken: E2EEV2CallPushTokens.apnsToken) else {
+        let tokens = E2EEV2CallPushTokens.body(voipToken: voip, apnsToken: E2EEV2CallPushTokens.apnsToken)
+        let registration = Registration(sessionId: session.sessionId, deviceId: deviceId, body: tokens)
+        if lock.withLock({ lastRegistered == registration }) { return true }
+        guard let body = tokens else {
             // Aucun jeton encore : une lecture signée qui consomme sa preuve lie
             // quand même la session à l'appareil (E.1), pour que `pending` montre
             // les appels chiffrés.
             if case .success = await transport.getJSON(
                 path: "/api/e2ee/v2/epoch-rotation-requirements", expectedOwnerScopeId: session.ownerScopeId,
                 capabilitySet: .message
-            ) { return true }
+            ) {
+                lock.withLock { lastRegistered = registration }
+                return true
+            }
             return false
         }
         let result = await transport.putJSON(
@@ -379,7 +396,10 @@ final class E2EEV2CallPushRegistrar: @unchecked Sendable {
             expectedOwnerScopeId: session.ownerScopeId,
             capabilitySet: .calls
         )
-        if case .success = result { return true }
+        if case .success = result {
+            lock.withLock { lastRegistered = registration }
+            return true
+        }
         return false
     }
 }

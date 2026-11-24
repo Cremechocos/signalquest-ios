@@ -178,6 +178,35 @@ final class E2EEV2CallRuntimeTests: XCTestCase {
                        "« Appels vérifiés » n'est annoncé que verrou d'appels ouvert")
     }
 
+    /// IOS-047 : le jeton APNs, le jeton VoIP et la reconnexion de session
+    /// demandaient chacun l'envoi au lancement. Les mêmes jetons ne repartent
+    /// pas ; d'autres jetons, si.
+    func testIdenticalPushTokensAreSentOncePerSession() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let previousAPNs = E2EEV2CallPushTokens.apnsToken
+        defer { E2EEV2CallPushTokens.apnsToken = previousAPNs; MockURLProtocol.requestHandler = nil }
+        let puts = Box(0)
+        let counting = NSLock()
+        MockURLProtocol.requestHandler = { request in
+            if request.httpMethod == "PUT", request.url?.path.hasSuffix("/push-tokens") == true {
+                counting.withLock { puts.value += 1 }
+            }
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!,
+                    Data(#"{"ok":true}"#.utf8))
+        }
+        E2EEV2CallPushTokens.apnsToken = String(repeating: "0f", count: 32)
+        let registrar = E2EEV2CallPushRegistrar(api: fixture.api, identityStore: fixture.identity, open: { true })
+
+        let first = await registrar.register(voipToken: nil)
+        let second = await registrar.register(voipToken: nil)
+        XCTAssertTrue(first); XCTAssertTrue(second)
+        XCTAssertEqual(puts.value, 1, "les mêmes jetons ne repartent pas")
+
+        let withVoip = await registrar.register(voipToken: String(repeating: "ab", count: 32))
+        XCTAssertTrue(withVoip)
+        XCTAssertEqual(puts.value, 2, "un nouveau jeton repart tout de suite")
+    }
+
     /// Un appel terminé avant que son nonce soit vu ici ne se rejoint plus,
     /// sous aucun nonce ; son propre descripteur ne fait pas sonner l'appareil.
     func testATerminatedCallAndOwnDescriptorsNeverRing() async throws {
