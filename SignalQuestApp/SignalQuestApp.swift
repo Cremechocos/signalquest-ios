@@ -1231,8 +1231,10 @@ struct MainTabView: View {
             if AppEnvironment.showsBlurEditorQA { showsBlurEditorQA = true }
             #endif
             guard user != nil else { return }
-            await services.refreshInboxBadge()
-            await services.refreshNotificationBadge()
+            // Le passage de la scène à « active » demande les mêmes badges au même instant :
+            // ces relectures de routine se joignent (IOS-058).
+            await services.refreshInboxBadge(joiningRecent: true)
+            await services.refreshNotificationBadge(joiningRecent: true)
         }
         .sheet(isPresented: $showGuestReceipts) {
             NavigationStack { GuestSpeedtestReceiptsView() }
@@ -1266,8 +1268,8 @@ struct MainTabView: View {
             if phase == .active {
                 if user != nil {
                     Task {
-                        await services.refreshInboxBadge(force: true)
-                        await services.refreshNotificationBadge(force: true)
+                        await services.refreshInboxBadge(force: true, joiningRecent: true)
+                        await services.refreshNotificationBadge(force: true, joiningRecent: true)
                     }
                 }
                 consumeIntentRoutes()
@@ -1284,8 +1286,8 @@ struct MainTabView: View {
             withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) { router.isDockMinimized = false }
             if user != nil {
                 Task {
-                    await services.refreshInboxBadge()
-                    if router.selectedTab == .home { await services.refreshNotificationBadge() }
+                    await services.refreshInboxBadge(joiningRecent: true)
+                    if router.selectedTab == .home { await services.refreshNotificationBadge(joiningRecent: true) }
                 }
             }
         }

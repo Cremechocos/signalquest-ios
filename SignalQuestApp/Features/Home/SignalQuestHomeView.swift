@@ -32,6 +32,10 @@ struct SignalQuestHomeView: View {
     /// Horodatage du dernier rafraîchissement réel des données de zone (throttle des
     /// refetch à chaque retour au premier plan ou sur l'onglet — PERF-HOME-01).
     @State private var lastNearbyRefreshAt: Date = .distantPast
+    /// Une relecture de routine est en cours (l'horodatage ci-dessus n'est posé qu'après la
+    /// position) : au lancement, `.task` et le passage à « active » demandaient deux fois pannes
+    /// et sites prévus à la même milliseconde (IOS-058, iPhone du 24/11).
+    @State private var nearbyRefreshInFlight = false
     /// Pannes ouvertes à moins de 5 km, la plus proche d'abord. `nil` = pas encore chargées.
     @State private var nearbyOutages: [CommunityOutage]?
     @State private var showOutages = false
@@ -1584,6 +1588,9 @@ struct SignalQuestHomeView: View {
             return
         }
         if !forceFresh, Date().timeIntervalSince(lastNearbyRefreshAt) < 20 { return }
+        if !forceFresh, nearbyRefreshInFlight { return }
+        nearbyRefreshInFlight = true
+        defer { nearbyRefreshInFlight = false }
         // Ne JAMAIS déclencher le prompt système de localisation depuis l'Accueil (UXP-01) :
         // on n'interroge la position que si l'autorisation est déjà accordée ou qu'un fix
         // est déjà connu.

@@ -622,7 +622,43 @@ final class AuthSessionTests: XCTestCase {
 }
 
 @MainActor
+private final class JoinerReadCounter {
+    var value = 0
+}
+
+@MainActor
 final class InboxBadgePresentationStateTests: XCTestCase {
+    /// IOS-058 : au lancement, deux relectures de routine demandées au même instant ne font
+    /// qu'un GET ; une demande arrivée après la fenêtre, ou une fois la lecture revenue, repart.
+    func testRoutineBadgeRefreshesJoinTheOneInFlight() async {
+        let joiner = RecentRefreshJoiner(window: 1)
+        let reads = JoinerReadCounter()
+        func refresh() async {
+            if let recent = joiner.recent() { return await recent.value }
+            await joiner.start {
+                reads.value += 1
+                try? await Task.sleep(for: .milliseconds(80))
+            }
+        }
+        async let first: Void = refresh()
+        async let second: Void = refresh()
+        _ = await (first, second)
+        XCTAssertEqual(reads.value, 1, "le passage à « active » rejoint la lecture du lancement")
+        await refresh()
+        XCTAssertEqual(reads.value, 2, "la lecture revenue, une nouvelle demande relit")
+
+        let started = Date()
+        async let slow: Void = joiner.start(now: started) {
+            reads.value += 1
+            try? await Task.sleep(for: .milliseconds(80))
+        }
+        try? await Task.sleep(for: .milliseconds(10))
+        XCTAssertNotNil(joiner.recent(now: started.addingTimeInterval(0.5)))
+        XCTAssertNil(joiner.recent(now: started.addingTimeInterval(1.5)), "au-delà d'une seconde, plus de jonction")
+        await slow
+        XCTAssertEqual(reads.value, 3)
+    }
+
     func testResetClearsAccountABadgeAndReopensThrottleForAccountB() throws {
         let sessionA = LocalAccountSession(ownerScopeId: "user:account-a", sessionId: UUID().uuidString)
         let sessionB = LocalAccountSession(ownerScopeId: "user:account-b", sessionId: UUID().uuidString)

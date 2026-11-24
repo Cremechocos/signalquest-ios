@@ -57,6 +57,32 @@ final class InboxBadgePresentationState {
     }
 }
 
+/// Une lecture de badge lancée il y a moins de `window` et pas encore revenue : une demande
+/// identique s'y joint au lieu de refaire le même GET. Au lancement, `.task` et le passage de
+/// la scène à « active » demandaient chacun conversations et notifications à la même
+/// milliseconde (IOS-058, iPhone du 24/11). Au-delà de la fenêtre, une demande repart.
+@MainActor
+final class RecentRefreshJoiner {
+    private var running: (task: Task<Void, Never>, startedAt: Date)?
+    private let window: TimeInterval
+
+    init(window: TimeInterval = 1) {
+        self.window = window
+    }
+
+    func recent(now: Date = Date()) -> Task<Void, Never>? {
+        guard let running, now.timeIntervalSince(running.startedAt) < window else { return nil }
+        return running.task
+    }
+
+    func start(now: Date = Date(), _ work: @escaping @MainActor () async -> Void) async {
+        let task = Task { @MainActor in await work() }
+        running = (task, now)
+        await task.value
+        if running?.task == task { running = nil }
+    }
+}
+
 @MainActor
 final class AppServices: ObservableObject {
     let api: APIClient
@@ -200,8 +226,10 @@ final class AppServices: ObservableObject {
     /// Nombre de conversations non lues — alimente le badge de l'onglet Messages.
     @Published var unreadConversations = 0
     private let inboxBadgeState = InboxBadgePresentationState()
+    private let inboxBadgeJoiner = RecentRefreshJoiner()
     @Published private(set) var unreadNotifications = 0
     private let notificationBadgeState = InboxBadgePresentationState()
+    private let notificationBadgeJoiner = RecentRefreshJoiner()
 
     init(config: AppConfig = .current, location: LocationService = LocationService()) {
         self.location = location
@@ -333,10 +361,16 @@ final class AppServices: ObservableObject {
     /// Recalcule le nombre de conversations non lues (dernier message postérieur à
     /// la dernière lecture). Approximation côté client, sans appel dédié.
     /// `force` (retour foreground) contourne le throttle de 20 s.
-    func refreshInboxBadge(force: Bool = false) async {
+    /// `joiningRecent` : seulement pour les relectures de routine (lancement, retour au premier
+    /// plan, changement d'onglet). Après un geste (lu, quitté) ou un push, l'état du serveur vient
+    /// de changer : une lecture partie juste avant ne le refléterait pas.
+    func refreshInboxBadge(force: Bool = false, joiningRecent: Bool = false) async {
+        if joiningRecent, let recent = inboxBadgeJoiner.recent() { return await recent.value }
         guard let ticket = inboxBadgeState.beginRefresh(force: force) else { return }
-        guard let conversations = try? await messages.conversations() else { return }
-        applyInbox(conversations, ticket: ticket)
+        await inboxBadgeJoiner.start { [weak self] in
+            guard let self, let conversations = try? await self.messages.conversations() else { return }
+            self.applyInbox(conversations, ticket: ticket)
+        }
     }
 
     /// La liste des conversations vient de lire le serveur : le badge s'en déduit sans
@@ -551,11 +585,15 @@ final class AppServices: ObservableObject {
         )
     }
 
-    func refreshNotificationBadge(force: Bool = false) async {
+    /// Même jonction que le badge Messages, pour les mêmes seules relectures de routine.
+    func refreshNotificationBadge(force: Bool = false, joiningRecent: Bool = false) async {
+        if joiningRecent, let recent = notificationBadgeJoiner.recent() { return await recent.value }
         guard let ticket = notificationBadgeState.beginRefresh(force: force) else { return }
-        guard let page = try? await notifications.list(cursor: nil) else { return }
-        let count = page.unreadCount ?? page.notifications.filter { $0.read != true }.count
-        publishNotificationBadge(unreadCount: count, for: ticket)
+        await notificationBadgeJoiner.start { [weak self] in
+            guard let self, let page = try? await self.notifications.list(cursor: nil) else { return }
+            let count = page.unreadCount ?? page.notifications.filter { $0.read != true }.count
+            self.publishNotificationBadge(unreadCount: count, for: ticket)
+        }
     }
 
     func notificationBadgeRefreshTicket() -> InboxBadgePresentationState.RefreshTicket? {
