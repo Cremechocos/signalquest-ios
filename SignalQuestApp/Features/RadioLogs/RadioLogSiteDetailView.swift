@@ -85,6 +85,8 @@ struct RadioLogSiteDetailView: View {
                     actions
                 }
                 .padding(.horizontal, SQSpace.lg)
+                // Le titre sous le haut de la feuille, comme les autres feuilles de la carte.
+                .padding(.top, SQSpace.lg)
                 .padding(.bottom, SQSpace.xxl)
                 .sqReadableWidth()
             }
@@ -700,7 +702,7 @@ struct RadioLogCellReadingSheet: View {
             }
             .padding(.horizontal, SQSpace.lg)
             // Sous la poignée de la feuille, pas contre elle.
-            .padding(.top, SQSpace.xl)
+            .padding(.top, SQSpace.lg)
             .padding(.bottom, SQSpace.xxl)
             .sqReadableWidth()
         }
