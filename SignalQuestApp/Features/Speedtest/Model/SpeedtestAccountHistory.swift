@@ -107,6 +107,7 @@ extension SpeedtestAccountHistory {
         result.servedBufferbloatDeltaMs = detail.bufferbloatDeltaMs
         result.packetLossPct = detail.packetLossPct
         result.pingSampleCount = detail.pingSampleCount
+        result.streamCount = detail.streams.flatMap { $0 > 0 ? $0 : nil }
         return result
     }
 

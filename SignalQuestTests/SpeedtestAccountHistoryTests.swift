@@ -111,7 +111,7 @@ final class AccountSpeedtestDetailTests: XCTestCase {
         let served = try detail("""
         {"id":"cksp2","timestamp":"2026-11-24T10:00:00.000Z","averageSpeed":300,"connectionType":"wifi","connectionKind":"wifi",
          "uploadServerName":"Paris BBR","wifiSsid":"Maison-5G","radioTechChangedDuringTest":true,
-         "bufferbloatGrade":"B","bufferbloatDeltaMs":21,"packetLossPct":12.5,"pingSampleCount":8}
+         "bufferbloatGrade":"B","bufferbloatDeltaMs":21,"packetLossPct":12.5,"pingSampleCount":8,"streams":16}
         """)
         let owner = SpeedtestAccountHistory.runResult(from: served)
         XCTAssertEqual(owner.uploadServerName, "Paris BBR")
@@ -120,6 +120,7 @@ final class AccountSpeedtestDetailTests: XCTestCase {
         XCTAssertEqual(owner.servedBufferbloatGrade, "B")
         XCTAssertEqual(owner.packetLossPct, 12.5)
         XCTAssertEqual(owner.pingSampleCount, 8)
+        XCTAssertEqual(owner.streamCount, 16)
         XCTAssertEqual(SpeedtestDetailContent.packetLossText(12.5, pings: 8), "12,5 % sur 8 pings")
         XCTAssertNil(SpeedtestAccountHistory.runResult(from: served, includesPrivateDetails: false).wifiSSID)
         let bogus = try detail(#"{"id":"x","bufferbloatGrade":"Z","packetLossPct":140}"#)

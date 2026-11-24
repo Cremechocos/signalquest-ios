@@ -639,6 +639,8 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
     var servedBufferbloatDeltaMs: Double? = nil
     var packetLossPct: Double? = nil
     var pingSampleCount: Int? = nil
+    /// Connexions parallèles du test, servies par la fiche (comme Android « Connexions parallèles »).
+    var streamCount: Int? = nil
     // « >= 6 » et jamais « == 6 » : la v7 ne change que la gigue.
     var primaryPingMs: Double? { (methodologyVersion ?? 0) >= 6 ? pingMinMs : pingMs }
 

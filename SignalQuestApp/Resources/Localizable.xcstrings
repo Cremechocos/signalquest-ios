@@ -117513,6 +117513,22 @@
           }
         }
       }
+    },
+    "Connexions parallèles" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parallel connections"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connexions parallèles"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

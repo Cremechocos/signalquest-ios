@@ -604,6 +604,9 @@ struct SpeedtestDetailContent: View {
             if result.durationSeconds > 0 {
                 dotRow("Durée du test", String(localized: "\(Int(result.durationSeconds.rounded())) s"))
             }
+            if let streams = result.streamCount {
+                dotRow("Connexions parallèles", String(streams))
+            }
             if let source = Self.resultByteSource(result.measurementTrace?.phases.first(where: { $0.phase == "upload" }), fallback: result.uploadMeasurementSource) {
                 dotRow("Comptage de l’envoi", Self.byteSourceLabel(source))
             }
