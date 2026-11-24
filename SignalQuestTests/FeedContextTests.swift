@@ -50,10 +50,27 @@ final class FeedContextTests: XCTestCase {
         let model = FeedViewModel(service: service)
         let old = Task { await model.load() }
         await fulfillment(of: [entered], timeout: 2)
-        await model.select(.latest)
+        await model.select(.following)
         await gate.finish(.success(Self.page("old")))
         await old.value
         XCTAssertEqual(model.page?.requestId, "new")
+        XCTAssertFalse(model.isLoading)
+    }
+
+    /// « Autour » sans position : aucune requête au serveur, l'onglet dit ce qui manque.
+    func testNearbyWithoutPositionSendsNothing() async {
+        let calls = FeedCallCount()
+        let model = FeedViewModel(service: FeedContextFixture { _, _, tab in
+            if tab == .nearby { _ = await calls.next() }
+            return Self.page("page")
+        })
+        await model.select(.nearby)
+        let nearbyCalls = await calls.next() - 1
+        XCTAssertEqual(nearbyCalls, 0)
+        XCTAssertEqual(model.nearbyPosition, .unavailable)
+        // Une page vide : l'onglet quitte le squelette de chargement pour dire ce qui manque.
+        XCTAssertEqual(model.page?.items.isEmpty, true)
+        XCTAssertNil(model.page?.nextCursor)
         XCTAssertFalse(model.isLoading)
     }
 
@@ -66,7 +83,7 @@ final class FeedContextTests: XCTestCase {
         })
         let first = Task { await model.load() }
         await fulfillment(of: [oldStarted], timeout: 2)
-        let second = Task { await model.select(.latest) }
+        let second = Task { await model.select(.following) }
         await fulfillment(of: [newStarted], timeout: 2)
         await oldGate.finish(.failure(FeedFixtureError.unused)); await first.value
         XCTAssertTrue(model.isLoading); XCTAssertNil(model.errorMessage)
@@ -100,7 +117,7 @@ final class FeedContextTests: XCTestCase {
         await model.load()
         let old = Task { await model.loadMore() }
         await fulfillment(of: [started], timeout: 2)
-        await model.select(.latest)
+        await model.select(.following)
         await gate.finish(.success(Self.page("old-page"))); await old.value
         XCTAssertEqual(model.page?.requestId, "current"); XCTAssertNil(model.page?.nextCursor)
         XCTAssertFalse(model.isLoadingMore)
@@ -165,12 +182,12 @@ final class FeedContextTests: XCTestCase {
         let streams = FeedFixtureStreams(), calls = FeedCallCount()
         let current = Self.item("current"), fresh = Self.item("fresh")
         let model = FeedViewModel(service: FeedContextFixture { _, tag, tab in
-            XCTAssertEqual(tag, "beta"); XCTAssertEqual(tab, .latest)
+            XCTAssertEqual(tag, "beta"); XCTAssertEqual(tab, .following)
             let count = await calls.next()
             return Self.page("filtered", items: count == 1 ? [current] : [current, fresh])
         })
         model.selectedHashtag = "beta"
-        await model.select(.latest)
+        await model.select(.following)
         model.startStream { streams.make() }
         defer { model.stopStream() }
         // Two unrelated global posts must not produce a count of two.

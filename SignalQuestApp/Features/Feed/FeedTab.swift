@@ -1,3 +1,4 @@
+import CoreLocation
 import Foundation
 
 /// Onglets du fil communautaire.
@@ -7,16 +8,13 @@ import Foundation
 /// seule des combinaisons possibles. Ces onglets n'ajoutent aucun écran : ils
 /// rendent atteignable ce que le serveur sait déjà faire.
 ///
-/// Volontairement RESTREINT à six entrées. Le backend en autorise davantage
-/// (`liked`, `reposted`, `posts`, `media`…), mais une barre d'onglets qui défile
-/// sur deux écrans ne se lit plus. Les filtres restants relèvent d'un écran de
-/// recherche, pas de la navigation principale.
+/// Quatre onglets sans recoupement (choix d'Alexandre du 24/11 à 19:29) : « Récent »
+/// n'était que « Pour toi » trié par date, un ami est forcément suivi, et « Réseau »
+/// reprenait les mesures déjà mêlées à « Pour toi ». « Enregistrés » vit dans le menu ⋯.
 enum FeedTab: String, CaseIterable, Identifiable, Sendable {
     case forYou
-    case latest
     case following
-    case friends
-    case telecom
+    case nearby
     case photos
     case saved
 
@@ -25,10 +23,11 @@ enum FeedTab: String, CaseIterable, Identifiable, Sendable {
     /// Valeur du paramètre `filter` attendue par `/api/social/feed`.
     var filter: String {
         switch self {
-        case .forYou, .latest: return "all"
+        case .forYou: return "all"
+        // Les amis compris : un ami est forcément suivi.
         case .following: return "following"
-        case .friends: return "friends"
-        case .telecom: return "telecom"
+        // Publications à 30 km du point envoyé (NEARBY-FEED-1), comme Android et le Web.
+        case .nearby: return "nearby"
         // `media` : le backend l'accepte depuis le début, iOS ne l'exposait pas.
         // Il ne rend que les publications porteuses d'une image ou d'une vidéo.
         case .photos: return "media"
@@ -39,24 +38,24 @@ enum FeedTab: String, CaseIterable, Identifiable, Sendable {
     /// Valeur du paramètre `ranking`.
     ///
     /// « Pour toi » est le SEUL à demander `foryou` : c'est le classement nourri
-    /// par les signaux d'engagement. Les autres gardent `smart`, qui reste un
-    /// bon défaut hors personnalisation, sauf « Récent » qui doit être
-    /// strictement chronologique.
+    /// par les signaux d'engagement. « Suivis » est strictement chronologique, comme
+    /// le fil des abonnements de toute app sociale. Les autres gardent `smart`.
     var ranking: String {
         switch self {
         case .forYou: return "foryou"
-        case .latest: return "latest"
+        case .following: return "latest"
         default: return "smart"
         }
     }
 
+    /// L'onglet envoie la position (arrondie) de l'appareil.
+    var needsPosition: Bool { self == .nearby }
+
     var title: String {
         switch self {
         case .forYou: return "Pour toi"
-        case .latest: return "Récent"
-        case .following: return String(localized: "feed.tab.following", defaultValue: "Abonnements")
-        case .friends: return "Amis"
-        case .telecom: return "Réseau"
+        case .following: return "Suivis"
+        case .nearby: return "Autour"
         case .photos: return "Photos"
         case .saved: return "Enregistrés"
         }
@@ -65,10 +64,8 @@ enum FeedTab: String, CaseIterable, Identifiable, Sendable {
     var systemImage: String {
         switch self {
         case .forYou: return "sparkles"
-        case .latest: return "clock"
-        case .following: return "person.badge.plus"
-        case .friends: return "person.2"
-        case .telecom: return "antenna.radiowaves.left.and.right"
+        case .following: return "person.2"
+        case .nearby: return "location"
         case .photos: return "photo.on.rectangle.angled"
         case .saved: return "bookmark"
         }
@@ -86,12 +83,27 @@ enum FeedTab: String, CaseIterable, Identifiable, Sendable {
     var emptyMessage: String {
         switch self {
         case .forYou: return "Lance quelques speedtests et suis des membres : les recommandations arrivent vite."
-        case .latest: return "Aucune publication récente pour l'instant."
         case .following: return "Tu ne suis encore personne. Explore les profils pour remplir cet onglet."
-        case .friends: return "Aucune publication de tes amis pour l'instant."
-        case .telecom: return "Aucune mesure ni identification partagée récemment."
+        case .nearby: return "Rien n’a été partagé à moins de 30 km ces derniers temps."
         case .photos: return "Aucune photo partagée pour l'instant. Ajoute-en une depuis une antenne ou une publication."
         case .saved: return "Enregistre une publication pour la retrouver ici."
         }
+    }
+}
+
+/// Point de l'onglet « Autour », arrondi au centième de degré (environ 1 km) AVANT d'être envoyé :
+/// le serveur l'arrondit aussi, la position exacte ne quitte jamais l'appareil.
+struct FeedNearPoint: Equatable, Sendable {
+    let latitude: Double
+    let longitude: Double
+
+    init(_ coordinate: CLLocationCoordinate2D) {
+        latitude = (coordinate.latitude * 100).rounded() / 100
+        longitude = (coordinate.longitude * 100).rounded() / 100
+    }
+
+    var queryItems: [URLQueryItem] {
+        [URLQueryItem(name: "lat", value: String(format: "%.2f", latitude)),
+         URLQueryItem(name: "lng", value: String(format: "%.2f", longitude))]
     }
 }

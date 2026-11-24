@@ -77,13 +77,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "SignalQuest uses your location, if you allow it, to place your speedtests and contributions on the map, to track a Drive Test (including with the screen locked) and, if you turn it on, to share your live location with your friends."
+            "value" : "SignalQuest uses your location, if you allow it, to place your speedtests and contributions on the map, to show you what is shared around you, to track a Drive Test (including with the screen locked) and, if you turn it on, to share your live location with your friends."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "SignalQuest utilise ta position, si tu l'autorises, pour placer tes speedtests et contributions sur la carte, suivre un Drive Test (y compris écran verrouillé) et, si tu l'actives, partager ta position en direct avec tes amis."
+            "value" : "SignalQuest utilise ta position, si tu l'autorises, pour placer tes speedtests et contributions sur la carte, te montrer ce qui est partagé autour de toi, suivre un Drive Test (y compris écran verrouillé) et, si tu l'actives, partager ta position en direct avec tes amis."
           }
         }
       }

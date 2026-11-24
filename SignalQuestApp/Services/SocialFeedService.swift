@@ -7,6 +7,9 @@ protocol SocialFeedServicing: Sendable {
     /// Les posts seuls : la page suivante, la revérification du flux et le fil d'un
     /// hashtag jetaient stories, tendances et suggestions (audit perf, E2).
     func loadFeedItems(cursor: String?, hashtag: String?, tab: FeedTab?) async throws -> SocialFeedPage
+    /// Mêmes lectures avec le point de l'onglet « Autour » (`tab.needsPosition`).
+    func loadFeed(cursor: String?, hashtag: String?, tab: FeedTab?, near: FeedNearPoint?) async throws -> SocialFeedPage
+    func loadFeedItems(cursor: String?, hashtag: String?, tab: FeedTab?, near: FeedNearPoint?) async throws -> SocialFeedPage
     /// Récupère un post unique (deep-link / notification) par son identifiant.
     func post(id: String) async throws -> UnifiedSocialFeedItem?
     /// Détail d'un test d'expérience (`GET /api/experience-tests/{id}`), nil si
@@ -109,6 +112,15 @@ protocol SocialFeedServicing: Sendable {
 extension SocialFeedServicing {
     func loadFeedItems(cursor: String?, hashtag: String?, tab: FeedTab?) async throws -> SocialFeedPage {
         try await loadFeed(cursor: cursor, hashtag: hashtag, tab: tab)
+    }
+
+    /// Un service sans position (démo, doublures de test) lit l'onglet sans point.
+    func loadFeed(cursor: String?, hashtag: String?, tab: FeedTab?, near: FeedNearPoint?) async throws -> SocialFeedPage {
+        try await loadFeed(cursor: cursor, hashtag: hashtag, tab: tab)
+    }
+
+    func loadFeedItems(cursor: String?, hashtag: String?, tab: FeedTab?, near: FeedNearPoint?) async throws -> SocialFeedPage {
+        try await loadFeedItems(cursor: cursor, hashtag: hashtag, tab: tab)
     }
 
     func retryPendingPosts() async {}
@@ -233,7 +245,16 @@ final class SocialFeedService: SocialFeedServicing {
         try await feed(cursor: cursor, hashtag: hashtag, tab: tab, include: "items")
     }
 
-    private func feed(cursor: String?, hashtag: String?, tab: FeedTab?, include: String) async throws -> SocialFeedPage {
+    func loadFeed(cursor: String?, hashtag: String?, tab: FeedTab?, near: FeedNearPoint?) async throws -> SocialFeedPage {
+        try await feed(cursor: cursor, hashtag: hashtag, tab: tab, near: near, include: "items,stories,trends,suggestions")
+    }
+
+    func loadFeedItems(cursor: String?, hashtag: String?, tab: FeedTab?, near: FeedNearPoint?) async throws -> SocialFeedPage {
+        try await feed(cursor: cursor, hashtag: hashtag, tab: tab, near: near, include: "items")
+    }
+
+    private func feed(cursor: String?, hashtag: String?, tab: FeedTab?, near: FeedNearPoint? = nil,
+                      include: String) async throws -> SocialFeedPage {
         var query = [
             URLQueryItem(name: "limit", value: "20"),
             URLQueryItem(name: "filter", value: tab?.filter ?? "all"),
@@ -242,6 +263,7 @@ final class SocialFeedService: SocialFeedServicing {
         ]
         if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
         if let hashtag, !hashtag.isEmpty { query.append(URLQueryItem(name: "hashtag", value: hashtag)) }
+        if tab?.needsPosition == true, let near { query += near.queryItems }
         return try await api.request(APIEndpoint(path: "/api/social/feed", query: query, responseDeadline: .seconds(30)), as: SocialFeedPage.self)
     }
 

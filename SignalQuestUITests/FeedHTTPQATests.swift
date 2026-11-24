@@ -25,7 +25,8 @@ final class FeedHTTPQATests: XCTestCase {
         let community = SignalQuestUITestSupport.tab(named: "Communauté", in: app)
         XCTAssertTrue(community.waitForExistence(timeout: 30)); community.tap()
         try await waitEvent("received", key: "old")
-        tap("feed.tab.latest", in: app)
+        // « Suivis » est chronologique : la recette répond « recent » à `ranking=latest`.
+        tap("feed.tab.following", in: app)
         XCTAssertTrue(card("recent", in: app).waitForExistence(timeout: 20))
         try await waitEvent("sent", key: "old")
         XCTAssertFalse(card("old", in: app).exists)

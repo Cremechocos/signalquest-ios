@@ -63,6 +63,20 @@ final class FeedViewModel: ObservableObject {
     /// Onglet actif. Changer d'onglet change le couple filtre/classement envoyé
     /// au serveur — c'est le seul état qui pilote `loadFeed`.
     @Published var tab: FeedTab = .forYou { didSet { if oldValue != tab { invalidateQuery() } } }
+
+    /// Où en est la position de l'onglet « Autour ».
+    enum NearbyPosition: Equatable {
+        case ready
+        /// Jamais demandée : l'onglet propose de l'autoriser (choix explicite de la personne).
+        case needsPermission
+        case denied
+        /// Autorisée mais aucun point obtenu (intérieur, délai dépassé).
+        case unavailable
+    }
+
+    /// Point arrondi envoyé avec « Autour » ; relu à chaque chargement de l'onglet.
+    @Published private(set) var nearPoint: FeedNearPoint?
+    @Published private(set) var nearbyPosition: NearbyPosition = .ready
     /// Publications reçues en direct et NON encore insérées.
     ///
     /// Le plan est explicite : jamais d'insertion directe. Faire remonter la
@@ -72,6 +86,7 @@ final class FeedViewModel: ObservableObject {
     @Published private(set) var trendingHashtags: [TrendingHashtag] = []
     private struct Query: Equatable {
         let tab: FeedTab
+        let near: FeedNearPoint?
         let hashtag: String?
         let owner: String
         let session: LocalAccountSession?
@@ -93,7 +108,8 @@ final class FeedViewModel: ObservableObject {
     private var liveCheckID: UUID?
     private var knownIds: Set<String> = []
     private var query: Query {
-        Query(tab: tab, hashtag: selectedHashtag, owner: LocalAccountScope.currentOwnerScopeId,
+        Query(tab: tab, near: tab.needsPosition ? nearPoint : nil, hashtag: selectedHashtag,
+              owner: LocalAccountScope.currentOwnerScopeId,
               session: LocalAccountScope.sessionSnapshot(), revision: queryRevision)
     }
 
@@ -109,6 +125,37 @@ final class FeedViewModel: ObservableObject {
     func select(_ newTab: FeedTab) async {
         guard newTab != tab else { return }
         tab = newTab
+        await load()
+    }
+
+    /// Position de « Autour », sans jamais déclencher la demande d'autorisation : celle-ci ne part
+    /// que du bouton de l'onglet. Un point déjà lu sert tant qu'il est frais (`currentLocation`).
+    private func resolveNearPoint() async {
+        guard let location else { nearbyPosition = .unavailable; return }
+        switch location.authorizationStatus {
+        case .notDetermined:
+            nearbyPosition = .needsPermission
+        case .denied, .restricted:
+            nearbyPosition = .denied
+        default:
+            if let coordinate = await location.currentLocation()?.coordinate {
+                nearPoint = FeedNearPoint(coordinate)
+                nearbyPosition = .ready
+            } else {
+                nearbyPosition = nearPoint == nil ? .unavailable : .ready
+            }
+        }
+    }
+
+    /// Bouton « Autoriser » de l'onglet « Autour » : la demande d'iOS, puis l'onglet se recharge
+    /// dès la réponse.
+    func requestNearbyPermission() async {
+        guard let location else { return }
+        location.requestWhenInUse()
+        for await status in location.$authorizationStatus.values where status != .notDetermined {
+            break
+        }
+        guard tab.needsPosition else { return }
         await load()
     }
 
@@ -194,7 +241,8 @@ final class FeedViewModel: ObservableObject {
         }
         let loading = loadRevision
         do {
-            let freshPage = try await service.loadFeedItems(cursor: nil, hashtag: context.hashtag, tab: context.tab)
+            let freshPage = try await service.loadFeedItems(cursor: nil, hashtag: context.hashtag, tab: context.tab,
+                                                            near: context.near)
             guard context == query, streamID == streamRevision, loading == loadRevision,
                   !Task.isCancelled, let page else { return }
             let fresh = Set(freshPage.items.map(\.id)).subtracting(page.items.map(\.id)).subtracting(knownIds)
@@ -208,6 +256,18 @@ final class FeedViewModel: ObservableObject {
     func applyPending() async { await load() }
 
     func load() async {
+        // « Autour » lit sa position d'abord : sans point, aucune requête, l'onglet dit pourquoi.
+        if tab.needsPosition, !AppEnvironment.usesDemoData {
+            await resolveNearPoint()
+            guard tab.needsPosition else { return }
+            if nearPoint == nil {
+                // Une page vide, pas `nil` : sans page, le fil garde son squelette de chargement.
+                page = SocialFeedPage(items: [], nextCursor: nil, stories: [], trendingHashtags: [],
+                                      suggestedUsers: [], requestId: nil)
+                errorMessage = nil; isLoading = false; isLoadingMore = false
+                return
+            }
+        }
         let context = query, request = UUID()
         let receiptRevisionAtStart = detailReceiptRevision
         loadRevision = request; isLoading = true; isLoadingMore = false; errorMessage = nil
@@ -221,7 +281,8 @@ final class FeedViewModel: ObservableObject {
         Task { await service.retryPendingPosts() }
         if AppEnvironment.delaysLoadForQA { try? await Task.sleep(for: .seconds(4)) }
         do {
-            let loaded = try await service.loadFeed(cursor: nil, hashtag: context.hashtag, tab: context.tab)
+            let loaded = try await service.loadFeed(cursor: nil, hashtag: context.hashtag, tab: context.tab,
+                                                    near: context.near)
             guard context == query, request == loadRevision, !Task.isCancelled else { return }
             page = SocialFeedPage(
                 items: loaded.items.map { item in
@@ -291,7 +352,8 @@ final class FeedViewModel: ObservableObject {
         defer { if context == query && loading == loadRevision { isLoadingMore = false } }
         do {
             for _ in 0..<Self.emptyPageHops {
-                let next = try await service.loadFeedItems(cursor: cursor, hashtag: context.hashtag, tab: context.tab)
+                let next = try await service.loadFeedItems(cursor: cursor, hashtag: context.hashtag, tab: context.tab,
+                                                           near: context.near)
                 guard context == query, loading == loadRevision, !Task.isCancelled, let current = page else { return }
                 var seen = Set(current.items.map(\.id))
                 let appended = next.items.filter { seen.insert($0.id).inserted }
@@ -823,7 +885,10 @@ struct FeedView: View {
                             Task { await model.load(); await model.loadPulse() }
                         }
                     }
-                    if (model.page?.items.isEmpty ?? true), !model.isLoading, model.errorMessage == nil {
+                    if model.tab.needsPosition, model.nearbyPosition != .ready, !model.isLoading,
+                       model.selectedHashtag == nil {
+                        nearbyPositionState
+                    } else if (model.page?.items.isEmpty ?? true), !model.isLoading, model.errorMessage == nil {
                         // État vide explicite : sans lui, un nouveau compte (onglet par
                         // défaut) voit un écran quasi nu, l'app paraît cassée (INT-01).
                         // Message propre à l'onglet ou au hashtag : « Ton fil est
@@ -1946,6 +2011,44 @@ struct FeedView: View {
         .buttonStyle(SQPressButtonStyle())
         .accessibilityHint("Affiche les publications reçues")
         .accessibilityIdentifier("feed.pending")
+    }
+
+    /// « Autour » sans position : ce qui manque, et le geste qui le donne. La demande d'iOS ne part
+    /// que d'ici, jamais à l'ouverture du fil.
+    @ViewBuilder
+    private var nearbyPositionState: some View {
+        switch model.nearbyPosition {
+        case .ready:
+            EmptyView()
+        case .needsPermission:
+            EmptyStateView(
+                title: String(localized: "Ce qui se passe autour de toi"),
+                message: String(localized: "Autorise la localisation pour voir les publications partagées à moins de 30 km. Ta position est arrondie à environ 1 km avant d’être envoyée."),
+                systemImage: "location"
+            )
+            .padding(.top, SQSpace.xxl)
+            GradientButton("Autoriser la localisation", systemImage: "location.fill") {
+                Task { await model.requestNearbyPermission() }
+            }
+            .accessibilityIdentifier("feed.nearby.allow")
+        case .denied:
+            EmptyStateView(
+                title: String(localized: "Localisation désactivée"),
+                message: String(localized: "Active la localisation de SignalQuest dans Réglages pour voir les publications partagées autour de toi."),
+                systemImage: "location.slash"
+            )
+            .padding(.top, SQSpace.xxl)
+            GradientButton("Ouvrir Réglages", style: .secondary) {
+                guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+                UIApplication.shared.open(url)
+            }
+            .accessibilityIdentifier("feed.nearby.settings")
+        case .unavailable:
+            ErrorStateView(title: String(localized: "Position introuvable"),
+                           message: String(localized: "Ta position n’a pas pu être lue. Réessaie dans un instant.")) {
+                Task { await model.load() }
+            }
+        }
     }
 
     /// Onglets visibles. « Enregistrés » vit dans le menu ⋯ et ne rejoint la

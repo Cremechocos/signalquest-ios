@@ -49787,23 +49787,6 @@
         }
       }
     },
-    "Aucune mesure ni identification partagée récemment." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No measurement or identification shared recently."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucune mesure ni identification partagée récemment."
-          }
-        }
-      }
-    },
     "Aucune mesure pour l’instant" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -49978,52 +49961,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucune publication avec #%@ pour l’instant."
-          }
-        }
-      }
-    },
-    "Aucune publication de tes amis pour l'instant." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No posts from your friends yet."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucune publication de tes amis pour l'instant."
-          }
-        }
-      }
-    },
-    "SQFormal|Aucune publication de tes amis pour l'instant." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucune publication de vos amis pour l'instant."
-          }
-        }
-      },
-      "shouldTranslate" : false
-    },
-    "Aucune publication récente pour l'instant." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No recent posts yet."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucune publication récente pour l'instant."
           }
         }
       }
@@ -93436,23 +93373,6 @@
         }
       }
     },
-    "feed.tab.following" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Following"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Abonnements"
-          }
-        }
-      }
-    },
     "fermé" : {
       "localizations" : {
         "en" : {
@@ -118702,6 +118622,166 @@
           }
         }
       }
+    },
+    "Rien n’a été partagé à moins de 30 km ces derniers temps." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing has been shared within 30 km lately."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien n’a été partagé à moins de 30 km ces derniers temps."
+          }
+        }
+      }
+    },
+    "Ce qui se passe autour de toi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What’s happening around you"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qui se passe autour de toi"
+          }
+        }
+      }
+    },
+    "SQFormal|Ce qui se passe autour de toi" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qui se passe autour de vous"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Autorise la localisation pour voir les publications partagées à moins de 30 km. Ta position est arrondie à environ 1 km avant d’être envoyée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow location to see posts shared within 30 km. Your position is rounded to about 1 km before it is sent."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autorise la localisation pour voir les publications partagées à moins de 30 km. Ta position est arrondie à environ 1 km avant d’être envoyée."
+          }
+        }
+      }
+    },
+    "SQFormal|Autorise la localisation pour voir les publications partagées à moins de 30 km. Ta position est arrondie à environ 1 km avant d’être envoyée." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autorisez la localisation pour voir les publications partagées à moins de 30 km. Votre position est arrondie à environ 1 km avant d’être envoyée."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Active la localisation de SignalQuest dans Réglages pour voir les publications partagées autour de toi." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on location for SignalQuest in Settings to see posts shared around you."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Active la localisation de SignalQuest dans Réglages pour voir les publications partagées autour de toi."
+          }
+        }
+      }
+    },
+    "SQFormal|Active la localisation de SignalQuest dans Réglages pour voir les publications partagées autour de toi." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activez la localisation de SignalQuest dans Réglages pour voir les publications partagées autour de vous."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ouvrir Réglages" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Settings"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir Réglages"
+          }
+        }
+      }
+    },
+    "Position introuvable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Position not found"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Position introuvable"
+          }
+        }
+      }
+    },
+    "Ta position n’a pas pu être lue. Réessaie dans un instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your position could not be read. Try again in a moment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta position n’a pas pu être lue. Réessaie dans un instant."
+          }
+        }
+      }
+    },
+    "SQFormal|Ta position n’a pas pu être lue. Réessaie dans un instant." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre position n’a pas pu être lue. Réessayez dans un instant."
+          }
+        }
+      },
+      "shouldTranslate" : false
     }
   },
   "version" : "1.0"

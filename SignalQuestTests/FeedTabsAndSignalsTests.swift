@@ -13,7 +13,7 @@ final class FeedTabsTests: XCTestCase {
     /// Valeurs acceptées par `/api/social/feed` (schéma zod du backend).
     private let validFilters: Set<String> = [
         "all", "posts", "telecom", "media", "following", "friends",
-        "mine", "liked", "reposted", "saved", "followed-hashtags"
+        "mine", "liked", "reposted", "saved", "followed-hashtags", "nearby"
     ]
     private let validRankings: Set<String> = ["smart", "latest", "foryou"]
 
@@ -31,9 +31,23 @@ final class FeedTabsTests: XCTestCase {
         XCTAssertEqual(personalised, [.forYou])
     }
 
-    /// « Récent » doit être strictement chronologique : `smart` réordonnerait.
-    func testLatestIsChronological() {
-        XCTAssertEqual(FeedTab.latest.ranking, "latest")
+    /// Choix d'Alexandre du 24/11 : quatre onglets sans recoupement, « Enregistrés » dans le
+    /// menu ⋯ ; « Suivis » strictement chronologique (`smart` réordonnerait), amis compris.
+    func testFourDistinctTabsAndFollowingIsChronological() {
+        XCTAssertEqual(FeedTab.allCases.filter { $0 != .saved }, [.forYou, .following, .nearby, .photos])
+        XCTAssertEqual(FeedTab.following.filter, "following")
+        XCTAssertEqual(FeedTab.following.ranking, "latest")
+        XCTAssertEqual(FeedTab.allCases.filter(\.needsPosition), [.nearby])
+    }
+
+    /// « Autour » n'envoie qu'un point arrondi au centième de degré (environ 1 km).
+    func testNearbyPointIsRoundedBeforeLeavingTheDevice() {
+        let point = FeedNearPoint(CLLocationCoordinate2D(latitude: 48.856_613, longitude: 2.352_222))
+        XCTAssertEqual(point.latitude, 48.86, accuracy: 1e-9)
+        XCTAssertEqual(point.longitude, 2.35, accuracy: 1e-9)
+        XCTAssertEqual(point.queryItems, [URLQueryItem(name: "lat", value: "48.86"), URLQueryItem(name: "lng", value: "2.35")])
+        let south = FeedNearPoint(CLLocationCoordinate2D(latitude: -21.115_141, longitude: 55.536_384))
+        XCTAssertEqual(south.queryItems.map(\.value), ["-21.12", "55.54"])
     }
 
     /// Deux onglets qui enverraient le MÊME couple afficheraient la même liste —
