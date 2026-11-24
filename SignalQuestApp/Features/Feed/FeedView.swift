@@ -69,11 +69,80 @@ final class FeedViewModel: ObservableObject {
     /// Mes abonnements, lus pour l'état vide de « Suivis » : « Tu ne suis encore personne »
     /// et « Rien de neuf » ne disent pas la même chose. nil tant qu'inconnu.
     @Published private(set) var followingCount: Int?
+    /// La lecture a échoué : « Rien de neuf… », jamais « personne » à qui suit peut-être des profils.
+    @Published private(set) var followingCountFailed = false
     private var followingCountOwner: String?
     /// Profils suivis depuis l'état vide, en un toucher, et ceux dont la réponse est attendue.
     @Published private(set) var followedSuggestionIds: Set<String> = []
     @Published private(set) var followBusyIds: Set<String> = []
     private var didRestoreTab = false
+
+    /// Tri choisi par onglet (préférence `feedSort` du compte, Fil Communauté C8). Un onglet
+    /// absent suit son défaut. Le dernier état connu sert tout de suite, le serveur le confirme.
+    @Published private(set) var feedSort: [FeedTab: FeedSortChoice] = [:]
+    private var feedSortOwner: String?
+
+    /// Tri appliqué à un onglet ; nil pour un onglet sans choix (Suivis, Enregistrés).
+    func sort(for tab: FeedTab) -> FeedSortChoice? {
+        tab.sortKey == nil ? nil : (feedSort[tab] ?? tab.defaultSort)
+    }
+
+    /// L'onglet ouvert se lit dans l'ordre chronologique : séparateurs de jour, heure exacte.
+    var isChronological: Bool { tab.isChronological(for: sort(for: tab)) }
+
+    nonisolated static func feedSortKey(ownerScopeId: String) -> String {
+        "FeedView.feedSort.\(LocalAccountScope.storageNamespace(for: ownerScopeId))"
+    }
+
+    /// Dernier `feedSort` connu de ce compte, sur cet appareil : le fil s'ouvre dans le bon tri
+    /// sans attendre le serveur. Relu à chaque changement de compte.
+    func restoreFeedSort(defaults: UserDefaults = .standard) {
+        let owner = LocalAccountScope.currentOwnerScopeId
+        guard feedSortOwner != owner else { return }
+        feedSortOwner = owner
+        let raw = defaults.dictionary(forKey: Self.feedSortKey(ownerScopeId: owner)) as? [String: String]
+        feedSort = FeedTab.sortPreference(from: raw)
+    }
+
+    private func storeFeedSort(defaults: UserDefaults = .standard) {
+        var raw: [String: String] = [:]
+        for (tab, choice) in feedSort { if let key = tab.sortKey { raw[key] = choice.rawValue } }
+        defaults.set(raw, forKey: Self.feedSortKey(ownerScopeId: LocalAccountScope.currentOwnerScopeId))
+    }
+
+    /// La préférence servie remplace le dernier état connu. Si le tri de l'onglet ouvert change
+    /// (choisi sur une autre app), le fil se recharge, la page affichée restant à l'écran.
+    func refreshFeedSort() async {
+        guard !AppEnvironment.usesDemoData, LocalAccountScope.sessionSnapshot() != nil else { return }
+        let owner = LocalAccountScope.currentOwnerScopeId
+        guard let served = try? await service.feedSortPreference(),
+              owner == LocalAccountScope.currentOwnerScopeId else { return }
+        let before = sort(for: tab)
+        feedSort = served
+        storeFeedSort()
+        if sort(for: tab) != before, page != nil { await reloadKeepingPage() }
+    }
+
+    /// « Pertinence | Récent » : le choix vaut pour cet onglet, sur le compte. La page affichée
+    /// reste à l'écran jusqu'à l'arrivée de la nouvelle. Un enregistrement refusé ne change pas
+    /// l'affichage ; le choix revient du serveur au prochain affichage.
+    func selectSort(_ choice: FeedSortChoice) async {
+        guard tab.sortKey != nil, sort(for: tab) != choice else { return }
+        let changedTab = tab
+        feedSort[changedTab] = choice
+        storeFeedSort()
+        if !AppEnvironment.usesDemoData, LocalAccountScope.sessionSnapshot() != nil {
+            Task { [service] in _ = try? await service.setFeedSort(choice, for: changedTab) }
+        }
+        await reloadKeepingPage()
+    }
+
+    private func reloadKeepingPage() async {
+        queryRevision = UUID()
+        pendingCount = 0; pendingItems = []; knownIds.removeAll(); needsLiveCheck = false; liveCheckID = nil
+        restartStream()
+        await load()
+    }
 
     /// Dernier onglet ouvert, par compte, sur cet appareil (plan Fil Communauté, C1).
     nonisolated static func lastTabKey(ownerScopeId: String) -> String {
@@ -103,11 +172,18 @@ final class FeedViewModel: ObservableObject {
     func loadFollowingCount(userId: String) async {
         let owner = LocalAccountScope.currentOwnerScopeId
         guard followingCountOwner != owner || followingCount == nil else { return }
+        if followingCountOwner != owner { followingCount = nil; followingCountFailed = false }
         if AppEnvironment.usesDemoData { followingCount = 0; followingCountOwner = owner; return }
-        guard let profile = try? await service.userProfile(userId: userId),
-              owner == LocalAccountScope.currentOwnerScopeId else { return }
-        followingCount = profile.followingCount
-        followingCountOwner = owner
+        do {
+            let profile = try await service.userProfile(userId: userId)
+            guard owner == LocalAccountScope.currentOwnerScopeId else { return }
+            followingCount = profile.followingCount
+            followingCountFailed = false
+            followingCountOwner = owner
+        } catch {
+            guard owner == LocalAccountScope.currentOwnerScopeId, !error.isCancellation else { return }
+            followingCountFailed = true
+        }
     }
 
     /// Suivre un profil suggéré en un toucher, depuis l'état vide. La route serveur est
@@ -124,7 +200,9 @@ final class FeedViewModel: ObservableObject {
             do {
                 let result = try await service.toggleFollow(userId: author.id)
                 if !result.following { followedSuggestionIds.remove(author.id) }
+                // « Rien de neuf… » aussitôt, sans relire le profil (règle commune du 25/11).
                 if let count = result.followingCount { followingCount = count }
+                else if result.following { followingCount = max(followingCount ?? 0, 1) }
                 // « Suivis » se remplit aussitôt avec les publications du profil suivi.
                 if result.following, tab == .following { await load() }
             } catch {
@@ -154,9 +232,13 @@ final class FeedViewModel: ObservableObject {
     /// liste pendant que l'utilisateur lit déplace ce qu'il regarde — on
     /// annonce, il décide. C'est aussi ce que font toutes les apps de fil.
     @Published private(set) var pendingCount = 0
+    /// Les publications annoncées par la pastille, plus récentes que tout ce qui est affiché.
+    /// Un toucher les insère en tête, quel que soit le tri (Fil Communauté, C2/C8).
+    private var pendingItems: [UnifiedSocialFeedItem] = []
     @Published private(set) var trendingHashtags: [TrendingHashtag] = []
     private struct Query: Equatable {
         let tab: FeedTab
+        let sort: FeedSortChoice?
         let near: FeedNearPoint?
         let hashtag: String?
         let owner: String
@@ -179,7 +261,7 @@ final class FeedViewModel: ObservableObject {
     private var liveCheckID: UUID?
     private var knownIds: Set<String> = []
     private var query: Query {
-        Query(tab: tab, near: tab.needsPosition ? nearPoint : nil, hashtag: selectedHashtag,
+        Query(tab: tab, sort: sort(for: tab), near: tab.needsPosition ? nearPoint : nil, hashtag: selectedHashtag,
               owner: LocalAccountScope.currentOwnerScopeId,
               session: LocalAccountScope.sessionSnapshot(), revision: queryRevision)
     }
@@ -188,7 +270,7 @@ final class FeedViewModel: ObservableObject {
         queryRevision = UUID(); loadRevision = UUID()
         detailReceipts.removeAll()
         page = nil; errorMessage = nil; isLoading = true; isLoadingMore = false
-        pendingCount = 0; knownIds.removeAll(); needsLiveCheck = false; liveCheckID = nil
+        pendingCount = 0; pendingItems = []; knownIds.removeAll(); needsLiveCheck = false; liveCheckID = nil
         if metadataOwner != LocalAccountScope.currentOwnerScopeId { trendingHashtags = [] }
         restartStream()
     }
@@ -338,19 +420,50 @@ final class FeedViewModel: ObservableObject {
         }
         let loading = loadRevision
         do {
+            // Toujours en `latest`, jamais mis en cache, quel que soit le tri affiché : la première
+            // page « Pertinence » reste figée 60 s (contrat B3, « Pastille »).
             let freshPage = try await service.loadFeedItems(cursor: nil, hashtag: context.hashtag, tab: context.tab,
-                                                            near: context.near)
+                                                            near: context.near, sort: .latest)
             guard context == query, streamID == streamRevision, loading == loadRevision,
                   !Task.isCancelled, let page else { return }
-            let fresh = Set(freshPage.items.map(\.id)).subtracting(page.items.map(\.id)).subtracting(knownIds)
-            knownIds.formUnion(fresh)
-            pendingCount += fresh.count
+            let fresh = Self.newerItems(in: freshPage.items, than: page.items + pendingItems,
+                                        excluding: knownIds.union(deferredDeletions.keys))
+            knownIds.formUnion(fresh.map(\.id))
+            pendingItems = fresh + pendingItems
+            pendingCount = pendingItems.count
         } catch {
             // A live refresh failure never replaces the current reading.
         }
     }
 
-    func applyPending() async { await load() }
+    /// Nouveautés : seulement ce qui est plus récent que la publication la plus récente déjà
+    /// affichée. Une publication ancienne qui remonte (classement recalculé) ou une publication
+    /// en cours de suppression n'est pas une nouveauté.
+    nonisolated static func newerItems(in candidates: [UnifiedSocialFeedItem], than shown: [UnifiedSocialFeedItem],
+                                       excluding ids: Set<String>) -> [UnifiedSocialFeedItem] {
+        let shownIds = Set(shown.map(\.id))
+        let newest = shown.compactMap(\.createdAt).max()
+        var seen = Set<String>()
+        return candidates.filter { item in
+            guard !shownIds.contains(item.id), !ids.contains(item.id), seen.insert(item.id).inserted else { return false }
+            guard let newest else { return true }
+            guard let created = item.createdAt else { return false }
+            return created > newest
+        }
+    }
+
+    /// Toucher la pastille insère les nouveautés en tête, sans relire le tri affiché (figé 60 s
+    /// en Pertinence, il ne les contiendrait pas). Sans nouveauté gardée, un rechargement.
+    func applyPending() async {
+        guard !pendingItems.isEmpty, let current = page else { await load(); return }
+        let inserted = pendingItems.filter { item in !current.items.contains { $0.id == item.id } }
+        page = SocialFeedPage(
+            items: inserted + current.items, nextCursor: current.nextCursor, stories: current.stories,
+            trendingHashtags: current.trendingHashtags, suggestedUsers: current.suggestedUsers,
+            requestId: current.requestId
+        )
+        pendingItems = []; pendingCount = 0
+    }
 
     func load() async {
         // « Autour » lit sa position d'abord : sans point, aucune requête, l'onglet dit pourquoi.
@@ -372,14 +485,14 @@ final class FeedViewModel: ObservableObject {
         defer { if context == query && loadRevision == request { isLoading = false } }
         if AppEnvironment.usesDemoData {
             page = .demo; trendingHashtags = page?.trendingHashtags ?? []
-            pendingCount = 0; knownIds.removeAll()
+            pendingCount = 0; pendingItems = []; knownIds.removeAll()
             return
         }
         Task { await service.retryPendingPosts() }
         if AppEnvironment.delaysLoadForQA { try? await Task.sleep(for: .seconds(4)) }
         do {
             let loaded = try await service.loadFeed(cursor: nil, hashtag: context.hashtag, tab: context.tab,
-                                                    near: context.near)
+                                                    near: context.near, sort: context.sort)
             guard context == query, request == loadRevision, !Task.isCancelled else { return }
             if let radius = loaded.nearRadiusKm, radius > 0 { nearRadiusKm = Int(radius.rounded()) }
             page = SocialFeedPage(
@@ -397,7 +510,7 @@ final class FeedViewModel: ObservableObject {
             // Un GET démarré après le reçu peut désormais faire autorité.
             detailReceipts = detailReceipts.filter { $0.value.revision > receiptRevisionAtStart }
             trendingHashtags = loaded.trendingHashtags; metadataOwner = context.owner
-            pendingCount = 0; knownIds.removeAll()
+            pendingCount = 0; pendingItems = []; knownIds.removeAll()
             if needsLiveCheck, streamFactory != nil {
                 needsLiveCheck = false
                 let streamID = streamRevision
@@ -451,7 +564,7 @@ final class FeedViewModel: ObservableObject {
         do {
             for _ in 0..<Self.emptyPageHops {
                 let next = try await service.loadFeedItems(cursor: cursor, hashtag: context.hashtag, tab: context.tab,
-                                                           near: context.near)
+                                                           near: context.near, sort: context.sort)
                 guard context == query, loading == loadRevision, !Task.isCancelled, let current = page else { return }
                 var seen = Set(current.items.map(\.id))
                 let appended = next.items.filter { deferredDeletions[$0.id] == nil && seen.insert($0.id).inserted }
@@ -1005,14 +1118,29 @@ struct FeedView: View {
                 }
                 composerPrompt
                 feedTabs
+                if model.tab.sortKey != nil { sortPicker }
                 if let tag = model.selectedHashtag { hashtagFilter(tag) }
                 if model.tab == .nearby, model.selectedHashtag == nil, model.nearbyPosition == .ready {
                     nearbyZoneBar
                 }
 
                 if model.page == nil && model.errorMessage == nil {
-                    LoadingSkeleton()
+                    // Photos se charge en grille : son squelette aussi (recette de l'audit, 24/11).
+                    if model.tab.rendersAsGallery {
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: SQSpace.xs), count: 3),
+                                  spacing: SQSpace.xs) {
+                            ForEach(0..<12, id: \.self) { _ in
+                                RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
+                                    .fill(SQColor.surfaceMuted)
+                                    .aspectRatio(1, contentMode: .fit)
+                            }
+                        }
                         .sqShimmer()
+                        .accessibilityHidden(true)
+                    } else {
+                        LoadingSkeleton()
+                            .sqShimmer()
+                    }
                 } else {
                     // Le pouls décrit la zone, pas un filtre : il n'ouvre que
                     // « Pour toi ».
@@ -1038,8 +1166,15 @@ struct FeedView: View {
                     if model.tab.rendersAsGallery {
                         photoGallery(model.page?.items ?? [])
                     } else {
-                        ForEach(model.page?.items ?? []) { item in
+                        let items = model.page?.items ?? []
+                        let chronological = model.isChronological
+                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                            // Fil chronologique : un séparateur à chaque nouveau jour (C8).
+                            if chronological, let title = FeedDaySeparator.title(for: item, after: index > 0 ? items[index - 1] : nil) {
+                                FeedDaySeparator(title: title)
+                            }
                             feedCard(for: item)
+                                .environment(\.feedCardExactTime, chronological)
                         }
                     }
                     if model.isLoadingMore {
@@ -1067,6 +1202,11 @@ struct FeedView: View {
             }
         }
         .sqAnimation(SQMotion.snappy, value: model.pendingCount > 0)
+        // Pastille annoncée sans déplacer le focus de VoiceOver (C7).
+        .onChangeCompat(of: model.pendingCount) { old, new in
+            guard new > old, UIAccessibility.isVoiceOverRunning else { return }
+            UIAccessibility.post(notification: .announcement, argument: String(localized: "\(new) nouvelle publication"))
+        }
         .onChangeCompat(of: scrollTopRequest) { _, _ in
             proxy.scrollTo(Self.topAnchor, anchor: .top)
         }
@@ -1113,11 +1253,13 @@ struct FeedView: View {
             // Le dernier onglet ouvert, relu avant le premier chargement : changer d'onglet
             // marque le fil « en chargement » sans rien demander, d'où `restored`.
             let restored = model.page == nil && model.restoreLastTab()
+            model.restoreFeedSort()
             model.startStream(services.sse)
             // Au lancement à froid, le passage à l'état actif arrive pendant ce
             // premier chargement : sans `isLoading`, le fil partait deux fois (F-44).
             if model.page == nil, restored || !model.isLoading { await model.load() }
             guard !Task.isCancelled, isFeedVisible else { return }
+            await model.refreshFeedSort()
             await model.loadPulse()
             await consumeFeedRoutesIfNeeded()
             presentMessagesIfNeeded()
@@ -1822,16 +1964,25 @@ struct FeedView: View {
                 EmptyStateView(title: String(localized: "Rien de neuf chez les profils que tu suis"),
                                message: String(localized: "Leurs prochaines publications arriveront ici."),
                                systemImage: "person.2")
+            case .none where model.followingCountFailed:
+                EmptyStateView(title: String(localized: "Rien de neuf chez les profils que tu suis"),
+                               message: String(localized: "Leurs prochaines publications arriveront ici."),
+                               systemImage: "person.2")
             case .none:
-                EmptyStateView(title: String(localized: "Rien ici pour l’instant"),
-                               message: FeedTab.following.emptyMessage, systemImage: "person.2")
+                // Ni « personne » ni « rien de neuf » tant que le nombre d'abonnements n'est pas
+                // connu : un texte qui change au bout de quelques secondes se lit comme un bug.
+                LoadingSkeleton()
+                    .sqShimmer()
+                    .accessibilityHidden(true)
             }
         }
         .padding(.top, SQSpace.xxl)
         .task(id: currentUser?.id) {
             if let id = currentUser?.id { await model.loadFollowingCount(userId: id) }
         }
-        emptyFeedNextSteps(followable: true)
+        if model.followingCount != nil || model.followingCountFailed {
+            emptyFeedNextSteps(followable: true)
+        }
     }
 
     /// Fil vide : publier se fait déjà depuis la ligne « Quoi de neuf ? » au-dessus.
@@ -2229,7 +2380,7 @@ struct FeedView: View {
                 Image(systemName: "arrow.up")
                     .font(.system(size: 12, weight: .bold))
                     .accessibilityHidden(true)
-                Text("\(model.pendingCount) nouveauté")
+                Text("\(model.pendingCount) nouvelle publication")
                     .font(SQType.subhead(.semibold))
             }
             .foregroundStyle(SQColor.onInk)
@@ -2331,7 +2482,39 @@ struct FeedView: View {
         .padding(.horizontal, -SQSpace.lg)
     }
 
-    /// Filtre par hashtag actif : la pastille le nomme et le retire.
+    /// « Pertinence | Récent » sous les onglets qui le proposent (Fil Communauté, C8). Un groupe
+    /// de deux choix exclusifs : VoiceOver annonce le choix actif par `.isSelected`.
+    private var sortPicker: some View {
+        HStack(spacing: SQSpace.xs) {
+            ForEach(FeedSortChoice.allCases, id: \.self) { choice in
+                let selected = model.sort(for: model.tab) == choice
+                Button {
+                    Haptics.selection()
+                    Task { await model.selectSort(choice) }
+                } label: {
+                    Text(choice == .relevance ? "Pertinence" : "Récent")
+                        .font(SQType.caption.weight(selected ? .bold : .semibold))
+                        .sqSingleLine()
+                        .padding(.horizontal, SQSpace.md)
+                        .frame(minHeight: 30)
+                        .foregroundStyle(selected ? SQColor.label : SQColor.chipInk)
+                        .background(selected ? SQColor.surface : Color.clear,
+                                    in: Capsule(style: .continuous))
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+                .accessibilityIdentifier("feed.sort.\(choice.rawValue)")
+            }
+        }
+        .padding(.horizontal, SQSpace.xxs)
+        .background(SQColor.chip, in: Capsule(style: .continuous))
+        .frame(maxHeight: 44)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Ordre du fil")
+    }
+
     /// « Changer de zone » : une ville choisie à la main, même sans localisation.
     private var changeZoneButton: some View {
         GradientButton("Changer de zone", systemImage: "map", style: .secondary) {
@@ -2376,6 +2559,7 @@ struct FeedView: View {
         .padding(.horizontal, SQSpace.xs)
     }
 
+    /// Filtre par hashtag actif : la pastille le nomme et le retire.
     private func hashtagFilter(_ tag: String) -> some View {
         HStack(spacing: SQSpace.sm) {
             Button {
@@ -2792,5 +2976,35 @@ struct NearbyZonePicker: View {
                 }
             }
         }
+    }
+}
+
+/// Séparateur de jour d'un fil chronologique : « Aujourd'hui », « Hier », puis la date.
+struct FeedDaySeparator: View {
+    let title: String
+
+    /// Titre à poser avant `item` s'il ouvre un nouveau jour ; nil sinon, ou sans date.
+    static func title(for item: UnifiedSocialFeedItem, after previous: UnifiedSocialFeedItem?,
+                      now: Date = Date(), calendar: Calendar = .current) -> String? {
+        guard let date = item.createdAt else { return nil }
+        if let before = previous?.createdAt, calendar.isDate(before, inSameDayAs: date) { return nil }
+        if calendar.isDate(date, inSameDayAs: now) { return String(localized: "Aujourd’hui") }
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: now), calendar.isDate(date, inSameDayAs: yesterday) {
+            return String(localized: "Hier")
+        }
+        let sameYear = calendar.component(.year, from: date) == calendar.component(.year, from: now)
+        return sameYear
+            ? date.formatted(.dateTime.weekday(.wide).day().month(.wide))
+            : date.formatted(.dateTime.day().month(.wide).year())
+    }
+
+    var body: some View {
+        Text(verbatim: title)
+            .sqKicker()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, SQSpace.sm)
+            .padding(.leading, SQSpace.xs)
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityIdentifier("feed.day")
     }
 }

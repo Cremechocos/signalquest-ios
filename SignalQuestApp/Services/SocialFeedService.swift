@@ -10,6 +10,13 @@ protocol SocialFeedServicing: Sendable {
     /// Mêmes lectures avec le point de l'onglet « Autour » (`tab.needsPosition`).
     func loadFeed(cursor: String?, hashtag: String?, tab: FeedTab?, near: FeedNearPoint?) async throws -> SocialFeedPage
     func loadFeedItems(cursor: String?, hashtag: String?, tab: FeedTab?, near: FeedNearPoint?) async throws -> SocialFeedPage
+    /// Mêmes lectures avec le tri choisi pour l'onglet (Fil Communauté, C8).
+    func loadFeed(cursor: String?, hashtag: String?, tab: FeedTab?, near: FeedNearPoint?, sort: FeedSortChoice?) async throws -> SocialFeedPage
+    func loadFeedItems(cursor: String?, hashtag: String?, tab: FeedTab?, near: FeedNearPoint?, sort: FeedSortChoice?) async throws -> SocialFeedPage
+    /// Préférence `feedSort` du compte (`GET /api/user/preferences`), choix explicites et défauts.
+    func feedSortPreference() async throws -> [FeedTab: FeedSortChoice]
+    /// Enregistre le tri d'un onglet (`PATCH /api/user/preferences`) ; renvoie la préférence servie.
+    func setFeedSort(_ sort: FeedSortChoice, for tab: FeedTab) async throws -> [FeedTab: FeedSortChoice]
     /// Récupère un post unique (deep-link / notification) par son identifiant.
     func post(id: String) async throws -> UnifiedSocialFeedItem?
     /// Détail d'un test d'expérience (`GET /api/experience-tests/{id}`), nil si
@@ -122,6 +129,19 @@ extension SocialFeedServicing {
     func loadFeedItems(cursor: String?, hashtag: String?, tab: FeedTab?, near: FeedNearPoint?) async throws -> SocialFeedPage {
         try await loadFeedItems(cursor: cursor, hashtag: hashtag, tab: tab)
     }
+
+    /// Un service sans tri (démo, doublures de test) lit l'onglet dans son ordre par défaut.
+    func loadFeed(cursor: String?, hashtag: String?, tab: FeedTab?, near: FeedNearPoint?, sort: FeedSortChoice?) async throws -> SocialFeedPage {
+        try await loadFeed(cursor: cursor, hashtag: hashtag, tab: tab, near: near)
+    }
+
+    func loadFeedItems(cursor: String?, hashtag: String?, tab: FeedTab?, near: FeedNearPoint?, sort: FeedSortChoice?) async throws -> SocialFeedPage {
+        try await loadFeedItems(cursor: cursor, hashtag: hashtag, tab: tab, near: near)
+    }
+
+    func feedSortPreference() async throws -> [FeedTab: FeedSortChoice] { [:] }
+
+    func setFeedSort(_ sort: FeedSortChoice, for tab: FeedTab) async throws -> [FeedTab: FeedSortChoice] { [tab: sort] }
 
     func retryPendingPosts() async {}
 
@@ -253,14 +273,41 @@ final class SocialFeedService: SocialFeedServicing {
         try await feed(cursor: cursor, hashtag: hashtag, tab: tab, near: near, include: "items")
     }
 
+    func loadFeed(cursor: String?, hashtag: String?, tab: FeedTab?, near: FeedNearPoint?, sort: FeedSortChoice?) async throws -> SocialFeedPage {
+        try await feed(cursor: cursor, hashtag: hashtag, tab: tab, near: near, sort: sort, include: "items,stories,trends,suggestions")
+    }
+
+    func loadFeedItems(cursor: String?, hashtag: String?, tab: FeedTab?, near: FeedNearPoint?, sort: FeedSortChoice?) async throws -> SocialFeedPage {
+        try await feed(cursor: cursor, hashtag: hashtag, tab: tab, near: near, sort: sort, include: "items")
+    }
+
+    private struct FeedSortPreferences: Decodable { let feedSort: [String: String]? }
+    private struct FeedSortPatch: Encodable { let feedSort: [String: String] }
+
+    func feedSortPreference() async throws -> [FeedTab: FeedSortChoice] {
+        let response = try await api.request(APIEndpoint(path: "/api/user/preferences"), as: FeedSortPreferences.self)
+        return FeedTab.sortPreference(from: response.feedSort)
+    }
+
+    func setFeedSort(_ sort: FeedSortChoice, for tab: FeedTab) async throws -> [FeedTab: FeedSortChoice] {
+        guard let key = tab.sortKey else { return [:] }
+        let response: FeedSortPreferences = try await api.requestJSON(
+            "/api/user/preferences", method: .patch, body: FeedSortPatch(feedSort: [key: sort.rawValue])
+        )
+        return FeedTab.sortPreference(from: response.feedSort)
+    }
+
     private func feed(cursor: String?, hashtag: String?, tab: FeedTab?, near: FeedNearPoint? = nil,
-                      include: String) async throws -> SocialFeedPage {
+                      sort: FeedSortChoice? = nil, include: String) async throws -> SocialFeedPage {
         var query = [
             URLQueryItem(name: "limit", value: "20"),
             URLQueryItem(name: "filter", value: tab?.filter ?? "all"),
-            URLQueryItem(name: "ranking", value: tab?.ranking ?? "smart"),
+            URLQueryItem(name: "ranking", value: tab?.ranking(for: sort) ?? "smart"),
             URLQueryItem(name: "include", value: include)
         ]
+        // Contrat B3 v1.1 : la fenêtre de Pertinence, seulement pour le fil qui a choisi son tri
+        // (sa pastille détecte en `latest`), à chaque page. L'accueil et le profil ne l'envoient pas.
+        if let sort, tab?.sendsRankWindow(for: sort) == true { query.append(URLQueryItem(name: "rankWindow", value: "1")) }
         if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
         if let hashtag, !hashtag.isEmpty { query.append(URLQueryItem(name: "hashtag", value: hashtag)) }
         if tab?.needsPosition == true, let near { query += near.queryItems }

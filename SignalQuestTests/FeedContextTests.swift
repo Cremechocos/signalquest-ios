@@ -205,8 +205,10 @@ final class FeedContextTests: XCTestCase {
         streams.emit(0, raw); streams.emit(1, raw)
         await fulfillment(of: [replayChecked], timeout: 2)
         XCTAssertEqual(model.pendingCount, 1)
+        // Règle commune du 24/11 (Fil Communauté, C2/C8) : toucher la pastille insère les
+        // nouveautés en tête, sans relire le tri affiché.
         await model.applyPending()
-        XCTAssertEqual(model.page?.items.map(\.id), ["current", "fresh"])
+        XCTAssertEqual(model.page?.items.map(\.id), ["fresh", "current"])
         XCTAssertEqual(model.pendingCount, 0)
     }
 
@@ -262,6 +264,123 @@ final class FeedContextTests: XCTestCase {
         _ = try await service.loadFeedItems(cursor: nil, hashtag: "beta", tab: nil)
         XCTAssertEqual(includes, ["items,stories,trends,suggestions", "items", "items"])
         XCTAssertEqual(model.page?.items.map(\.id), ["a"])
+    }
+
+    /// Fil Communauté C8 et contrat B3 v1.1 : le tri choisi donne le `ranking`, et seule la
+    /// Pertinence du fil demande `rankWindow=1` ; la pastille relit toujours en `latest`.
+    func testSortSetsRankingAndRankWindowOnEveryPage() async throws {
+        var queries: [String] = []
+        MockURLProtocol.requestHandler = { request in
+            if request.url?.path == "/api/social/feed" {
+                // Pas de closure ici : sous le MainActor du test, elle serait isolée et ferait
+                // planter le gestionnaire, qui tourne sur une file de CFNetwork.
+                let filter = Self.queryValue("filter", of: request) ?? "?"
+                let ranking = Self.queryValue("ranking", of: request) ?? "?"
+                let window = Self.queryValue("rankWindow", of: request) ?? "-"
+                queries.append("\(filter)|\(ranking)|\(window)")
+            }
+            let json = Self.queryValue("cursor", of: request) != nil
+                ? #"{"items":[],"nextCursor":null}"#
+                : #"{"items":[{"id":"a","kind":"post","author":{"id":"qa-author","name":"Recette"},"text":"a"}],"nextCursor":"rank:opaque"}"#
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                                           headerFields: ["Content-Type": "application/json"])!
+            return (response, Data(json.utf8))
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("feed-sort-access-token")
+        let service = SocialFeedService(api: APIClient(config: .test, credentials: credentials,
+                                                       session: URLSession(configuration: configuration)))
+        _ = try await service.loadFeed(cursor: nil, hashtag: nil, tab: .forYou, near: nil, sort: .relevance)
+        _ = try await service.loadFeedItems(cursor: "rank:opaque", hashtag: nil, tab: .forYou, near: nil, sort: .relevance)
+        _ = try await service.loadFeedItems(cursor: nil, hashtag: nil, tab: .forYou, near: nil, sort: .latest)
+        _ = try await service.loadFeedItems(cursor: nil, hashtag: nil, tab: .photos, near: nil, sort: .relevance)
+        _ = try await service.loadFeedItems(cursor: nil, hashtag: nil, tab: .following, near: nil, sort: nil)
+        // L'accueil et les appelants sans tri ne demandent jamais la fenêtre.
+        _ = try await service.loadFeedItems(cursor: nil, hashtag: nil, tab: .forYou)
+        XCTAssertEqual(queries, ["all|foryou|1", "all|foryou|1", "all|latest|-", "media|smart|1",
+                                 "following|latest|-", "all|foryou|-"])
+    }
+
+    /// C2/C8 : une nouveauté est plus récente que la plus récente affichée. Une publication
+    /// ancienne qui remonte, ou en cours de suppression, n'en est pas une (recette du 24/11).
+    func testOnlyNewerPostsAreAnnouncedAndTheirTapInsertsThem() async throws {
+        func dated(_ id: String, _ iso: String) -> UnifiedSocialFeedItem {
+            let raw = #"{"id":"\#(id)","kind":"post","author":{"id":"qa-author","name":"Recette"},"text":"\#(id)","createdAt":"\#(iso)"}"#
+            return try! JSONDecoder.signalQuest.decode(UnifiedSocialFeedItem.self, from: Data(raw.utf8))
+        }
+        let shown = [dated("b", "2026-11-24T10:00:00Z"), dated("a", "2026-11-24T09:00:00Z")]
+        let candidates = [dated("new", "2026-11-24T11:00:00Z"), dated("deleting", "2026-11-24T10:30:00Z"),
+                          dated("b", "2026-11-24T10:00:00Z"), dated("old", "2026-11-23T08:00:00Z")]
+        XCTAssertEqual(FeedViewModel.newerItems(in: candidates, than: shown, excluding: ["deleting"]).map(\.id), ["new"])
+        // Rien d'affiché ni de daté : tout ce qui n'est pas connu compte.
+        XCTAssertEqual(FeedViewModel.newerItems(in: candidates, than: [], excluding: []).count, 4)
+
+        let model = FeedViewModel(service: FeedContextFixture { _, _, _ in Self.page("page", items: shown) })
+        await model.load()
+        await model.applyPending()
+        XCTAssertEqual(model.page?.items.map(\.id), ["b", "a"], "sans nouveauté gardée, un simple rechargement")
+    }
+
+    /// Règle commune du 25/11 : un profil illisible donne « Rien de neuf… », jamais « personne ».
+    func testUnreadableFollowingCountIsNotReadAsNobody() async {
+        let model = FeedViewModel(service: FeedContextFixture { _, _, _ in Self.page("page") })
+        XCTAssertNil(model.followingCount)
+        XCTAssertFalse(model.followingCountFailed)
+        await model.loadFollowingCount(userId: "qa-viewer")
+        XCTAssertNil(model.followingCount)
+        XCTAssertTrue(model.followingCountFailed)
+    }
+
+    /// C8 : changer de tri garde la page affichée jusqu'à l'arrivée de la nouvelle.
+    func testChangingTheSortKeepsThePageUntilTheNewOneArrives() async throws {
+        let key = FeedViewModel.feedSortKey(ownerScopeId: LocalAccountScope.currentOwnerScopeId)
+        let previous = UserDefaults.standard.dictionary(forKey: key)
+        defer { UserDefaults.standard.set(previous, forKey: key) }
+        let gate = FeedFixtureGate<SocialFeedPage>(), calls = FeedCallCount()
+        let started = expectation(description: "second load")
+        let model = FeedViewModel(service: FeedContextFixture { _, _, _ in
+            if await calls.next() == 1 { return Self.page("relevance", items: [Self.item("a")]) }
+            started.fulfill()
+            return try await gate.wait()
+        })
+        await model.load()
+        XCTAssertEqual(model.sort(for: .forYou), .relevance)
+        XCTAssertEqual(model.sort(for: .nearby), .latest)
+        XCTAssertNil(model.sort(for: .following))
+        XCTAssertFalse(model.isChronological)
+        let change = Task { await model.selectSort(.latest) }
+        await fulfillment(of: [started], timeout: 2)
+        XCTAssertEqual(model.page?.requestId, "relevance", "la page affichée reste à l'écran")
+        XCTAssertTrue(model.isChronological)
+        await gate.finish(.success(Self.page("latest", items: [Self.item("b")])))
+        await change.value
+        XCTAssertEqual(model.page?.requestId, "latest")
+        XCTAssertEqual(model.sort(for: .forYou), .latest)
+    }
+
+    /// C8 : séparateurs « Aujourd'hui », « Hier », puis la date ; heure exacte au-delà de 24 h.
+    func testDaySeparatorsAndExactTime() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Paris")!
+        let now = ISO8601DateFormatter().date(from: "2026-11-24T20:00:00Z")!
+        func dated(_ id: String, _ iso: String) -> UnifiedSocialFeedItem {
+            let raw = #"{"id":"\#(id)","kind":"post","author":{"id":"qa-author","name":"Recette"},"text":"\#(id)","createdAt":"\#(iso)"}"#
+            return try! JSONDecoder.signalQuest.decode(UnifiedSocialFeedItem.self, from: Data(raw.utf8))
+        }
+        let today = dated("t", "2026-11-24T18:00:00Z"), today2 = dated("t2", "2026-11-24T08:00:00Z")
+        let yesterday = dated("y", "2026-11-23T21:40:00Z"), older = dated("o", "2026-11-20T10:00:00Z")
+        XCTAssertEqual(FeedDaySeparator.title(for: today, after: nil, now: now, calendar: calendar), String(localized: "Aujourd’hui"))
+        XCTAssertNil(FeedDaySeparator.title(for: today2, after: today, now: now, calendar: calendar))
+        XCTAssertEqual(FeedDaySeparator.title(for: yesterday, after: today2, now: now, calendar: calendar), String(localized: "Hier"))
+        XCTAssertNotNil(FeedDaySeparator.title(for: older, after: yesterday, now: now, calendar: calendar))
+        XCTAssertNil(FeedDaySeparator.title(for: Self.item("sans-date"), after: nil, now: now, calendar: calendar))
+
+        let recent = now.addingTimeInterval(-3_600), dayOld = now.addingTimeInterval(-90_000)
+        XCTAssertEqual(CardHeader.timeLabel(exact: true, now: now)(recent), recent.formatted(.sqRelative))
+        XCTAssertEqual(CardHeader.timeLabel(exact: true, now: now)(dayOld), dayOld.formatted(date: .omitted, time: .shortened))
+        XCTAssertEqual(CardHeader.timeLabel(exact: false, now: now)(dayOld), dayOld.formatted(.sqRelative))
     }
 
     /// Jusqu'à 5 s : une seconde ne suffisait pas sous la charge des portes

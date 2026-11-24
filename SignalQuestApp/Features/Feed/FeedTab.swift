@@ -105,6 +105,59 @@ enum FeedTab: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// Tri d'un onglet, préférence `feedSort` du compte (contrat feedSort v1, Fil Communauté C8) :
+/// « Pertinence » ou « Récent ». Un choix vaut pour le compte, sur toutes ses apps.
+enum FeedSortChoice: String, CaseIterable, Sendable {
+    case relevance
+    case latest
+}
+
+extension FeedTab {
+    /// Clé de l'onglet dans `feedSort` ; nil pour un onglet sans choix de tri (Suivis est
+    /// toujours chronologique, Enregistrés garde son ordre).
+    var sortKey: String? {
+        switch self {
+        case .forYou: return "forYou"
+        case .nearby: return "nearby"
+        case .photos: return "photos"
+        case .following, .saved: return nil
+        }
+    }
+
+    /// Défaut du serveur tant que le membre n'a rien choisi (choix d'Alexandre du 24/11).
+    var defaultSort: FeedSortChoice { self == .nearby || self == .following ? .latest : .relevance }
+
+    /// `ranking` envoyé pour un tri : « Récent » = `latest` ; « Pertinence » = `foryou` sur
+    /// Pour toi, `smart` sur Autour et Photos. Sans choix, le tri par défaut de l'onglet.
+    func ranking(for sort: FeedSortChoice?) -> String {
+        guard sortKey != nil else { return ranking }
+        switch sort ?? defaultSort {
+        case .latest: return "latest"
+        case .relevance: return self == .forYou ? "foryou" : "smart"
+        }
+    }
+
+    /// `rankWindow=1` (contrat B3 v1.1) : la Pertinence classée sur toute la fenêtre de
+    /// candidats, demandée sur toutes les pages d'un onglet réglé sur Pertinence.
+    func sendsRankWindow(for sort: FeedSortChoice?) -> Bool {
+        sortKey != nil && (sort ?? defaultSort) == .relevance
+    }
+
+    /// Fil chronologique : séparateurs de jour et heure exacte au-delà de 24 h.
+    func isChronological(for sort: FeedSortChoice?) -> Bool { ranking(for: sort) == "latest" }
+
+    /// Lit `feedSort` tel que servi ; une clé ou une valeur inconnue est ignorée (défaut).
+    static func sortPreference(from raw: [String: String]?) -> [FeedTab: FeedSortChoice] {
+        var result: [FeedTab: FeedSortChoice] = [:]
+        for tab in FeedTab.allCases {
+            if let key = tab.sortKey, let value = raw?[key].flatMap(FeedSortChoice.init(rawValue:)) {
+                result[tab] = value
+            }
+        }
+        return result
+    }
+}
+
 /// Point de l'onglet « Autour », arrondi au centième de degré (environ 1 km) AVANT d'être envoyé :
 /// le serveur l'arrondit aussi, la position exacte ne quitte jamais l'appareil.
 struct FeedNearPoint: Equatable, Sendable {

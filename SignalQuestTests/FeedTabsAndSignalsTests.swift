@@ -48,6 +48,24 @@ final class FeedTabsTests: XCTestCase {
         XCTAssertEqual(FeedTab.photos.ranking, "smart")
     }
 
+    /// Contrat feedSort v1 : correspondance tri → `ranking`, défauts, et lecture tolérante.
+    func testFeedSortMapsToTheServerRankings() {
+        XCTAssertEqual(FeedTab.forYou.ranking(for: .relevance), "foryou")
+        XCTAssertEqual(FeedTab.forYou.ranking(for: .latest), "latest")
+        XCTAssertEqual(FeedTab.nearby.ranking(for: .relevance), "smart")
+        XCTAssertEqual(FeedTab.nearby.ranking(for: nil), "latest")
+        XCTAssertEqual(FeedTab.photos.ranking(for: .relevance), "smart")
+        XCTAssertEqual(FeedTab.photos.ranking(for: .latest), "latest")
+        XCTAssertEqual(FeedTab.following.ranking(for: .relevance), "latest", "Suivis reste chronologique")
+        XCTAssertEqual(FeedTab.allCases.compactMap(\.sortKey), ["forYou", "nearby", "photos"])
+        XCTAssertTrue(FeedTab.nearby.sendsRankWindow(for: .relevance))
+        XCTAssertFalse(FeedTab.nearby.sendsRankWindow(for: .latest))
+        XCTAssertFalse(FeedTab.following.sendsRankWindow(for: .relevance))
+        XCTAssertTrue(FeedTab.following.isChronological(for: nil))
+        let parsed = FeedTab.sortPreference(from: ["forYou": "latest", "nearby": "relevance", "photos": "random", "following": "latest"])
+        XCTAssertEqual(parsed, [.forYou: .latest, .nearby: .relevance])
+    }
+
     /// Titres d'état vide communs aux trois plateformes (C4).
     func testEmptyTitlesFollowTheSharedPlan() {
         XCTAssertEqual(FeedTab.forYou.emptyTitle, "Ton fil est encore vide")

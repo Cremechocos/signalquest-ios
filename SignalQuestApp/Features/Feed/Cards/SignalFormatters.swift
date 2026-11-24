@@ -279,6 +279,7 @@ struct CardHeader: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.feedCardMenu) private var menu
     @Environment(\.feedCardShowsAuthor) private var showsAuthor
+    @Environment(\.feedCardExactTime) private var exactTime
     @Environment(\.feedCardSpotlightPostId) private var spotlightPostId
 
     /// Marge intérieure commune aux cartes du fil (`.padding(SQSpace.lg)`) : le bandeau la
@@ -420,8 +421,18 @@ struct CardHeader: View {
             }
     }
 
+    /// Dans un fil chronologique, le séparateur de jour dit déjà le jour : au-delà de 24 h,
+    /// l'heure exacte (« 21:40 ») remplace « il y a 2 j » (plan Fil Communauté, C8).
+    nonisolated static func timeLabel(exact: Bool, now: Date = Date()) -> (Date) -> String {
+        { date in
+            exact && now.timeIntervalSince(date) >= 86_400
+                ? date.formatted(date: .omitted, time: .shortened)
+                : date.formatted(.sqRelative)
+        }
+    }
+
     private var spokenAuthorLine: String {
-        [author.displayName, place, createdAt?.formatted(.sqRelative)]
+        [author.displayName, place, createdAt.map(Self.timeLabel(exact: exactTime))]
             .compactMap { $0 }
             .joined(separator: ", ")
     }
@@ -481,7 +492,7 @@ struct CardHeader: View {
                     .accessibilityHidden(true)
                     .accessibilityIdentifier("feed.metadata.separator")
             }
-            Text(createdAt, format: .sqRelative)
+            Text(verbatim: Self.timeLabel(exact: exactTime)(createdAt))
                 .sqSingleLine()
                 .accessibilityIdentifier("feed.metadata.date")
         }
@@ -834,6 +845,10 @@ struct CardActionsBar: View {
 
 // MARK: - Contexte posé par l'écran du fil
 
+private struct FeedCardExactTimeKey: EnvironmentKey {
+    static var defaultValue: Bool { false }
+}
+
 private struct FeedCardShowsAuthorKey: EnvironmentKey {
     static var defaultValue: Bool { true }
 }
@@ -864,6 +879,12 @@ extension EnvironmentValues {
 
     /// Faux sur le profil d'un membre : son nom et son avatar en tête de
     /// chaque carte ne disaient rien de plus que la page (lot F, F-35).
+    /// Fil chronologique (Suivis, ou un onglet réglé sur Récent) : heure exacte au-delà de 24 h.
+    var feedCardExactTime: Bool {
+        get { self[FeedCardExactTimeKey.self] }
+        set { self[FeedCardExactTimeKey.self] = newValue }
+    }
+
     var feedCardShowsAuthor: Bool {
         get { self[FeedCardShowsAuthorKey.self] }
         set { self[FeedCardShowsAuthorKey.self] = newValue }
