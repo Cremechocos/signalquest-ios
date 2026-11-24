@@ -23,6 +23,16 @@ final class Audit2TourQATests: XCTestCase {
         continueAfterFailure = true
     }
 
+    /// `SQ_AUDIT2_REAL=1` : la session déjà ouverte sur le simulateur (pile locale de
+    /// recette, build pointé dessus) au lieu du mode démo, et le journal E2EE signé par
+    /// les clés de test de cette pile. Sans le drapeau : `--mock-auth`, comme avant.
+    private static func sessionArguments(_ base: [String]) -> [String] {
+        if ProcessInfo.processInfo.environment["SQ_AUDIT2_REAL"] == "1" {
+            return ["--qa-auto-log-vector-keys"] + base.filter { !$0.hasPrefix("--qa-demo") }
+        }
+        return ["--mock-auth"] + base
+    }
+
     func testTourFrench() { runTour(locale: "fr", prefix: "fr") }
 
     func testTourEnglish() { runTour(locale: "en", prefix: "en") }
@@ -40,7 +50,7 @@ final class Audit2TourQATests: XCTestCase {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(
             app,
-            arguments: ["--mock-auth", "--qa-demo-friends", "--qa-demo-photos", "--reset-map"] + extra,
+            arguments: Self.sessionArguments(["--qa-demo-friends", "--qa-demo-photos", "--reset-map"]) + extra,
             locale: locale
         )
         dismissSystemAlerts()
@@ -324,7 +334,7 @@ final class Audit2TourQATests: XCTestCase {
         ]
         for (index, hook) in hooks.enumerated() {
             let app = XCUIApplication()
-            SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth", "--reset-map"] + hook.1, locale: locale)
+            SignalQuestUITestSupport.launch(app, arguments: Self.sessionArguments(["--reset-map"]) + hook.1, locale: locale)
             dismissSystemAlerts()
             pause(7)
             capture(app, String(format: "%@-deep-%02d-%@", locale, index + 1, hook.0))
