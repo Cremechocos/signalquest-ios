@@ -96,6 +96,10 @@ final class FeedComposerTests: XCTestCase {
     /// chaque écriture notifiait SwiftUI, et la vue parente, qui recrée le
     /// composer à chaque rendu, tournait en boucle (l'éditeur ne s'ouvrait plus).
     func testReopeningWithADraftWritesNothing() {
+        // IOS-017 : une tâche laissée par un test précédent (brouillon effacé, photo du
+        // compositeur) écrivait dans UserDefaults pendant ce test, qui comptait ses
+        // écritures et lisait un texte vide. On la laisse finir avant de commencer.
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
         let draft = ComposerViewModel(service: ComposerFeedFixture())
         draft.text = "Brouillon en cours"
         final class Count: @unchecked Sendable { var value = 0 }
