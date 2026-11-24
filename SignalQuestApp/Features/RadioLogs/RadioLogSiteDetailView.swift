@@ -31,6 +31,8 @@ struct RadioLogSiteDetailView: View {
     @State private var supportCoordinate: CLLocationCoordinate2D?
     @State private var region: MKCoordinateRegion
     @State private var showsConfirmation = false
+    /// Cellule dont on lit les relevés (IOS-037, comme Android).
+    @State private var openedCell: RadioLogCell?
 
     /// Au-delà, la carte n'apprend plus rien et MapKit ralentit : on garde les
     /// relevés les plus récents.
@@ -90,6 +92,9 @@ struct RadioLogSiteDetailView: View {
             .toolbar(.hidden, for: .navigationBar)
         }
         .task { await load() }
+        .sheet(item: $openedCell) { cell in
+            RadioLogCellReadingSheet(cell: cell, site: site, service: service)
+        }
         .alert("Confirmer ce site ?", isPresented: $showsConfirmation, presenting: proposal) { _ in
             Button("Annuler", role: .cancel) {}
             Button("Confirmer") {
@@ -378,7 +383,15 @@ struct RadioLogSiteDetailView: View {
         }
     }
 
+    /// Toucher une cellule ouvre toutes les données de son relevé (IOS-037, comme Android).
     private func cellRow(_ cell: RadioLogCell) -> some View {
+        Button { openedCell = cell } label: { cellRowContent(cell) }
+            .buttonStyle(.plain)
+            .accessibilityHint(Text("Ouvre les données du relevé"))
+            .accessibilityIdentifier("radioLogs.detail.cell")
+    }
+
+    private func cellRowContent(_ cell: RadioLogCell) -> some View {
         HStack(alignment: .center, spacing: SQSpace.md) {
             VStack(spacing: 0) {
                 Text(verbatim: "PCI")
@@ -413,9 +426,14 @@ struct RadioLogSiteDetailView: View {
                     rsrpBar(rsrp)
                 }
             }
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(P.muted)
+                .accessibilityHidden(true)
         }
         .padding(.horizontal, SQSpace.md)
         .padding(.vertical, SQSpace.md)
+        .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }
 
@@ -543,5 +561,191 @@ struct RadioLogSiteDetailView: View {
                 longitudeDelta: max(0.006, (maxLng - minLng) * 1.4)
             )
         )
+    }
+}
+
+// MARK: - Relevé d'une cellule
+
+/// « Toutes les données du relevé » d'une cellule, comme Android : ce que le journal garde de la
+/// mesure (bande, niveaux, d'où elle vient), et non seulement la géométrie. Une donnée absente
+/// n'est pas écrite, sauf le PCI et le TAC de l'identité : « — » y dit que la cellule a été
+/// relevée sans son code. Un bloc sans aucun champ connu ne s'affiche pas.
+enum RadioLogReadingFields {
+    struct Field: Equatable {
+        let label: String
+        let value: String
+        var technical = true
+    }
+
+    struct Section: Equatable {
+        let title: String
+        let fields: [Field]
+    }
+
+    static func sections(for entry: RadioLogEntry, now: Date = Date()) -> [Section] {
+        [
+            Section(title: String(localized: "Identité réseau"), fields: identity(entry)),
+            Section(title: String(localized: "Radio"), fields: radio(entry)),
+            Section(title: String(localized: "Collecte"), fields: capture(entry)),
+        ].filter { !$0.fields.isEmpty }
+    }
+
+    private static func known(_ text: String?) -> String? {
+        guard let text = text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
+        return text
+    }
+
+    static func identity(_ entry: RadioLogEntry) -> [Field] {
+        var fields: [Field] = []
+        if let tech = known(entry.technology) { fields.append(Field(label: "RAT", value: tech)) }
+        if let name = known(entry.canonicalOperatorName) ?? known(entry.rawOperatorName) {
+            fields.append(Field(label: String(localized: "Opérateur"), value: name, technical: false))
+        }
+        // « 208-20 » et non « 20820 » : le MCC tient sur 3 chiffres.
+        if let plmn = entry.plmnEvidence.components {
+            fields.append(Field(label: "PLMN", value: "\(plmn.mcc)-\(plmn.mnc)"))
+        }
+        if let enb = known(entry.enb) { fields.append(Field(label: "eNB", value: enb)) }
+        if let gnb = known(entry.gnb) { fields.append(Field(label: "gNB", value: gnb)) }
+        // L'intitulé suit la techno : NCI en 5G, ECI en 4G.
+        let cellValue = entry.canonicalCellIdentity.map(String.init) ?? known(entry.eciCellId) ?? "—"
+        fields.append(Field(label: entry.cellIdentityKind, value: cellValue))
+        fields.append(Field(label: "PCI", value: entry.pci.map(String.init) ?? "—"))
+        fields.append(Field(label: "TAC", value: entry.tac.map(String.init) ?? "—"))
+        return fields
+    }
+
+    static func radio(_ entry: RadioLogEntry) -> [Field] {
+        var fields: [Field] = []
+        if let band = entry.band, band > 0 {
+            fields.append(Field(label: String(localized: "Bande"), value: SQUnits.band(band, isNR: entry.isNr)))
+        }
+        if let earfcn = entry.earfcn, earfcn > 0 {
+            fields.append(Field(label: entry.isNr ? "NR-ARFCN" : "EARFCN", value: String(earfcn)))
+        }
+        if let rsrp = entry.rsrp { fields.append(Field(label: "RSRP", value: "\(rsrp) dBm")) }
+        if let rsrq = entry.rsrq { fields.append(Field(label: "RSRQ", value: "\(rsrq) dB")) }
+        if let sinr = entry.sinr { fields.append(Field(label: "SINR", value: "\(sinr) dB")) }
+        if let rssi = entry.rssi { fields.append(Field(label: "RSSI", value: "\(rssi) dBm")) }
+        // Le TA brut ET son rayon : « TA 3 » seul ne dit rien. Le TA du journal vient toujours de
+        // l'ancre LTE (pas de 78,12 m), même sur un relevé 5G NSA.
+        if let ta = entry.timingAdvance, ta >= 0 {
+            let meters = SQUnits.distance(meters: Double(ta) * TaRingSelection.lteStepMeters)
+            fields.append(Field(label: "TA", value: "\(ta) ≈ \(meters)"))
+        }
+        return fields
+    }
+
+    static func capture(_ entry: RadioLogEntry) -> [Field] {
+        func stamp(_ date: Date) -> String { date.formatted(date: .abbreviated, time: .shortened) }
+        var fields = [Field(label: String(localized: "Horodatage"), value: stamp(entry.observedAt))]
+        // Souvent égale à l'horodatage : écrite seulement quand elle raconte autre chose.
+        if let first = entry.firstSeenAt, first != entry.observedAt {
+            fields.append(Field(label: String(localized: "Première observation"), value: stamp(first)))
+        }
+        if let last = entry.lastSeenAt, last != entry.observedAt {
+            fields.append(Field(label: String(localized: "Dernière observation"), value: stamp(last)))
+        }
+        if let sim = known(entry.simOperatorName) {
+            fields.append(Field(label: "SIM", value: sim, technical: false))
+        }
+        if let source = known(entry.logSource) ?? known(entry.sourceApp) {
+            fields.append(Field(label: String(localized: "Source"), value: source, technical: false))
+        }
+        if let accuracy = entry.locationAccuracyMeters, accuracy >= 0 {
+            fields.append(Field(label: String(localized: "Précision"), value: SQUnits.distance(meters: accuracy)))
+        }
+        if let file = known(entry.sourceFileName) {
+            fields.append(Field(label: String(localized: "Fichier d’import"), value: file, technical: false))
+        }
+        return fields
+    }
+}
+
+/// La feuille d'une cellule : son relevé le plus récent, champ par champ.
+struct RadioLogCellReadingSheet: View {
+    let cell: RadioLogCell
+    let site: RadioLogSite
+    let service: RadioLogsServicing
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var entries: [RadioLogEntry]?
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.md) {
+                MapSheetHeader(title: title, closeIdentifier: "radioLogs.cell.close") { dismiss() }
+                if let entries {
+                    if let latest = entries.first {
+                        if entries.count > 1 {
+                            Text("Le plus récent des \(entries.count) relevés de cette cellule.")
+                                .font(SQType.caption)
+                                .foregroundStyle(P.muted)
+                        }
+                        ForEach(RadioLogReadingFields.sections(for: latest), id: \.title) { section in
+                            sectionCard(section)
+                        }
+                    } else {
+                        Text("Ce relevé n’est plus dans le journal de cet appareil.")
+                            .font(SQType.callout)
+                            .foregroundStyle(P.muted)
+                    }
+                } else {
+                    RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
+                        .fill(SQColor.fill)
+                        .frame(height: 220)
+                        .sqShimmer()
+                        .accessibilityHidden(true)
+                }
+            }
+            .padding(.horizontal, SQSpace.lg)
+            // Sous la poignée de la feuille, pas contre elle.
+            .padding(.top, SQSpace.xl)
+            .padding(.bottom, SQSpace.xxl)
+            .sqReadableWidth()
+        }
+        .background(SQColor.bg.ignoresSafeArea())
+        .presentationDetents([.medium, .large])
+        .task {
+            let cell = cell, service = service
+            entries = await Task.detached(priority: .userInitiated) {
+                RadioLogSiteBuilder.entries(of: cell, from: service.cachedSnapshot().entries)
+            }.value
+        }
+        .accessibilityIdentifier("radioLogs.cell")
+    }
+
+    private var title: String {
+        [cell.pciLabel, cell.bandLabel].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    private func sectionCard(_ section: RadioLogReadingFields.Section) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs) {
+            Text(verbatim: section.title)
+                .sqKicker()
+                .accessibilityAddTraits(.isHeader)
+            VStack(spacing: 0) {
+                ForEach(Array(section.fields.enumerated()), id: \.offset) { index, field in
+                    HStack(alignment: .firstTextBaseline, spacing: SQSpace.md) {
+                        Text(verbatim: field.label)
+                            .font(SQType.callout)
+                            .foregroundStyle(P.muted)
+                        Spacer(minLength: SQSpace.sm)
+                        Text(verbatim: field.value)
+                            .font(field.technical ? .sqTechnical(14, .semibold) : SQType.callout(.semibold))
+                            .foregroundStyle(P.ink)
+                            .multilineTextAlignment(.trailing)
+                            .textSelection(.enabled)
+                    }
+                    .padding(.vertical, SQSpace.sm)
+                    .accessibilityElement(children: .combine)
+                    if index < section.fields.count - 1 {
+                        Rectangle().fill(P.hair).frame(height: 1)
+                    }
+                }
+            }
+            .padding(.horizontal, SQSpace.md)
+            .background(P.card, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        }
     }
 }

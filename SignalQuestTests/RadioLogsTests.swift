@@ -1200,6 +1200,52 @@ final class RadioLogsTests: XCTestCase {
         }
     }
 
+    // MARK: Relevé d'une cellule (IOS-037)
+
+    /// Toucher une cellule ouvre ses relevés, retrouvés par la clé même du regroupement, et la
+    /// fiche écrit ses données comme Android : PLMN « 208-01 », bande « B3 », TA avec son rayon,
+    /// PCI et TAC même absents (« — »), un champ inconnu jamais écrit.
+    func testCellReadingFindsItsOwnLinesAndListsTheirData() throws {
+        func line(_ key: String, pci: Int?, ci: String, at: String, extra: String = "") throws -> RadioLogEntry {
+            try decodeEntry("""
+            {"dedupeKey":"cap|\(key)","technology":"LTE","enb":"42","ci":"\(ci)",\(pci.map { "\"pci\":\($0)," } ?? "")
+             "observedPlmn":"20801","canonicalOperatorKey":"ORANGE","canonicalOperatorName":"Orange",
+             "observedAt":"\(at)"\(extra)}
+            """)
+        }
+        let older = try line("a", pci: 35, ci: "10753", at: "2026-11-20T08:00:00Z")
+        let latest = try line("b", pci: 35, ci: "10753", at: "2026-11-22T08:00:00Z",
+                              extra: #","band":3,"earfcn":1300,"rsrp":-95,"rsrq":-11,"timingAdvance":3,"tac":1234"#)
+        let other = try line("c", pci: nil, ci: "10754", at: "2026-11-21T08:00:00Z")
+        let all = [older, latest, other]
+        let site = try XCTUnwrap(RadioLogSiteBuilder.build(from: all).first)
+        XCTAssertEqual(site.cells.count, 2)
+
+        let cell = try XCTUnwrap(site.cells.first { $0.pci == 35 })
+        let lines = RadioLogSiteBuilder.entries(of: cell, from: all)
+        XCTAssertEqual(lines.map(\.dedupeKey), ["cap|b", "cap|a"], "Les relevés de CETTE cellule, le plus récent d'abord")
+
+        let fields = Dictionary(RadioLogReadingFields.sections(for: latest).flatMap(\.fields).map { ($0.label, $0.value) },
+                                uniquingKeysWith: { first, _ in first })
+        XCTAssertEqual(fields["PLMN"], "208-01")
+        XCTAssertEqual(fields["ECI"], "10753")
+        XCTAssertEqual(fields["PCI"], "35")
+        XCTAssertEqual(fields["TAC"], "1234")
+        XCTAssertEqual(fields[String(localized: "Bande")], "B3")
+        XCTAssertEqual(fields["EARFCN"], "1300")
+        XCTAssertEqual(fields["RSRP"], "-95 dBm")
+        XCTAssertTrue(fields["TA"]?.hasPrefix("3 ≈ ") == true)
+        XCTAssertNil(fields["SINR"], "Une mesure absente n'est pas écrite")
+
+        let bare = try XCTUnwrap(site.cells.first { $0.pci == nil })
+        let bareLine = try XCTUnwrap(RadioLogSiteBuilder.entries(of: bare, from: all).first)
+        let bareFields = RadioLogReadingFields.identity(bareLine)
+        XCTAssertEqual(bareFields.first { $0.label == "PCI" }?.value, "—")
+        XCTAssertEqual(bareFields.first { $0.label == "TAC" }?.value, "—")
+        XCTAssertTrue(RadioLogReadingFields.radio(bareLine).isEmpty)
+        XCTAssertEqual(RadioLogReadingFields.sections(for: bareLine).count, 2, "Un bloc sans champ ne s'affiche pas")
+    }
+
     // MARK: Fabriques
 
     private func decodeEntry(_ json: String) throws -> RadioLogEntry {

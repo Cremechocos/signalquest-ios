@@ -359,6 +359,34 @@ enum RadioLogSiteBuilder {
         return nil
     }
 
+    /// Relevés qui ont formé une cellule, retrouvés par la clé même de `build` : la fiche d'une
+    /// cellule lit exactement ses lignes. Les plus récentes d'abord.
+    static func entries(of cell: RadioLogCell, from entries: [RadioLogEntry]) -> [RadioLogEntry] {
+        var networks: [String: RadioLogOperatorResolver.ServingNetwork] = [:]
+        return entries.filter { entry in
+            guard !entry.isDeleted else { return false }
+            let plmn = entry.plmnEvidence.components
+            let network = plmn.map { plmn in
+                if let cached = networks[plmn.plmn] { return cached }
+                let resolved = RadioLogOperatorResolver.servingNetwork(observedPlmn: plmn.plmn)
+                networks[plmn.plmn] = resolved
+                return resolved
+            }
+            guard let (kind, node) = nodeIdentity(of: entry, network: network) else { return false }
+            let key = siteKey(
+                operatorName: network?.operatorName,
+                operatorKey: network?.operatorKey,
+                mcc: plmn?.mcc,
+                mnc: plmn?.mnc,
+                kind: kind,
+                node: node,
+                unresolvedNetworkKey: plmn == nil ? entry.unresolvedNetworkKey : nil
+            )
+            return "\(key)#\(cellIdentity(of: entry, canonicalCi: entry.canonicalCellIdentity))" == cell.id
+        }
+        .sorted { ($0.lastSeenAt ?? $0.observedAt) > ($1.lastSeenAt ?? $1.observedAt) }
+    }
+
     /// Identité d'une cellule DANS son site : le couple (PCI, identité complète).
     /// Deux relevés du même PCI sur des ECI différents restent deux rangées —
     /// c'est bien deux cellules physiques.
