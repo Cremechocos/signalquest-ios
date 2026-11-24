@@ -335,7 +335,7 @@ private struct LocalFileImage: View {
     }
 
     static func decode(_ url: URL) async -> UIImage? {
-        let scale = await UITraitCollection.current.displayScale
+        let scale = UITraitCollection.current.displayScale
         return await Task.detached(priority: .userInitiated) {
             guard let data = try? Data(contentsOf: url) else { return nil }
             return ImagePipeline.animatedImage(data: data, maxPixel: 1600 * max(scale, 1))

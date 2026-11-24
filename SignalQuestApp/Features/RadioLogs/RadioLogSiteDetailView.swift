@@ -34,7 +34,7 @@ struct RadioLogSiteDetailView: View {
 
     /// Au-delà, la carte n'apprend plus rien et MapKit ralentit : on garde les
     /// relevés les plus récents.
-    static let maxMapReadings = 200
+    nonisolated static let maxMapReadings = 200
 
     struct Reading: Identifiable, Equatable, Sendable {
         let id: String

@@ -5224,7 +5224,6 @@ actor IPerf3Runner {
                     while isTestRunning.value {
                         try? await Task.sleep(nanoseconds: 150_000_000)
                         guard isTestRunning.value, !Task.isCancelled else { break }
-                        let wall = speedtestMonotonicSeconds() - start
                         let current = totalBytesCounter.timedSnapshot()
                         let usefulElapsed = max(0, current.timestamp - omitSnapshot.timestamp)
                         let usefulBytes = max(0, current.bytes - omitSnapshot.bytes)

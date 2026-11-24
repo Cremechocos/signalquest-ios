@@ -989,9 +989,12 @@ struct ComposerSheet: View {
 
     /// Photo, Speedtest et Sondage, avec leur nom ; plein encre quand actifs.
     private func attachmentTools(showsLabels: Bool) -> some View {
-        HStack(spacing: SQSpace.xs2) {
+        // L'étiquette de PhotosPicker est une fermeture `@Sendable` : l'état du modèle
+        // (fil principal) est lu avant, pas dedans (IOS-009).
+        let photoChip = ComposerToolChip(title: "Photo", systemImage: "photo", isOn: model.previewImage != nil, showsLabel: showsLabels)
+        return HStack(spacing: SQSpace.xs2) {
             PhotosPicker(selection: $model.selectedItem, matching: .images) {
-                ComposerToolChip(title: "Photo", systemImage: "photo", isOn: model.previewImage != nil, showsLabel: showsLabels)
+                photoChip
             }
             .accessibilityLabel("Ajouter une photo")
 

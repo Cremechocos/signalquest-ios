@@ -366,7 +366,7 @@ struct MapKitMapView: UIViewRepresentable {
         context.coordinator.applyCameraIfNeeded(center: center, zoom: zoom, on: map)
         if context.coordinator.lastViewportRefreshID != viewportRefreshID {
             context.coordinator.lastViewportRefreshID = viewportRefreshID
-            (map as? SQViewportMapView)?.requestViewportDelivery()
+            map.requestViewportDelivery()
         }
         context.coordinator.applySessionTrace(sessionTrace, isDark: colorScheme == .dark, on: map)
         container.zoneCompareView.onMoveEnd = onZoneCompareMove

@@ -22,7 +22,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     /// non rattrapable en Swift : l'app crashait au lancement avant même
     /// d'afficher un écran. On dégrade donc proprement — push et Crashlytics
     /// inopérants, tout le reste fonctionne.
-    private(set) static var isFirebaseConfigured = false
+    /// Lu aussi hors du fil principal (rappel du jeton FCM) : un verrou plutôt que
+    /// l'isolation de l'AppDelegate (IOS-009).
+    nonisolated private static let firebaseConfiguredFlag = OSAllocatedUnfairLock(initialState: false)
+    nonisolated static var isFirebaseConfigured: Bool { firebaseConfiguredFlag.withLock { $0 } }
 
     private static let logger = Logger(subsystem: "fr.signalquest.ios", category: "firebase")
 
@@ -55,7 +58,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
             return true
         }
         FirebaseApp.configure()
-        Self.isFirebaseConfigured = true
+        Self.firebaseConfiguredFlag.withLock { $0 = true }
         // Collecte coupée par l'Info.plist : seul un « oui » enregistré la rallume, un
         // « non » supprime les rapports restés sur l'appareil.
         CrashReportingConsent.applyAtLaunch(collector: .crashlytics)

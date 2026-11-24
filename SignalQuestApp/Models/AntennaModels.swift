@@ -722,8 +722,8 @@ struct AntennaCoreDetails: Decodable, Equatable {
 
         init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
-            lte = (try? c.decodeIfPresent([String].self, forKey: .lte)) as? [String] ?? []
-            fiveG = (try? c.decodeIfPresent([String].self, forKey: .fiveG)) as? [String] ?? []
+            lte = (try? c.decodeIfPresent([String].self, forKey: .lte)) ?? []
+            fiveG = (try? c.decodeIfPresent([String].self, forKey: .fiveG)) ?? []
         }
 
         var labels: [String] {
@@ -775,7 +775,7 @@ struct AntennaCoreDetails: Decodable, Equatable {
             .flatMap { $0?.labels } ?? []
         sectorSystems = c.decodeLossyArray([AntennaSectorSystems].self, forKey: .sectorSystems)
             .sorted { $0.azimuth < $1.azimuth }
-        isCustomSite = (try? c.decodeIfPresent(Bool.self, forKey: .isCustomSite)) as? Bool ?? false
+        isCustomSite = (try? c.decodeIfPresent(Bool.self, forKey: .isCustomSite)) ?? false
         validationStatus = c.decodeFlexibleString(forKey: .validationStatus)
         source = c.decodeFlexibleString(forKey: .source)
         displayName = c.decodeFlexibleString(forKey: .displayName)

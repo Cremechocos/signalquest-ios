@@ -138,7 +138,7 @@ struct FrequencyBlocks: Decodable, Equatable, Sendable {
                 range: plage,
                 widthMhz: number(.widthMhz),
                 duplex: ["FDD", "TDD", "SDL"].contains(duplex ?? "") ? duplex : nil,
-                planned: (try? c.decodeIfPresent(Bool.self, forKey: .planned)) as? Bool ?? false,
+                planned: (try? c.decodeIfPresent(Bool.self, forKey: .planned)) ?? false,
                 dlSharePercent: number(.dlSharePercent)
             )
         }

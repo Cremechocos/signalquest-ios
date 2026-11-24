@@ -34,7 +34,7 @@ struct DriveSpeedtestPoint: Identifiable, Equatable {
 /// le moteur speedtest, le suivi de localisation continu et la géométrie de secteur.
 @MainActor
 final class DriveTestViewModel: ObservableObject {
-    private static let log = Logger(subsystem: "fr.signalquest.ios", category: "DriveTest")
+    nonisolated private static let log = Logger(subsystem: "fr.signalquest.ios", category: "DriveTest")
     // Session speedtest continue.
     @Published private(set) var isRunning = false
     @Published private(set) var testCount = 0

@@ -128,7 +128,7 @@ struct OperatorIncidentCard: View {
     /// molette et le libellé « Maintenance programmée », dans cette carte. Le badge de carte, lui,
     /// n'a ni glyphe ni mot : maintenance et dégradé y sont indiscernables. Assumé — le badge
     /// ALERTE, la nature se lit en ouvrant la fiche.
-    static func tint(for issueType: String) -> Color {
+    nonisolated static func tint(for issueType: String) -> Color {
         switch issueType.lowercased() {
         case "maintenance", "degraded": return OutageTint.degraded
         default: return OutageTint.down
@@ -137,7 +137,7 @@ struct OperatorIncidentCard: View {
 
     /// La même lecture en version ENCRE : les teintes ci-dessus sont calibrées comme des aplats
     /// (3:1, WCAG 1.4.11) et ne tiennent pas le 4,5:1 dès qu'elles portent des mots.
-    static func ink(for issueType: String) -> Color {
+    nonisolated static func ink(for issueType: String) -> Color {
         switch issueType.lowercased() {
         case "degraded", "maintenance": return OutageTint.degradedInk
         default: return OutageTint.downInk

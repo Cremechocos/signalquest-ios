@@ -198,7 +198,9 @@ struct AppRootView: View {
                 canPresent: canPresentPasswordReset, mustDismiss: mustDismissPasswordReset,
                 session: session, locale: locale, onClose: closePasswordReset, onSuccess: completePasswordReset))
             .onAppear {
-                appLock.signOut = { [weak session] in await session?.logout() }
+                // Référence faible prise ici, pas sur `self.session` déjà capturé fort (IOS-009).
+                let currentSession = session
+                appLock.signOut = { [weak currentSession] in await currentSession?.logout() }
                 if AppEnvironment.showsPasswordResetQA, passwordResetRoute == nil {
                     passwordResetRoute = PasswordResetRoute(request: PasswordResetRequest(token: "qa-layout-only"))
                 }
@@ -1212,7 +1214,7 @@ struct MainTabView: View {
             if AppEnvironment.showsCallEndQA { services.callManager.presentQAEndNotice() }
             if AppEnvironment.showsBlurEditorQA { showsBlurEditorQA = true }
             #endif
-            guard let user else { return }
+            guard user != nil else { return }
             await services.refreshInboxBadge()
             await services.refreshNotificationBadge()
         }

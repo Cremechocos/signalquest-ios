@@ -3787,7 +3787,6 @@ struct MapExplorerView: View {
         }
     }
 
-    @ViewBuilder
     private func searchResultIdentifier(_ result: MapSearchResult) -> String {
         switch result {
         case .place(let place): return "map.search.result.place.\(place.id)"

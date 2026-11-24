@@ -193,7 +193,7 @@ struct OutageThreadSection: View {
                invisible avant l'envoi, irréparable après. La croix rend le champ au fil. */
             if let target = replyTarget {
                 HStack(spacing: SQSpace.sm) {
-                    Text(String(localized: "Réponse à @\(target.author.handle ?? target.author.displayName ?? "")"))
+                    Text(String(localized: "Réponse à @\(target.author.handle ?? target.author.displayName)"))
                         .font(SQFont.body(13, .semibold, relativeTo: .caption))
                         .foregroundStyle(SQColor.brandRed)
                         .sqSingleLine()
@@ -257,14 +257,14 @@ struct OutageThreadSection: View {
             // Initiales plutôt qu'un avatar distant : cette fiche s'ouvre souvent avec un réseau
             // dégradé — c'est même son sujet — et une image qui met dix secondes à venir vaut
             // moins qu'une pastille immédiate.
-            Text(String((comment.author.displayName ?? "?").prefix(2)).uppercased())
+            Text(String(comment.author.displayName.prefix(2)).uppercased())
                 .font(SQFont.body(12, .semibold, relativeTo: .caption))
                 .frame(width: 34, height: 34)
                 .background(SQColor.accentSoft, in: Circle())
                 .foregroundStyle(SQColor.brandRed)
 
             VStack(alignment: .leading, spacing: SQSpace.xs) {
-                Text(comment.author.displayName ?? "")
+                Text(comment.author.displayName)
                     .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
                 Text(comment.text)
                     .font(SQType.body)
@@ -425,7 +425,7 @@ struct OutageThreadSection: View {
     /// le même parent, avec la mention `@` pour dire à qui l'on parle.
     private func replyRow(_ reply: SocialComment) -> some View {
         HStack(alignment: .top, spacing: SQSpace.sm) {
-            Text(String((reply.author.displayName ?? "?").prefix(2)).uppercased())
+            Text(String(reply.author.displayName.prefix(2)).uppercased())
                 .font(SQType.micro)
                 .minimumScaleFactor(0.8)
                 .frame(width: 27, height: 27)
@@ -433,7 +433,7 @@ struct OutageThreadSection: View {
                 .foregroundStyle(SQColor.brandRed)
 
             VStack(alignment: .leading, spacing: SQSpace.xs) {
-                Text(reply.author.displayName ?? "")
+                Text(reply.author.displayName)
                     .font(SQFont.body(13, .semibold, relativeTo: .caption))
                 Text(reply.text)
                     .font(SQType.caption)

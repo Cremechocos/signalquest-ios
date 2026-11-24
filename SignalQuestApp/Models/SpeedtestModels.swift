@@ -226,8 +226,6 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
         case .milkywan: return "Croissy-Beaubourg"
         case .mojiParis: return "Paris · Moji"
         case .clouviderFra: return String(localized: "Francfort · Clouvider")
-        case .clouviderAsh: return "Ashburn · Clouvider"
-        case .leasewebMtl: return "Montréal · Leaseweb"
         case .clouviderAms: return "Amsterdam · Clouvider"
         case .clouviderLon: return String(localized: "Londres · Clouvider")
         case .clouviderMan: return "Manchester · Clouvider"

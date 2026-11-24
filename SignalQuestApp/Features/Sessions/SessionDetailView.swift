@@ -1180,7 +1180,7 @@ struct SessionDetailView: View {
 
     // MARK: Helpers
 
-    static func formatKm(_ km: Double) -> String {
+    nonisolated static func formatKm(_ km: Double) -> String {
         SQUnits.distance(kilometers: km)
     }
 

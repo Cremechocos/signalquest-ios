@@ -115,7 +115,7 @@ extension E2EEAutoHistoryKeyGrace {
         guard sysctlbyname("kern.bootsessionuuid", nil, &size, nil, 0) == 0, size > 0 else { return "process-" + UUID().uuidString }
         var buffer = [CChar](repeating: 0, count: size)
         guard sysctlbyname("kern.bootsessionuuid", &buffer, &size, nil, 0) == 0 else { return "process-" + UUID().uuidString }
-        let value = String(cString: buffer)
+        let value = String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
         return value.isEmpty ? "process-" + UUID().uuidString : value
     }()
 

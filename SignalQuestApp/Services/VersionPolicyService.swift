@@ -107,8 +107,8 @@ struct AppVersionPolicy: Decodable, Equatable, Sendable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        minVersionCode = (try? c.decodeIfPresent(Int.self, forKey: .minVersionCode)) as? Int ?? 1
-        recommendedVersionCode = (try? c.decodeIfPresent(Int.self, forKey: .recommendedVersionCode)) as? Int ?? 1
+        minVersionCode = (try? c.decodeIfPresent(Int.self, forKey: .minVersionCode)) ?? 1
+        recommendedVersionCode = (try? c.decodeIfPresent(Int.self, forKey: .recommendedVersionCode)) ?? 1
         warnMessage = c.decodeFlexibleString(forKey: .warnMessage)
         blockMessage = c.decodeFlexibleString(forKey: .blockMessage)
         storeURL = c.decodeLossyURL(forKey: .storeUrl)

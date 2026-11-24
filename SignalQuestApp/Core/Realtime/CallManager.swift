@@ -279,6 +279,8 @@ enum CallRecentsHandle {
     }
 
     /// Appui dans Récents : `INStartCallIntent` (iOS 13+), ou ses formes audio/vidéo.
+    /// Les deux formes dépréciées restent lues (et leurs deux avertissements acceptés,
+    /// IOS-009) : rien ne garantit qu'une entrée de Récents ne les envoie plus.
     static func callBack(from activity: NSUserActivity) -> (conversationId: String, video: Bool)? {
         let intent = activity.interaction?.intent
         let contact: INPerson?
@@ -847,12 +849,12 @@ final class CallManager: NSObject, ObservableObject {
     /// tout de suite puis deux fois encore : elle peut arriver après la VoIP.
     nonisolated static func clearRingNotifications(callId: String) {
         let clear: @Sendable () -> Void = {
-            let center = UNUserNotificationCenter.current()
-            center.getDeliveredNotifications { delivered in
+            UNUserNotificationCenter.current().getDeliveredNotifications { delivered in
                 let ids = delivered
                     .filter { isRingNotification($0.request.content.userInfo, callId: callId) }
                     .map(\.request.identifier)
-                if !ids.isEmpty { center.removeDeliveredNotifications(withIdentifiers: ids) }
+                // Relu ici plutôt que capturé : le centre n'est pas `Sendable` (IOS-009).
+                if !ids.isEmpty { UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ids) }
             }
         }
         clear()

@@ -45,14 +45,14 @@ enum SignalFormatters {
         return "\(value)"
     }
 
-    nonisolated(unsafe) private static let dayFormatter: DateFormatter = {
+    nonisolated private static let dayFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         formatter.timeStyle = .none
         return formatter
     }()
 
-    nonisolated(unsafe) private static let dayTimeFormatter: DateFormatter = {
+    nonisolated private static let dayTimeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
@@ -125,7 +125,7 @@ enum SignalFormatters {
         return dateAroundHour(date)
     }
 
-    nonisolated(unsafe) private static let hourFormatter: DateFormatter = {
+    nonisolated private static let hourFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.setLocalizedDateFormatFromTemplate("j")
         return formatter
@@ -149,11 +149,11 @@ extension Date {
 }
 
 private enum SQDateTimeFormatters {
-    nonisolated(unsafe) private static let time = make(.none)
-    nonisolated(unsafe) private static let short = make(.short)
-    nonisolated(unsafe) private static let medium = make(.medium)
-    nonisolated(unsafe) private static let long = make(.long)
-    nonisolated(unsafe) private static let full = make(.full)
+    nonisolated private static let time = make(.none)
+    nonisolated private static let short = make(.short)
+    nonisolated private static let medium = make(.medium)
+    nonisolated private static let long = make(.long)
+    nonisolated private static let full = make(.full)
 
     static func formatter(_ dateStyle: DateFormatter.Style) -> DateFormatter {
         switch dateStyle {

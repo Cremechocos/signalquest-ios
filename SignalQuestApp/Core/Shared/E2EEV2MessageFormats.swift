@@ -829,7 +829,7 @@ struct E2EEV2DeliveredMessageV2: Equatable, Sendable {
               let sequence = root["sequence"]?.stringValue.flatMap(E2EEV2Canonical.safeInteger), sequence >= 1,
               let senderUserId = root["senderUserId"]?.stringValue, E2EEV2Canonical.isOpaque(senderUserId),
               let senderDeviceId = root["senderDeviceId"]?.stringValue, E2EEV2Canonical.isOpaque(senderDeviceId),
-              let signed = root["envelope"].flatMap { E2EEV2SignedMessageEnvelopeV2.parse($0) },
+              let signed = root["envelope"].flatMap({ E2EEV2SignedMessageEnvelopeV2.parse($0) }),
               let serverTag = E2EEV2SignedMessageEnvelopeV2.base64(root["serverTagB64"], 32...32),
               let serverTimeMs = root["serverTimeMs"]?.stringValue.flatMap(E2EEV2Canonical.safeInteger),
               let keyId = root["keyId"]?.stringValue, E2EEV2Canonical.isOpaque(keyId) else { return nil }

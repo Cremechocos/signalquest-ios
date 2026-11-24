@@ -132,7 +132,7 @@ struct DriveSpeedtestDetailSheet: View {
             phaseTitle: String(localized: "Réception"),
             phase: .finished,
             completionLabel: nil,
-            extendsToTenGigabits: (result.downloadMaxMbps ?? 0) > 1_000,
+            extendsToTenGigabits: result.downloadMaxMbps > 1_000,
             width: width
         )
     }

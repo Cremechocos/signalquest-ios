@@ -132,7 +132,7 @@ final class SQViewportMapView: MKMapView {
         if !FileManager.default.fileExists(atPath: file.path) { FileManager.default.createFile(atPath: file.path, contents: nil) }
         guard let handle = try? FileHandle(forWritingTo: file) else { return }
         defer { try? handle.close() }
-        try? handle.seekToEnd()
+        _ = try? handle.seekToEnd()
         try? handle.write(contentsOf: data)
     }
     #endif

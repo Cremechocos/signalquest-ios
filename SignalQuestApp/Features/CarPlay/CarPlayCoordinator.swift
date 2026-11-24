@@ -1203,8 +1203,10 @@ final class CarPlayCoordinator {
                     progress: { progress in
                         // Le handler est `@Sendable` et peut être appelé hors du
                         // main actor : on repasse explicitement dessus.
-                        Task { @MainActor [weak self] in
-                            self?.handleSpeedtestProgress(progress)
+                        // La tâche englobante tient déjà le coordinateur pendant tout le
+                        // test : une référence faible ici n'évitait rien (IOS-009).
+                        Task { @MainActor in
+                            self.handleSpeedtestProgress(progress)
                         }
                     }
                 )
