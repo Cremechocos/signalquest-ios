@@ -494,7 +494,7 @@ private struct CoverageRouteThumbnail: View {
     var spokenSummary: String? = nil
 
     // 2:1 plutôt que 16:9 : la carte du fil reste compacte (Alexandre, 12/11).
-    private static let aspect: CGFloat = 2
+    private static let aspect: CGFloat = RouteSnapshotCache.routeAspect
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.displayScale) private var displayScale
@@ -538,6 +538,7 @@ private struct CoverageRouteThumbnail: View {
                         let key = key(proxy.size)
                         background = RouteSnapshotCache.shared.cached(key)
                         guard background == nil, proxy.size.width > 1 else { return }
+                        RouteSnapshotCache.shared.noteRouteLayout(size: proxy.size, scale: displayScale, dark: colorScheme == .dark)
                         let image = await RouteSnapshotCache.shared.background(
                             of: rect, size: proxy.size, scale: displayScale, dark: colorScheme == .dark, key: key
                         )
@@ -554,7 +555,7 @@ private struct CoverageRouteThumbnail: View {
     }
 
     private func key(_ size: CGSize) -> String {
-        "\(postId)|\(colorScheme == .dark ? "dark" : "light")|\(Int(size.width.rounded()))"
+        RouteSnapshotCache.routeKey(postId: postId, dark: colorScheme == .dark, width: size.width)
     }
 }
 
@@ -620,6 +621,15 @@ final class RouteSnapshotCache {
     static let maxConcurrentRenders = 2
     private var rendering = 0
     private var waiting: [CheckedContinuation<Void, Never>] = []
+    /// IOS-053 (E6 de l'audit du 21/11) : les fonds des cartes de trajet suivantes se préparent
+    /// pendant la lecture de la carte courante. Un seul à la fois, et seulement quand aucune carte
+    /// visible ne se dessine : une carte qui apparaît garde toujours une place libre.
+    static let routeAspect: CGFloat = 2
+    static let prefetchQueueLimit = 6
+    private var routeLayout: (size: CGSize, scale: CGFloat, dark: Bool)?
+    private var prefetchQueue: [(key: String, rect: MKMapRect, size: CGSize, scale: CGFloat, dark: Bool)] = []
+    private var prefetchWorker: Task<Void, Never>?
+    private var prefetchWaiter: CheckedContinuation<Void, Never>?
     private let pathMonitor = NWPathMonitor()
     private var isConstrained = false
 
@@ -640,7 +650,45 @@ final class RouteSnapshotCache {
 
     func cached(_ key: String) -> UIImage? { images.object(forKey: key as NSString) }
 
+    /// Clé d'un fond de trajet : la même pour la miniature et pour le fond préparé d'avance.
+    nonisolated static func routeKey(postId: String, dark: Bool, width: CGFloat) -> String {
+        "\(postId)|\(dark ? "dark" : "light")|\(Int(width.rounded()))"
+    }
+
+    /// Taille, échelle et thème de la dernière miniature de trajet mesurée : les cartes du fil
+    /// ont toutes la même largeur, les fonds préparés d'avance prennent donc leur clé.
+    func noteRouteLayout(size: CGSize, scale: CGFloat, dark: Bool) {
+        guard size.width > 1, size.height > 1 else { return }
+        routeLayout = (size, scale, dark)
+    }
+
+    /// Fond d'une carte de trajet à venir, préparé pendant la lecture de la carte courante. Rien
+    /// tant qu'aucune miniature n'a été mesurée ; file bornée aux demandes les plus récentes.
+    func prefetchRoute(postId: String, coordinates: [CLLocationCoordinate2D]) {
+        guard !coordinates.isEmpty, !skipsBackground, let layout = routeLayout else { return }
+        let key = Self.routeKey(postId: postId, dark: layout.dark, width: layout.size.width)
+        guard cached(key) == nil, !prefetchQueue.contains(where: { $0.key == key }) else { return }
+        let rect = Self.frame(for: coordinates, aspect: Self.routeAspect)
+        prefetchQueue.append((key, rect, layout.size, layout.scale, layout.dark))
+        if prefetchQueue.count > Self.prefetchQueueLimit { prefetchQueue.removeFirst() }
+        guard prefetchWorker == nil else { return }
+        prefetchWorker = Task(priority: .utility) { await self.drainPrefetch() }
+    }
+
+    private func drainPrefetch() async {
+        while !prefetchQueue.isEmpty {
+            let next = prefetchQueue.removeFirst()
+            guard cached(next.key) == nil else { continue }
+            _ = await load(of: next.rect, size: next.size, scale: next.scale, dark: next.dark, key: next.key, prefetch: true)
+        }
+        prefetchWorker = nil
+    }
+
     func background(of rect: MKMapRect, size: CGSize, scale: CGFloat, dark: Bool, key: String) async -> UIImage? {
+        await load(of: rect, size: size, scale: scale, dark: dark, key: key, prefetch: false)
+    }
+
+    private func load(of rect: MKMapRect, size: CGSize, scale: CGFloat, dark: Bool, key: String, prefetch: Bool) async -> UIImage? {
         guard !skipsBackground else { return nil }
         let options = MKMapSnapshotter.Options()
         options.mapRect = rect
@@ -657,7 +705,7 @@ final class RouteSnapshotCache {
             remember(stored, key: key)
             return stored
         }
-        let image = await inTurn(key: key) {
+        let image = await inTurn(key: key, prefetch: prefetch) {
             let snapshotter = SnapshotterBox(MKMapSnapshotter(options: options))
             return await Self.render(timeout: 15,
                                      start: { done in snapshotter.value.start(with: .main) { snapshot, _ in done(snapshot?.image) } },
@@ -668,8 +716,8 @@ final class RouteSnapshotCache {
     }
 
     /// Deux rendus à la fois sur tout le fil ; le tour est rendu quoi qu'il arrive au rendu.
-    func inTurn(key: String, _ work: () async -> UIImage?) async -> UIImage? {
-        await takeTurn()
+    func inTurn(key: String, prefetch: Bool = false, _ work: () async -> UIImage?) async -> UIImage? {
+        await takeTurn(prefetch: prefetch)
         defer { endTurn() }
         // Carte sortie de l'écran pendant l'attente : rien à rendre.
         guard !Task.isCancelled else { return nil }
@@ -730,14 +778,27 @@ final class RouteSnapshotCache {
         }
     }
 
-    private func takeTurn() async {
+    private func takeTurn(prefetch: Bool) async {
+        if prefetch {
+            // Fond préparé d'avance : seulement quand rien d'autre ne se dessine.
+            guard rendering > 0 || !waiting.isEmpty || prefetchWaiter != nil else { rendering += 1; return }
+            await withCheckedContinuation { prefetchWaiter = $0 }
+            return
+        }
         guard rendering >= Self.maxConcurrentRenders else { rendering += 1; return }
         await withCheckedContinuation { waiting.append($0) }
     }
 
-    /// Le tour passe au premier en attente ; sinon une place se libère.
+    /// Le tour passe au premier en attente ; sinon une place se libère, et le fond préparé
+    /// d'avance ne la prend que si plus rien ne se dessine.
     private func endTurn() {
-        if waiting.isEmpty { rendering -= 1 } else { waiting.removeFirst().resume() }
+        if !waiting.isEmpty { waiting.removeFirst().resume(); return }
+        rendering -= 1
+        if rendering == 0, let next = prefetchWaiter {
+            prefetchWaiter = nil
+            rendering = 1
+            next.resume()
+        }
     }
 
     /// Emprise du tracé avec une marge, au moins 250 m de demi-côté autour du centre (sinon une

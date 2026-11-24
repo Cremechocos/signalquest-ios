@@ -1850,6 +1850,13 @@ struct FeedView: View {
     /// clé de cache, la carte les trouve décodées en apparaissant. Un échec reste muet, la
     /// carte retentera elle-même.
     private func prefetchImages(after id: String, in items: [UnifiedSocialFeedItem]) {
+        // Fonds de plan des cartes de trajet suivantes (IOS-053) : préparés d'avance, au
+        // format de la dernière miniature mesurée, sans jamais retarder une carte visible.
+        for item in FeedViewModel.upcoming(after: id, in: items)
+        where FeedActivity(item: item) == nil && ["coverage", "session", "drive_test"].contains(item.cardKind) {
+            guard let trace = SignalDetailSheet.trace(kind: item.kind, signal: item.signal), !trace.isEmpty else { continue }
+            RouteSnapshotCache.shared.prefetchRoute(postId: item.id, coordinates: trace)
+        }
         let scale = displayScale
         let targets = FeedViewModel.upcoming(after: id, in: items).compactMap(FeedItemCard.prefetchImage(for:))
         guard !targets.isEmpty else { return }

@@ -862,6 +862,34 @@ final class FeedDecodingRobustnessTests: XCTestCase {
         XCTAssertEqual(counter.active, 0)
     }
 
+    /// IOS-053 : un fond préparé d'avance attend qu'aucune carte visible ne se dessine, et une
+    /// carte qui apparaît pendant ce rendu passe tout de suite, sans l'attendre.
+    @MainActor
+    func testPrefetchedRouteBackgroundNeverDelaysAVisibleCard() async {
+        let cache = RouteSnapshotCache.shared
+        let log = RouteRenderCounter()
+        func render(_ name: String, prefetch: Bool = false, ms: Int) -> Task<UIImage?, Never> {
+            Task { @MainActor in
+                await cache.inTurn(key: "test-\(name)-\(UUID())", prefetch: prefetch) {
+                    log.events.append(name + "-start")
+                    try? await Task.sleep(for: .milliseconds(ms))
+                    log.events.append(name + "-end")
+                    return UIImage(systemName: "map")
+                }
+            }
+        }
+        let visible = render("visible", ms: 250)
+        try? await Task.sleep(for: .milliseconds(50))
+        let ahead = render("ahead", prefetch: true, ms: 400)
+        _ = await visible.value
+        try? await Task.sleep(for: .milliseconds(80))
+        let next = render("next", ms: 50)
+        _ = await next.value
+        _ = await ahead.value
+        XCTAssertEqual(log.events, ["visible-start", "visible-end", "ahead-start", "next-start", "next-end", "ahead-end"])
+        XCTAssertEqual(RouteSnapshotCache.routeKey(postId: "post-1", dark: false, width: 361.4), "post-1|light|361")
+    }
+
     /// E6 : la copie disque d'un fond dépend du post, du thème, de la largeur et de l'échelle,
     /// et se range dans le cache privé du compte, effacé à sa déconnexion.
     func testRouteBackgroundDiskCopyIsKeyedAndAccountScoped() throws {
@@ -897,6 +925,7 @@ private final class RouteRenderCounter {
     var active = 0
     var peak = 0
     var done = 0
+    var events: [String] = []
 }
 
 /// Post photo du fil (contrat social-photo-post v1, #827) : le lien vers la fiche
