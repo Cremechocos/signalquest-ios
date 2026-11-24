@@ -202,6 +202,8 @@ final class FeedViewModel: ObservableObject {
     /// Position de « Autour », sans jamais déclencher la demande d'autorisation : celle-ci ne part
     /// que du bouton de l'onglet. Un point déjà lu sert tant qu'il est frais (`currentLocation`).
     private func resolveNearPoint() async {
+        // Une zone choisie à la main passe avant la position de l'appareil, sans rien lui demander.
+        if let nearbyZone { nearPoint = nearbyZone.point; nearbyPosition = .ready; return }
         guard let location else { nearbyPosition = .unavailable; return }
         switch location.authorizationStatus {
         case .notDetermined:
@@ -216,6 +218,30 @@ final class FeedViewModel: ObservableObject {
                 nearbyPosition = nearPoint == nil ? .unavailable : .ready
             }
         }
+    }
+
+    /// Zone choisie à la main pour « Autour » (plan Fil Communauté, C4) : elle remplace la
+    /// position de l'appareil, refusée ou non, sans redemander l'autorisation. Le point est
+    /// arrondi comme une position (environ 1 km). Elle vaut pour la session.
+    struct NearbyZone: Equatable {
+        let name: String
+        let point: FeedNearPoint
+    }
+    @Published private(set) var nearbyZone: NearbyZone?
+
+    func chooseNearbyZone(name: String, coordinate: CLLocationCoordinate2D) async {
+        nearbyZone = NearbyZone(name: name, point: FeedNearPoint(coordinate))
+        guard tab.needsPosition else { return }
+        await load()
+    }
+
+    /// Retour à la position de l'appareil : relue au chargement, ou l'état qui dit ce qui manque.
+    func clearNearbyZone() async {
+        guard nearbyZone != nil else { return }
+        nearbyZone = nil
+        nearPoint = nil
+        guard tab.needsPosition else { return }
+        await load()
     }
 
     /// Bouton « Autoriser » de l'onglet « Autour » : la demande d'iOS, puis l'onglet se recharge
@@ -837,6 +863,7 @@ struct FeedView: View {
     /// neuf ? ». Porté par la présentation : lu dans une feuille `isPresented`,
     /// l'état voisin arrivait encore à son ancienne valeur.
     @State private var composerRequest: ComposerRequest?
+    @State private var showsZonePicker = false
     /// Page de choix de l'audience par défaut (PRIVACY-DPV v1, §6).
     @State private var showsDefaultVisibilityChoice = false
     /// Remonte en tête du fil (filtre par hashtag touché plus bas).
@@ -979,6 +1006,9 @@ struct FeedView: View {
                 composerPrompt
                 feedTabs
                 if let tag = model.selectedHashtag { hashtagFilter(tag) }
+                if model.tab == .nearby, model.selectedHashtag == nil, model.nearbyPosition == .ready {
+                    nearbyZoneBar
+                }
 
                 if model.page == nil && model.errorMessage == nil {
                     LoadingSkeleton()
@@ -1286,6 +1316,11 @@ struct FeedView: View {
         .fullScreenCover(isPresented: $showStoryComposer) {
             StoryComposer(service: services.stories, friendsService: services.friends, author: currentUser) { story in
                 model.insertPublishedStory(story)
+            }
+        }
+        .sheet(isPresented: $showsZonePicker) {
+            NearbyZonePicker { name, coordinate in
+                Task { await model.chooseNearbyZone(name: name, coordinate: coordinate) }
             }
         }
         .sheet(item: $composerRequest) { request in
@@ -1763,6 +1798,7 @@ struct FeedView: View {
                     composerRequest = ComposerRequest(start: nil)
                 }
                 .accessibilityIdentifier("feed.empty.publish")
+                changeZoneButton
             case .photos:
                 EmptyStateView(title: model.tab.emptyTitle, message: model.tab.emptyMessage, systemImage: "photo.on.rectangle.angled")
                     .padding(.top, SQSpace.xxl)
@@ -2227,6 +2263,7 @@ struct FeedView: View {
                 Task { await model.requestNearbyPermission() }
             }
             .accessibilityIdentifier("feed.nearby.allow")
+            changeZoneButton
         case .denied:
             EmptyStateView(
                 title: String(localized: "Localisation désactivée"),
@@ -2239,11 +2276,13 @@ struct FeedView: View {
                 UIApplication.shared.open(url)
             }
             .accessibilityIdentifier("feed.nearby.settings")
+            changeZoneButton
         case .unavailable:
             ErrorStateView(title: String(localized: "Position introuvable"),
                            message: String(localized: "Ta position n’a pas pu être lue. Réessaie dans un instant.")) {
                 Task { await model.load() }
             }
+            changeZoneButton
         }
     }
 
@@ -2293,6 +2332,50 @@ struct FeedView: View {
     }
 
     /// Filtre par hashtag actif : la pastille le nomme et le retire.
+    /// « Changer de zone » : une ville choisie à la main, même sans localisation.
+    private var changeZoneButton: some View {
+        GradientButton("Changer de zone", systemImage: "map", style: .secondary) {
+            showsZonePicker = true
+        }
+        .accessibilityIdentifier("feed.nearby.zone")
+    }
+
+    /// Zone de « Autour » : la position de l'appareil ou la ville choisie, et le geste pour en changer.
+    private var nearbyZoneBar: some View {
+        HStack(spacing: SQSpace.sm) {
+            Image(systemName: model.nearbyZone == nil ? "location.fill" : "mappin.and.ellipse")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .accessibilityHidden(true)
+            Text(model.nearbyZone.map { String(localized: "Zone : \($0.name)") } ?? String(localized: "Zone : ma position"))
+                .font(SQType.subhead(.semibold))
+                .foregroundStyle(SQColor.label)
+                .lineLimit(1)
+            Spacer(minLength: SQSpace.sm)
+            if model.nearbyZone != nil {
+                Button("Ma position") {
+                    Haptics.selection()
+                    Task { await model.clearNearbyZone() }
+                }
+                .font(SQType.subhead(.semibold))
+                .foregroundStyle(SQColor.accentInk)
+                .frame(minHeight: 44)
+                .accessibilityLabel("Revenir à ma position")
+                .accessibilityIdentifier("feed.nearby.zone.reset")
+            }
+            Button("Changer") {
+                Haptics.selection()
+                showsZonePicker = true
+            }
+            .font(SQType.subhead(.semibold))
+            .foregroundStyle(SQColor.accentInk)
+            .frame(minHeight: 44)
+            .accessibilityLabel("Changer de zone")
+            .accessibilityIdentifier("feed.nearby.zone.change")
+        }
+        .padding(.horizontal, SQSpace.xs)
+    }
+
     private func hashtagFilter(_ tag: String) -> some View {
         HStack(spacing: SQSpace.sm) {
             Button {
@@ -2643,5 +2726,71 @@ struct DeletedPostView: View {
         .navigationTitle("Publication")
         .navigationBarTitleDisplayMode(.inline)
         .signalQuestBackground()
+    }
+}
+
+/// Choix d'une zone à la main pour « Autour » : une ville ou un lieu cherché chez Apple
+/// (même géocodage que la carte), jamais la position de l'appareil.
+struct NearbyZonePicker: View {
+    let onChoose: (String, CLLocationCoordinate2D) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var query = ""
+    @State private var results: [PlaceResult] = []
+    @State private var searched = false
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(results) { place in
+                    Button {
+                        Haptics.selection()
+                        onChoose(place.name, CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude))
+                        dismiss()
+                    } label: {
+                        VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                            Text(verbatim: place.name)
+                                .font(SQType.body(.semibold))
+                                .foregroundStyle(SQColor.label)
+                            if let subtitle = place.subtitle {
+                                Text(verbatim: subtitle)
+                                    .font(SQType.caption)
+                                    .foregroundStyle(SQColor.labelSecondary)
+                                    .lineLimit(2)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("feed.nearby.zone.result")
+                }
+                if searched, results.isEmpty, !query.trimmingCharacters(in: .whitespaces).isEmpty {
+                    Text("Aucun lieu trouvé.")
+                        .font(SQType.callout)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+            .listStyle(.plain)
+            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always),
+                        prompt: Text("Ville ou lieu"))
+            .task(id: query) {
+                let text = query.trimmingCharacters(in: .whitespaces)
+                guard text.count >= 2 else { results = []; searched = false; return }
+                try? await Task.sleep(for: .milliseconds(300))
+                guard !Task.isCancelled else { return }
+                let found = await MapExplorerViewModel.geocodePlaces(text, near: nil)
+                guard !Task.isCancelled else { return }
+                results = found
+                searched = true
+            }
+            .navigationTitle("Changer de zone")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Annuler") { dismiss() }
+                        .accessibilityIdentifier("feed.nearby.zone.cancel")
+                }
+            }
+        }
     }
 }

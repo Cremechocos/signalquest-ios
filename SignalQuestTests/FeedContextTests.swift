@@ -1,5 +1,6 @@
 import XCTest
 import Combine
+import CoreLocation
 @testable import SignalQuest
 
 @MainActor
@@ -371,6 +372,28 @@ final class FeedContextTests: XCTestCase {
         await next.select(.forYou)
         XCTAssertFalse(next.restoreLastTab(), "relu une seule fois, au premier affichage")
         XCTAssertEqual(next.tab, .forYou)
+    }
+
+    /// Plan Fil Communauté, C4 : une zone choisie à la main remplace la position de l'appareil,
+    /// même sans service de localisation ; « Ma position » la retire.
+    func testNearbyZoneChosenByHandReplacesThePosition() async {
+        let calls = FeedCallCount()
+        let model = FeedViewModel(service: FeedContextFixture { _, _, tab in
+            if tab == .nearby { _ = await calls.next() }
+            return Self.page("page")
+        })
+        await model.select(.nearby)
+        XCTAssertEqual(model.nearbyPosition, .unavailable)
+        await model.chooseNearbyZone(name: "Annecy", coordinate: CLLocationCoordinate2D(latitude: 45.899_247, longitude: 6.129_384))
+        XCTAssertEqual(model.nearbyPosition, .ready)
+        XCTAssertEqual(model.nearbyZone?.name, "Annecy")
+        XCTAssertEqual(model.nearPoint, FeedNearPoint(CLLocationCoordinate2D(latitude: 45.90, longitude: 6.13)))
+        let afterZone = await calls.next() - 1
+        XCTAssertEqual(afterZone, 1, "la zone choisie charge l'onglet")
+        await model.clearNearbyZone()
+        XCTAssertNil(model.nearbyZone)
+        XCTAssertNil(model.nearPoint)
+        XCTAssertEqual(model.nearbyPosition, .unavailable)
     }
 
     /// Plan Fil Communauté, B4 : le rayon de « Autour » vient de la réponse, jamais d'une constante.
