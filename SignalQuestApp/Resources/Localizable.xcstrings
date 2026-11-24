@@ -117824,6 +117824,66 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "Plusieurs réseaux" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Several networks"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plusieurs réseaux"
+          }
+        }
+      }
+    },
+    "Appliquer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apply"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appliquer"
+          }
+        }
+      }
+    },
+    "Coche au moins deux réseaux : la carte montre leurs antennes et leurs mesures ensemble. La couverture reste à afficher un opérateur à la fois." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check at least two networks: the map shows their sites and measurements together. Coverage still shows one operator at a time."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coche au moins deux réseaux : la carte montre leurs antennes et leurs mesures ensemble. La couverture reste à afficher un opérateur à la fois."
+          }
+        }
+      }
+    },
+    "SQFormal|Coche au moins deux réseaux : la carte montre leurs antennes et leurs mesures ensemble. La couverture reste à afficher un opérateur à la fois." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cochez au moins deux réseaux : la carte montre leurs antennes et leurs mesures ensemble. La couverture reste à afficher un opérateur à la fois."
+          }
+        }
+      },
+      "shouldTranslate" : false
     }
   },
   "version" : "1.0"

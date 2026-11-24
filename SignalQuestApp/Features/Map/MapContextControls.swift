@@ -81,6 +81,10 @@ struct MapLayersSheet: View {
     let operatorAccent: (String) -> Color
     let antennaOperators: [MapAntennaLegendOperator]
     let onChooseOperator: (String) -> Void
+    /// Plusieurs opérateurs à la fois (IOS-037) : l'ensemble choisi, son nom court et son choix.
+    let operatorSet: Set<String>
+    let operatorSummary: String
+    let onChooseOperators: (Set<String>) -> Void
     let onChooseMarket: (MarketRegistryEntry) -> Void
     /// Registre ANFR ; `nil` masque la ligne.
     let onOpenANFR: ((MapANFRDestination) -> Void)?
@@ -107,6 +111,9 @@ struct MapLayersSheet: View {
          operatorAccent: @escaping (String) -> Color = { _ in SQColor.labelSecondary },
          antennaOperators: [MapAntennaLegendOperator] = [],
          onChooseOperator: @escaping (String) -> Void = { _ in },
+         operatorSet: Set<String> = [],
+         operatorSummary: String = "",
+         onChooseOperators: @escaping (Set<String>) -> Void = { _ in },
          onChooseMarket: @escaping (MarketRegistryEntry) -> Void = { _ in },
          onOpenANFR: ((MapANFRDestination) -> Void)? = nil,
          sessionSection: MapSessionTraceSection? = nil) {
@@ -125,6 +132,9 @@ struct MapLayersSheet: View {
         self.operatorAccent = operatorAccent
         self.antennaOperators = antennaOperators
         self.onChooseOperator = onChooseOperator
+        self.operatorSet = operatorSet
+        self.operatorSummary = operatorSummary
+        self.onChooseOperators = onChooseOperators
         self.onChooseMarket = onChooseMarket
         self.onOpenANFR = onOpenANFR
         self.sessionSection = sessionSection
@@ -221,7 +231,8 @@ struct MapLayersSheet: View {
         let shown = layerOptions.filter { layers.contains($0.0) && !isUnavailable($0.0) }.map(\.1)
         let layersText = shown.isEmpty ? String(localized: "Aucune couche")
             : (ListFormatter.localizedString(byJoining: shown))
-        return "\(operatorLabel(operatorName)) · \(layersText)"
+        let operatorText = operatorSet.count >= 2 ? operatorSummary : operatorLabel(operatorName)
+        return "\(operatorText) · \(layersText)"
     }
 
     var body: some View {
@@ -252,9 +263,31 @@ struct MapLayersSheet: View {
     private var operatorSection: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             Text("Opérateur").sqKicker().accessibilityAddTraits(.isHeader)
-            MapOperatorPicker(options: operatorOptions, selection: operatorName,
+            // Plusieurs opérateurs choisis : aucun segment n'est le bon, la ligne dessous les nomme.
+            MapOperatorPicker(options: operatorOptions, selection: operatorSet.count >= 2 ? "" : operatorName,
                               label: operatorLabel, accent: operatorAccent, onChoose: onChooseOperator)
+            if selectableOperators.count > 2 {
+                NavigationLink {
+                    MapOperatorsPage(options: selectableOperators, selected: initialMultiSelection,
+                                     label: operatorLabel, accent: operatorAccent, onConfirm: onChooseOperators)
+                } label: {
+                    MapSheetRow(title: String(localized: "Plusieurs réseaux"),
+                                value: operatorSet.count >= 2 ? operatorSummary : nil) {
+                        Image(systemName: "checklist").font(.system(size: 17, weight: .medium))
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("map.layers.operators.several")
+            }
         }
+    }
+
+    private var selectableOperators: [String] { operatorOptions.filter { $0.uppercased() != "ALL" } }
+
+    /// La liste s'ouvre sur l'ensemble choisi, sinon sur l'opérateur seul (rien coché en « Tous »).
+    private var initialMultiSelection: Set<String> {
+        if operatorSet.count >= 2 { return operatorSet }
+        return allOperators ? [] : [operatorName.uppercased()]
     }
 
     /// Rendu des azimuts, appliqué tout de suite et gardé sur l'appareil, comme
@@ -1139,5 +1172,68 @@ struct MapSessionTraceSection: View {
             .stroke(color, style: StrokeStyle(lineWidth: 4, lineCap: .butt, dash: dashed ? [4, 3] : []))
             .frame(width: 18, height: 4)
             .accessibilityHidden(true)
+    }
+}
+
+
+/// Liste « Plusieurs réseaux » (IOS-037, comme Android) : cocher deux opérateurs ou plus ; un
+/// seul revient au choix simple, tous reviennent à « Tous ».
+struct MapOperatorsPage: View {
+    let options: [String]
+    @State var selected: Set<String>
+    let label: (String) -> String
+    let accent: (String) -> Color
+    let onConfirm: (Set<String>) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    init(options: [String], selected: Set<String>, label: @escaping (String) -> String,
+         accent: @escaping (String) -> Color, onConfirm: @escaping (Set<String>) -> Void) {
+        self.options = options
+        _selected = State(initialValue: selected)
+        self.label = label
+        self.accent = accent
+        self.onConfirm = onConfirm
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: SQSpace.xl) {
+                    MapSheetPageHeader(title: String(localized: "Plusieurs réseaux"),
+                                       backIdentifier: "map.operators.back") { dismiss() }
+                    VStack(alignment: .leading, spacing: SQSpace.sm) {
+                        MapRowsTile {
+                            ForEach(Array(options.enumerated()), id: \.element) { index, key in
+                                MapCheckRow(isOn: selected.contains(key.uppercased()),
+                                            identifier: "map.operators.\(key.lowercased())") {
+                                    if selected.contains(key.uppercased()) { selected.remove(key.uppercased()) }
+                                    else { selected.insert(key.uppercased()) }
+                                } label: {
+                                    Circle().fill(accent(key)).frame(width: 10, height: 10).accessibilityHidden(true)
+                                    // La place permet le nom complet (« Bouygues Telecom », choix du 01/11).
+                                    Text(verbatim: SQBrand.operatorName(label(key)) ?? label(key))
+                                        .font(SQType.callout(.semibold)).foregroundStyle(SQColor.label)
+                                }
+                                .mapRowDivider(index > 0)
+                            }
+                        }
+                        Text("Coche au moins deux réseaux : la carte montre leurs antennes et leurs mesures ensemble. La couverture reste à afficher un opérateur à la fois.")
+                            .font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(.horizontal, SQSpace.lg)
+                .padding(.top, SQSpace.lg)
+                .padding(.bottom, SQSpace.xl)
+            }
+            MapSubpageFooter(clearDisabled: selected.isEmpty, confirmTitle: String(localized: "Appliquer"),
+                             identifier: "map.operators", onClear: { selected = [] }) {
+                onConfirm(selected)
+                dismiss()
+            }
+        }
+        .background(SQColor.surface)
+        .toolbar(.hidden, for: .navigationBar)
+        .sqKeepsSwipeBack()
     }
 }

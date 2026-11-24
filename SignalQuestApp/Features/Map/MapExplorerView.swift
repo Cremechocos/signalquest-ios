@@ -123,8 +123,17 @@ final class MapExplorerViewModel: ObservableObject {
     // Marché + opérateur initiaux : dernier choix persisté, sinon le pays de la
     // locale appareil (jamais la France imposée). La détection fine (SIM/GPS) est
     // appliquée ensuite dans `resolveInitialSelection`.
-    @Published var marketFilter = MapMarketStore.initialMarketCode()
-    @Published var operatorFilter = MapMarketStore.initialOperatorKey()
+    @Published var marketFilter = MapMarketStore.initialMarketCode() {
+        didSet { if marketFilter.caseInsensitiveCompare(oldValue) != .orderedSame { operatorSet = [] } }
+    }
+    @Published var operatorFilter = MapMarketStore.initialOperatorKey() {
+        didSet { if operatorFilter.uppercased() != "ALL" { operatorSet = [] } }
+    }
+    /// Plusieurs opérateurs à la fois (IOS-037, comme Android) : deux clés au moins. La carte
+    /// charge alors « Tous » et ne garde que leurs antennes et leurs mesures ; la couverture
+    /// reste masquée, comme en « Tous ». Vide : un seul opérateur, celui d'`operatorFilter`.
+    /// Pour la session seulement : un nouveau lancement repart d'un seul opérateur.
+    @Published var operatorSet: Set<String> = []
     /// Territoire DROM sous le viewport (Martinique, Réunion…) — restreint la liste
     /// d'opérateurs à ceux du territoire (les opérateurs Outre-mer sont géographiquement
     /// disjoints). `nil` hors DROM. Cf. `DromRegion`.
@@ -641,8 +650,36 @@ final class MapExplorerViewModel: ObservableObject {
         initialSelectionToObserve = nil
     }
 
+    /// Choix de la liste « Plusieurs réseaux » : un seul coché revient au choix simple, tous
+    /// cochés reviennent à « Tous ».
+    func chooseOperatorsManually(_ keys: Set<String>) {
+        let selectable = operatorOptions.filter { $0.uppercased() != "ALL" }
+        let chosen = selectable.filter { key in keys.contains { $0.caseInsensitiveCompare(key) == .orderedSame } }
+        if chosen.count == 1, let only = chosen.first { return chooseOperatorManually(only) }
+        let all = operatorOptions.first { $0.uppercased() == "ALL" } ?? "ALL"
+        invalidatePendingSelectionResolution()
+        coverageFocus = nil
+        operatorFilter = all
+        operatorSet = chosen.count >= 2 && chosen.count < selectable.count ? Set(chosen.map { $0.uppercased() }) : []
+        MapMarketStore.saveManual(market: marketFilter, operator: all)
+    }
+
+    /// « Orange + SFR » quand plusieurs opérateurs sont choisis, sinon le nom court habituel.
+    var operatorSummaryLabel: String {
+        guard operatorSet.count >= 2 else { return operatorShortLabel(operatorFilter) }
+        let ordered = operatorOptions.filter { operatorSet.contains($0.uppercased()) }
+        return ordered.map(operatorShortLabel).joined(separator: " + ")
+    }
+
+    /// Un site ou une mesure appartient-il aux opérateurs choisis ? Toujours vrai hors choix multiple.
+    func matchesOperatorSet(keys: [String]) -> Bool {
+        guard operatorSet.count >= 2 else { return true }
+        return keys.contains { operatorSet.contains($0.uppercased()) }
+    }
+
     func chooseOperatorManually(_ key: String) {
         guard let canonical = operatorOptions.first(where: { $0.caseInsensitiveCompare(key) == .orderedSame }) else { return }
+        operatorSet = []
         invalidatePendingSelectionResolution()
         if operatorFilter.caseInsensitiveCompare(canonical) != .orderedSame { coverageFocus = nil }
         operatorFilter = canonical
@@ -2081,6 +2118,9 @@ struct MapExplorerView: View {
                 operatorAccent: { model.operatorAccent($0) },
                 antennaOperators: antennaLegendOperators,
                 onChooseOperator: { model.chooseOperatorManually($0) },
+                operatorSet: model.operatorSet,
+                operatorSummary: model.operatorSummaryLabel,
+                onChooseOperators: { model.chooseOperatorsManually($0) },
                 onChooseMarket: { entry in
                     var next = filterSelection
                     next.market = entry.marketCode.isEmpty ? entry.code : entry.marketCode
@@ -2257,6 +2297,10 @@ struct MapExplorerView: View {
         }
         .onChangeCompat(of: selectedFriendFilterID) { _, _ in
             refreshFriendsRender()
+        }
+        .onChangeCompat(of: model.operatorSet) { _, _ in
+            // Plusieurs opérateurs : mêmes données « Tous », autre tri à l'affichage.
+            refreshMapRender()
         }
         .onChangeCompat(of: coverageByGeneration) { _, _ in
             // Bascule Signal ↔ Génération : recolore la couche sans recharger le réseau.
@@ -3209,7 +3253,7 @@ struct MapExplorerView: View {
     private var mapStatePill: some View {
         let layers = shownLayers
         let primary = layers.first.map { MapLayersSheet.layerTitle($0, communityOnly: model.isCommunityOnlyMarket) }
-        let operatorText = model.operatorShortLabel(model.operatorFilter)
+        let operatorText = model.operatorSummaryLabel
         return Button {
             Haptics.light()
             showLayersSheet = true
@@ -4152,7 +4196,7 @@ struct MapExplorerView: View {
                         avgRsrp: cluster.avgRsrp,
                         tech: cluster.tech,
                         timestamp: cluster.latestTimestamp,
-                        operatorName: model.operatorLabel(model.operatorFilter),
+                        operatorName: model.operatorSet.count >= 2 ? model.operatorSummaryLabel : model.operatorLabel(model.operatorFilter),
                         clusterCount: cluster.count
                     ),
                     antennaId: nil,
@@ -4186,6 +4230,7 @@ struct MapExplorerView: View {
                 // bande masque tout »).
                 guard site.bands.isEmpty || matchesSelectedBands(site.bands) else { return nil }
                 guard matchesSelectedSharing(site) else { return nil }
+                guard model.matchesOperatorSet(keys: site.operators + [site.owner].compactMap { $0 }) else { return nil }
                 guard siteFilters.matches(site, market: model.marketFilter,
                                           contributionDataAvailable: contributionDataAvailable,
                                           isedDataAvailable: isedDataAvailable) else { return nil }
@@ -4680,11 +4725,20 @@ struct MapExplorerView: View {
     private var speedtestFeatures: [SpeedtestFeature] {
         guard filters.contains(.speedtest) else { return [] }
         let techs = model.techFilters
+        // Plusieurs opérateurs : la mesure porte un nom affiché (« Orange »), ramené au nom complet.
+        let operatorNames: Set<String>? = model.operatorSet.count >= 2
+            ? Set(model.operatorSet.flatMap { key in
+                [key, model.operatorShortLabel(key), model.operatorLabel(key)].map { (SQBrand.operatorName($0) ?? $0).lowercased() }
+            })
+            : nil
         var seen = Set<String>()
         var features: [SpeedtestFeature] = []
         for tile in model.speedtestTiles {
             for marker in tile.markers {
                 guard seen.insert(marker.id).inserted else { continue }
+                if let operatorNames {
+                    guard let name = marker.operator, operatorNames.contains((SQBrand.operatorName(name) ?? name).lowercased()) else { continue }
+                }
                 if !techs.isEmpty, !Self.speedtestMatchesTech(marker.tech, selected: techs) { continue }
                 guard matchesSelectedBand(marker.band) || matchesSelectedBands(in: [marker.frequency, marker.tech].compactMap { $0 }) else { continue }
                 features.append(

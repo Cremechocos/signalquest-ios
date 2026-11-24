@@ -333,6 +333,32 @@ final class MapFilterSelectionTests: XCTestCase {
         XCTAssertNil(model.coverageFocus, "A radio site identity belongs to its carrier")
     }
 
+    /// IOS-037 lot 3 : plusieurs opérateurs à la fois, comme Android.
+    func testSeveralOperatorsLoadEverySiteAndKeepOnlyTheChosenOnes() throws {
+        let payload = try registry()
+        let model = makeModel(markets: LocatedFilterMarkets(payload: payload, locatedCode: "FR"))
+        model.registryMarkets = payload.markets
+        _ = try XCTUnwrap(model.applyFilterSelection(.defaults(market: "FR", operatorName: "SFR")))
+        model.chooseOperatorsManually(["orange", "SFR"])
+        XCTAssertEqual(model.operatorFilter.uppercased(), "ALL", "la carte charge « Tous » puis trie")
+        XCTAssertEqual(model.operatorSet, ["ORANGE", "SFR"])
+        XCTAssertTrue(model.matchesOperatorSet(keys: ["BOUYGUES", "SFR"]), "site partagé avec un opérateur choisi")
+        XCTAssertFalse(model.matchesOperatorSet(keys: ["FREE"]))
+        XCTAssertTrue(model.operatorSummaryLabel.contains(" + "))
+
+        model.chooseOperatorsManually(["ORANGE"])
+        XCTAssertEqual(model.operatorFilter, "ORANGE", "un seul coché revient au choix simple")
+        XCTAssertTrue(model.operatorSet.isEmpty)
+        model.chooseOperatorsManually(Set(model.operatorOptions))
+        XCTAssertEqual(model.operatorFilter.uppercased(), "ALL")
+        XCTAssertTrue(model.operatorSet.isEmpty, "tous cochés : « Tous », sans tri")
+        XCTAssertTrue(model.matchesOperatorSet(keys: ["FREE"]))
+
+        model.chooseOperatorsManually(["ORANGE", "FREE"])
+        _ = try XCTUnwrap(model.applyFilterSelection(.defaults(market: "CA", operatorName: "BELL")))
+        XCTAssertTrue(model.operatorSet.isEmpty, "un autre pays repart d'un seul opérateur")
+    }
+
     private func makeLocation(latitude: Double, longitude: Double) -> LocationService {
         let driver = FilterLocationDriver(authorizationStatus: .authorizedWhenInUse)
         let service = LocationService(manager: driver, makeOneShotManager: { FilterLocationDriver() })
