@@ -66,4 +66,22 @@ final class SQDateTimeFormatTests: XCTestCase {
         let old = try XCTUnwrap(calendar.date(byAdding: .day, value: -60, to: thisHour))
         XCTAssertTrue(SignalFormatters.approximateDate(old).contains(" vers "))
     }
+
+    /// IOS-036 : une date d'historique porte son année dès qu'elle n'est pas de l'année en cours.
+    func testHistoryDayShowsTheYearOnlyOutsideTheCurrentYear() {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = night
+        let sameYear = calendar.date(byAdding: .month, value: -3, to: now)!
+        let lastYear = calendar.date(byAdding: .year, value: -1, to: now)!
+        XCTAssertFalse(SignalFormatters.shortDay(sameYear, now: now, calendar: calendar).contains("2026"))
+        XCTAssertTrue(SignalFormatters.shortDay(lastYear, now: now, calendar: calendar).contains("2025"))
+    }
+
+    /// IOS-034 : la hauteur garde la décimale du registre, au format de la langue.
+    func testSupportHeightKeepsOneDecimal() {
+        XCTAssertEqual(SQUnits.height(meters: 29.5, locale: Locale(identifier: "fr_FR")), "29,5 m")
+        XCTAssertEqual(SQUnits.height(meters: 29.5, locale: Locale(identifier: "en_US")), "29.5 m")
+        XCTAssertEqual(SQUnits.height(meters: 30, locale: Locale(identifier: "fr_FR")), "30 m")
+        XCTAssertEqual(SQUnits.height(meters: 12.34, locale: Locale(identifier: "fr_FR")), "12,3 m")
+    }
 }

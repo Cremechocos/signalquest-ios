@@ -28,6 +28,9 @@ struct AntennaSectorGridView: View {
     let projectBands: [String]
     let antennaHeightMeters: Double?
     let tint: Color
+    /// Système intérieur ou distribué : pas de secteurs orientés, la fiche le dit
+    /// au-dessus de la grille ; la note du bas ne parle alors que des bandes.
+    var isDistributedSystem: Bool = false
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -363,7 +366,7 @@ struct AntennaSectorGridView: View {
 
     private var sectorCountLabel: String {
         let count = columns.count
-        if count == 0 {
+        if count == 0 && !isDistributedSystem {
             return String(localized: "L'orientation des secteurs n'est pas publiée pour ce site — seules ses bandes le sont.")
         }
         guard count > 1 else {

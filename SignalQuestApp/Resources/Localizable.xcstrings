@@ -125180,6 +125180,22 @@
           }
         }
       }
+    },
+    "Système intérieur ou distribué : les azimuts ne sont pas une direction." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indoor or distributed system: the azimuths are not a direction."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Système intérieur ou distribué : les azimuts ne sont pas une direction."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

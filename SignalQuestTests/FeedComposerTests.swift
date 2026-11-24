@@ -335,6 +335,17 @@ final class FeedComposerTests: XCTestCase {
         XCTAssertEqual(try stats(#"{"points":3110}"#).displayedPoints, 3110, "Ancien serveur : repli")
     }
 
+    /// IOS-031 : le niveau du profil d'un membre est celui des missions, comme son
+    /// propre profil et Android ; l'ancien niveau stocké ne sert que de repli.
+    func testPublicProfileShowsMissionsLevel() throws {
+        func stats(_ json: String) throws -> SocialUserProfileStats {
+            try JSONDecoder.signalQuest.decode(SocialUserProfileStats.self, from: Data(json.utf8))
+        }
+        XCTAssertEqual(try stats(#"{"level":1,"missionsLevel":7}"#).displayedLevel, 7)
+        XCTAssertEqual(try stats(#"{"level":4}"#).displayedLevel, 4, "Ancien serveur : repli")
+        XCTAssertNil(try stats(#"{}"#).displayedLevel)
+    }
+
     /// SOCIAL-BELL-1 : champ absent = cloche masquée ; une valeur inconnue s'affiche « Désactivées ».
     func testProfileDecodesPostNotificationsAbsentServedAndUnknown() throws {
         func profile(_ extra: String) throws -> SocialUserProfile {

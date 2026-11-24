@@ -850,11 +850,17 @@ struct SocialUserProfileStats: Codable, Equatable {
     let validations: Int?
     let photos: Int?
     let speedtests: Int?
+    /// Niveau des missions, seul niveau affiché partout depuis le 29/09 (son propre
+    /// profil, Android, Web) ; `level` est l'ancien niveau stocké.
+    var missionsLevel: Int? = nil
 
     /// IOS-023 : les points affichés sont ceux de la gamification, comme son propre
     /// profil (/api/user/stats), les classements et Android ; `points` (ancien
     /// compteur) ne sert plus que de repli quand le serveur ne sert pas l'autre.
     var displayedPoints: Int? { gamificationPoints ?? points }
+
+    /// IOS-031 : même principe pour le niveau ; `level` ne sert que de repli.
+    var displayedLevel: Int? { missionsLevel ?? level }
 }
 
 /// Profil public renvoyé par GET /api/users/[id]/profile.

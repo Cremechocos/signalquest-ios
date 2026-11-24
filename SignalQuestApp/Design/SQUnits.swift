@@ -155,6 +155,13 @@ enum SQUnits {
         }
     }
 
+    /// Hauteur d'un support ou d'une antenne, comme le registre la publie : une
+    /// décimale au plus (« 29,5 m »), jamais arrondie au mètre (IOS-034).
+    static func height(meters: Double, locale: Locale = .current) -> String {
+        guard meters.isFinite else { return "—" }
+        return "\(meters.formatted(.number.precision(.fractionLength(0...1)).grouping(.never).locale(locale))) m"
+    }
+
     // MARK: Débit, latence, bande
 
     /// « 412 Mb/s », « 7,5 Mb/s », « 1,722 Gb/s », dans toutes les langues comme

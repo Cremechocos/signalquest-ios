@@ -758,7 +758,7 @@ struct UserProfileView: View {
                 .foregroundStyle(SQColor.labelSecondary)
                 .lineLimit(1)
             }
-            let level = profile?.showsStats == false ? nil : profile?.stats?.level.map { String(localized: "Niveau \($0)") }
+            let level = profile?.showsStats == false ? nil : profile?.stats?.displayedLevel.map { String(localized: "Niveau \($0)") }
             let since = profile?.createdAt.map {
                 String(localized: "membre depuis \($0.formatted(.dateTime.month(.wide).year()))")
             }

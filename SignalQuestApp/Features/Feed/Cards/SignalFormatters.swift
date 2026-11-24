@@ -106,6 +106,14 @@ enum SignalFormatters {
         return includingTime ? dayTimeFormatter.string(from: date) : dayFormatter.string(from: date)
     }
 
+    /// « 20 juil. », avec l'année hors année en cours (« 20 juil. 2025 ») : dans un
+    /// historique, l'année ne doit pas se deviner (IOS-036).
+    static func shortDay(_ date: Date, now: Date = Date(), calendar: Calendar = .current) -> String {
+        calendar.isDate(date, equalTo: now, toGranularity: .year)
+            ? date.formatted(.dateTime.day().month(.abbreviated))
+            : date.formatted(.dateTime.day().month(.abbreviated).year())
+    }
+
     /// Heure tronquée par le serveur (tuiles publiques, `timestampPrecision` "hour") :
     /// « 5 nov. 2026 vers 11 h », jamais « 11:00 ».
     static func dateAroundHour(_ date: Date) -> String {

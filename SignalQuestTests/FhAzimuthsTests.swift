@@ -148,4 +148,25 @@ final class FhAzimuthsTests: XCTestCase {
         XCTAssertTrue(core.azimutsFh.isEmpty)
         XCTAssertFalse(core.hasFhLink)
     }
+
+    /// IOS-032 : un système intérieur ou distribué (métro, tunnel) garde ses azimuts
+    /// au registre, mais le drapeau dit qu'ils ne sont pas des directions ; absent sur
+    /// un serveur antérieur, il vaut faux.
+    func testDistributedSystemFlagDecodesAndDefaultsToFalse() throws {
+        let indoor = try XCTUnwrap(try details("""
+        {
+          "antenna": {
+            "id": "3", "supId": "3", "lat": 48.8566, "lng": 2.3522,
+            "operators": ["ORANGE"], "technologies": ["4G"],
+            "azimuts": [0, 120, 240], "isDistributedSystem": true
+          }
+        }
+        """).core)
+        XCTAssertTrue(indoor.isDistributedSystem)
+        XCTAssertEqual(indoor.azimuts, [0, 120, 240], "le registre reste lisible tel quel")
+        let legacy = try XCTUnwrap(try details("""
+        { "antenna": { "id": "4", "supId": "4", "lat": 48.8566, "lng": 2.3522, "azimuts": [90] } }
+        """).core)
+        XCTAssertFalse(legacy.isDistributedSystem)
+    }
 }

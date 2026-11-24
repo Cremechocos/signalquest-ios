@@ -87,7 +87,7 @@ struct ExperienceHistoryRow: View {
 
     /// « 27 oct. · Test d’expérience »
     var titleLine: String {
-        "\(item.measuredAt.formatted(.dateTime.day().month(.abbreviated))) · \(String(localized: "Test d’expérience"))"
+        "\(SignalFormatters.shortDay(item.measuredAt)) · \(String(localized: "Test d’expérience"))"
     }
 
     /// « Vidéo 4K · Page 365 ms · Jeu 13 ms » : seulement ce qui a été mesuré, jamais de tiret.

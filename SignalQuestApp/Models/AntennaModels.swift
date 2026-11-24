@@ -512,6 +512,10 @@ struct AntennaCoreDetails: Decodable, Equatable {
     /// qui ne sert que `azimutsFh` : la fiche retombe alors sur les directions
     /// seules, ce qu'elle sait déjà afficher.
     let fhLinks: [AntennaFhLink]
+    /// Système intérieur ou distribué (métro, tunnel, centre commercial ; site ISED de
+    /// type I ou U) : ses azimuts ne sont pas des directions de secteur, la fiche ne
+    /// les dessine pas (IOS-032, comme Android). `false` sur un serveur antérieur.
+    let isDistributedSystem: Bool
     let technical: AntennaTechnicalInfo
     let frequencyBands: [String]
     let radioCarriers: [AntennaRadioCarrier]
@@ -703,7 +707,7 @@ struct AntennaCoreDetails: Decodable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case id, supId, siteKey, anfrCode, market, rawLicenseeName, lat, lng, address, commune, postalCode, operators, operatorScope, operatorFacets, sharingKind, crozonLeader, zbLeader, isZTD, mutualiseOperators, technologies, azimuts, technical, frequencyBands, radioCarriers, cellIdentifiers, siteInfo
-        case status, technologiesInProject, sectorSystems, azimutsFh, fhLinks
+        case status, technologiesInProject, sectorSystems, azimutsFh, fhLinks, isDistributedSystem
         case datasetPublishedAt, operatorBrand, licences, municipality, provinceCode
         case isCustomSite, validationStatus, source, displayName, description
         case frequencyBlocks, operatorSiteId, operatorSiteIds
@@ -757,6 +761,7 @@ struct AntennaCoreDetails: Decodable, Equatable {
         azimutsFh = c.decodeLossyArray([Double].self, forKey: .azimutsFh)
         fhLinks = c.decodeLossyArray([AntennaFhLink].self, forKey: .fhLinks)
             .sorted { $0.azimuth < $1.azimuth }
+        isDistributedSystem = (try? c.decodeIfPresent(Bool.self, forKey: .isDistributedSystem)) ?? false
         technical = (try? c.decode(AntennaTechnicalInfo.self, forKey: .technical)) ?? AntennaTechnicalInfo()
         frequencyBands = c.decodeLossyArray([String].self, forKey: .frequencyBands)
         radioCarriers = c.decodeLossyArray([AntennaRadioCarrier].self, forKey: .radioCarriers)

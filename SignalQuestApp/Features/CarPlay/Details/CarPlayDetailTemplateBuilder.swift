@@ -53,7 +53,7 @@ enum CarPlayDetailTemplateBuilder {
         }
         if let height = details?.height {
             items.append(CPInformationItem(title: String(localized: "Hauteur"),
-                                           detail: "\(Int(height.rounded())) m"))
+                                           detail: SQUnits.height(meters: height)))
         }
         if let address = details?.address, !address.isEmpty {
             items.append(CPInformationItem(title: String(localized: "Adresse"), detail: address))

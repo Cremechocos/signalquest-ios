@@ -219,7 +219,7 @@ struct PlannedDetailSheet: View {
             infoRow("Code INSEE", site.insee)
             infoRow("Coordonnées", coordinatesLabel)
             infoRow("Support", anfr?.siteInfo.supportType ?? anfr?.technical.supportType)
-            infoRow("Hauteur du support", (anfr?.siteInfo.supportHeightMeters ?? anfr?.siteInfo.pylonHeight).map { "\(Int($0.rounded())) m" })
+            infoRow("Hauteur du support", (anfr?.siteInfo.supportHeightMeters ?? anfr?.siteInfo.pylonHeight).map { SQUnits.height(meters: $0) })
             infoRow("Propriétaire du support", anfr?.siteInfo.supportOwner)
             infoRow("Activation 5G prévue", formattedDate(site.date5g))
             infoRow(String(localized: "Mise en service"), formattedDate(site.activation?.lastInServiceDate))

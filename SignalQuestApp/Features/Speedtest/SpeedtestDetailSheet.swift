@@ -242,7 +242,10 @@ struct SpeedtestDetailContent: View {
                     triCell("Max réception", value: parts.value, unit: parts.unit)
                 }
                 if let ping = Self.measured(result.primaryPingMs) {
-                    triCell("Latence", value: Self.msText(ping), unit: "ms")
+                    // Depuis la méthodologie v6, la valeur est le minimum : même libellé
+                    // que l'écran de résultat et la carte de partage (IOS-033).
+                    let isMinimum = (result.methodologyVersion ?? 0) >= 6 && result.pingMinMs != nil
+                    triCell(isMinimum ? "Latence min." : "Latence", value: Self.msText(ping), unit: "ms")
                 }
                 if let jitter = Self.measured(result.jitterMs) {
                     triCell("Gigue", value: Self.jitterText(jitter), unit: "ms")

@@ -394,7 +394,7 @@ struct LeaderboardsView: View {
                         showsDivider: index > 0,
                         onOpen: { profileAuthor = entry.user }
                     ) {
-                        SpeedRowMeta(city: entry.city, tech: entry.tech, isProbablyIOS: entry.isProbablyIOS)
+                        SpeedRowMeta(operatorName: entry.operator, city: entry.city, tech: entry.tech, isProbablyIOS: entry.isProbablyIOS)
                     }
                 }
             }
@@ -1049,19 +1049,26 @@ private struct SQSoftShadowIf: ViewModifier {
 
 // MARK: - Lignes méta des rangées
 
-/// Étiquettes d'une rangée Vitesse : ville, technologie, provenance iOS.
+/// Étiquettes d'une rangée Vitesse : opérateur, ville, technologie, provenance iOS.
+///
+/// L'opérateur passe en tête (IOS-035) : sans lui, un débit ne dit pas de quel
+/// réseau il vient ; Android l'affiche aussi.
 ///
 /// Le nombre d'étiquettes se dégrade au lieu d'en tronquer une : à trois, la
 /// ville se réduisait à « Na… » alors que laisser tomber le tag « iOS » — la
 /// moins utile des trois — permet d'afficher « Nantes » en entier. L'ordre du
 /// tableau est l'ordre de priorité.
 private struct SpeedRowMeta: View {
+    let operatorName: String?
     let city: String?
     let tech: String?
     let isProbablyIOS: Bool
 
     private var tags: [(text: String, color: Color)] {
         var tags: [(text: String, color: Color)] = []
+        if let raw = operatorName?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty {
+            tags.append((SQBrand.operatorShortName(raw) ?? raw, SQBrand.operatorColor(raw)))
+        }
         if let city { tags.append((city, SQColor.label)) }
         if let tech { tags.append((tech, SQBrand.techColor(tech))) }
         if isProbablyIOS { tags.append(("iOS", SQColor.brandRed)) }
@@ -1072,7 +1079,8 @@ private struct SpeedRowMeta: View {
         let tags = tags
         ViewThatFits(in: .horizontal) {
             line(tags)
-            line(Array(tags.dropLast()))
+            line(Array(tags.prefix(3)))
+            line(Array(tags.prefix(2)))
             line(Array(tags.prefix(1)))
         }
     }

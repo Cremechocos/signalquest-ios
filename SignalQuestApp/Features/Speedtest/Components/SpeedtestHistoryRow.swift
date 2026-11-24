@@ -68,7 +68,7 @@ struct SpeedtestHistoryRow: View {
 
     /// « 10 juil. · 388 Mbit/s · 21 ms » (« Mbps » en anglais).
     var titleLine: String {
-        var parts = [result.createdAt.formatted(.dateTime.day().month(.abbreviated))]
+        var parts = [SignalFormatters.shortDay(result.createdAt)]
         parts.append(shortSpeed(result.downloadAverageMbps))
         if let ping = result.primaryPingMs, ping.isFinite, ping >= 0 {
             parts.append(SQUnits.milliseconds(ping))

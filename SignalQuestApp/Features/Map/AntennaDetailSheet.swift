@@ -725,7 +725,7 @@ struct AntennaDetailSheet: View {
                 ?? SQColor.labelSecondary,
             operators: supportOperators.map { MapPhotoSite.Operator(label: photoOperatorLabel($0), color: registryColor($0)) },
             technologies: displayedTechnologies,
-            height: (core?.siteInfo.supportHeightMeters ?? core?.siteInfo.pylonHeight).map { "\(Int($0.rounded())) m" }
+            height: (core?.siteInfo.supportHeightMeters ?? core?.siteInfo.pylonHeight).map { SQUnits.height(meters: $0) }
         )
     }
 
@@ -962,9 +962,14 @@ struct AntennaDetailSheet: View {
             // Ordre de la fiche Web (choix d'Alexandre du 20/11) : Fréquences, la rose des secteurs,
             // le dernier changement ANFR, ce que la communauté sait, puis les identifications du membre.
             if let details = model.details {
-                if !displayedAzimuths.isEmpty || !details.bands.isEmpty {
+                if !displayedAzimuths.isEmpty || !details.bands.isEmpty || isDistributedSystem {
                     section("Secteurs et bandes") {
+                        if isDistributedSystem {
+                            SQNotice(message: "Système intérieur ou distribué : les azimuts ne sont pas une direction.")
+                        }
                         sectorContent(details)
+                            // Sans rose (système distribué), le contenu ne remplit plus la largeur.
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(SQSpace.md)
                             .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
                     }
@@ -1768,8 +1773,14 @@ struct AntennaDetailSheet: View {
     /// fusionné, et la fiche montrait donc les secteurs de SFR sous l'étiquette
     /// d'Orange le temps que le détail réponde — à chaque bascule.
     private var displayedAzimuths: [Double] {
+        // Système intérieur ou distribué : aucune direction à dessiner (IOS-032).
+        guard !isDistributedSystem else { return [] }
         let core = model.details?.core?.azimuts ?? []
         return core.isEmpty ? operatorAzimuths : core
+    }
+
+    private var isDistributedSystem: Bool {
+        model.details?.core?.isDistributedSystem == true
     }
 
     /// Partage du support, qui fixe l'ordre des cônes en base 1 : le détail d'abord, la tuile
@@ -1817,13 +1828,17 @@ struct AntennaDetailSheet: View {
             azimuths: displayedAzimuths,
             siteBands: !isedBands.isEmpty ? isedBands
                 : (details.core?.frequencyBands ?? []).isEmpty ? details.bands : (details.core?.frequencyBands ?? []),
-            sectorSystems: !isedBands.isEmpty ? ISEDBandFamily.sectorSystems(carriers, azimuths: displayedAzimuths)
+            // Système distribué : le détail par secteur porte lui aussi des azimuts, que la
+            // rose dessinerait comme des directions (IOS-032).
+            sectorSystems: isDistributedSystem ? []
+                : !isedBands.isEmpty ? ISEDBandFamily.sectorSystems(carriers, azimuths: displayedAzimuths)
                 : details.core?.sectorSystems ?? [],
             fhBeams: details.core?.fhBeams ?? [],
             technologies: (details.core?.technologies ?? []).isEmpty ? details.technologies : (details.core?.technologies ?? []),
             projectBands: details.core?.technologiesInProject ?? [],
             antennaHeightMeters: details.core?.siteInfo.radiatingHeightMeters,
-            tint: operatorColor
+            tint: operatorColor,
+            isDistributedSystem: isDistributedSystem
         )
         .foregroundStyle(SQColor.label)
     }
@@ -2047,14 +2062,15 @@ struct AntennaDetailSheet: View {
                 }
                 detailRow("Bandes", core.frequencyBands.joined(separator: " / "), term: .band)
                 // Liste entière : une coupure muette faisait croire à moins de secteurs.
-                detailRow("Azimuts", core.azimuts.map { "\(Int($0.rounded()))°" }.joined(separator: " · "), term: .azimuth)
+                detailRow("Azimuts", core.isDistributedSystem ? nil
+                          : core.azimuts.map { "\(Int($0.rounded()))°" }.joined(separator: " · "), term: .azimuth)
                 detailRow("Support", core.siteInfo.supportType ?? core.technical.supportType)
                 // `supportHeight` est une chaîne brute du registre (« 29,5 », « 4 ») :
                 // l'afficher telle quelle donnait une hauteur sans unité.
                 detailRow(
                     "Hauteur support",
                     (core.siteInfo.supportHeightMeters ?? core.siteInfo.pylonHeight)
-                        .map { "\(Int($0.rounded())) m" }
+                        .map { SQUnits.height(meters: $0) }
                 )
                 detailRow("Types d'antennes", core.siteInfo.antennaTypes.joined(separator: " · "))
                 detailRow("Propriétaire", core.siteInfo.supportOwner ?? core.rawLicenseeName)

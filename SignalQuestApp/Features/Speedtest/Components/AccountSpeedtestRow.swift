@@ -48,7 +48,7 @@ struct AccountSpeedtestRow: View {
     var titleLine: String {
         var parts: [String] = []
         if let date = test.displayedDate {
-            parts.append(date.formatted(.dateTime.day().month(.abbreviated)))
+            parts.append(SignalFormatters.shortDay(date))
         }
         if let download = test.downloadAverageMbps, download.isFinite, download > 0 {
             parts.append(SQUnits.throughput(mbps: download))
