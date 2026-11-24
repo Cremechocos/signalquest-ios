@@ -608,7 +608,7 @@ struct ExploreView: View {
                             .frame(width: recentTileWidth)
                         }
                         .buttonStyle(SQPressButtonStyle())
-                        .accessibilityLabel("Voir le profil de \(item.title)")
+                        .accessibilityLabel(SQElision.apply(String(localized: "Voir le profil de \(item.title)"), name: item.title))
                         .accessibilityIdentifier("explore.recent.profile.\(item.targetId)")
                     }
                 }
@@ -687,7 +687,7 @@ struct ExploreView: View {
                             .sqEditorialCard()
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Voir le profil de \(result.displayName)")
+                        .accessibilityLabel(SQElision.apply(String(localized: "Voir le profil de \(result.displayName)"), name: result.displayName))
                     }
                 }
 
@@ -1049,7 +1049,7 @@ struct ExploreView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Voir le profil de \(author.displayName)")
+            .accessibilityLabel(SQElision.apply(String(localized: "Voir le profil de \(author.displayName)"), name: author.displayName))
 
             followButton(isOn: followed, onTitle: String(localized: "Suivi"), offTitle: String(localized: "Suivre")) {
                 model.toggleFollow(author)

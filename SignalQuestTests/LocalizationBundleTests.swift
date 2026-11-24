@@ -304,4 +304,33 @@ final class LocalizationBundleTests: XCTestCase {
         XCTAssertGreaterThan(scanned, 100)
         XCTAssertEqual(offenders, [], "GradientButton(\"clé\") ou GradientButton(verbatim:)")
     }
+
+    /// IOS-039 : « de » s'élide devant un nom en voyelle, selon la règle commune à iOS,
+    /// Android et au site ; l'anglais, les consonnes, h, y devant voyelle et les symboles
+    /// ne bougent pas.
+    func testDeElidesBeforeANameStartingWithAVowel() {
+        let cases: [(String, Bool)] = [
+            ("Inès", true), ("alexandre", true), ("Émile", true), ("Œdipe", true), (" Ugo", true),
+            ("Yves", true), ("Yasmine", false), ("Yann", false), ("Hugo", false), ("Hélène", false),
+            ("Lucie", false), ("@ines", false), ("4G Orange", false), ("", false), ("Y", false),
+            ("Álvaro", true), ("Ísis", true), ("Yánez", false),
+        ]
+        for (name, expected) in cases {
+            XCTAssertEqual(SQElision.elides(name), expected, name)
+        }
+        XCTAssertEqual(SQElision.apply("Story de Inès", name: "Inès"), "Story d’Inès")
+        XCTAssertEqual(SQElision.apply("Publication de Orange : de Orange", name: "Orange"), "Publication d’Orange : de Orange")
+        XCTAssertEqual(SQElision.apply("Story de Lucie", name: "Lucie"), "Story de Lucie")
+        XCTAssertEqual(SQElision.apply("Inès’s story", name: "Inès"), "Inès’s story")
+        XCTAssertEqual(SQElision.apply("Monde Inès", name: "Inès"), "Monde Inès")
+        XCTAssertEqual(SQElision.apply("De Inès", name: "Inès"), "D’Inès")
+        // Texte réel du catalogue : élidé en français, intact en anglais.
+        let profile = SQElision.apply(String(format: NSLocalizedString("Voir le profil de %@", comment: ""), "Inès"), name: "Inès")
+        if SQAddress.appIsFrench {
+            XCTAssertEqual(profile, "Voir le profil d’Inès")
+        } else {
+            XCTAssertFalse(profile.contains("d’"), profile)
+            XCTAssertTrue(profile.contains("Inès"), profile)
+        }
+    }
 }

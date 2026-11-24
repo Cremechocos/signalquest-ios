@@ -178,8 +178,8 @@ struct ConversationMediaView: View {
 
     private func photoLabel(_ entry: Entry) -> String {
         let author = entry.message.sender?.displayName ?? MemberIdentity.someone
-        guard let date = entry.message.createdAt else { return String(localized: "Photo de \(author)") }
-        return String(localized: "Photo de \(author), \(date.sqFormatted(date: .medium))")
+        guard let date = entry.message.createdAt else { return SQElision.apply(String(localized: "Photo de \(author)"), name: author) }
+        return SQElision.apply(String(localized: "Photo de \(author), \(date.sqFormatted(date: .medium))"), name: author)
     }
 
     /// Fichiers et notes vocales en lignes sur une seule carte.

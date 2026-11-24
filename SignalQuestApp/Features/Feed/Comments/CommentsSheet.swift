@@ -660,7 +660,7 @@ struct CommentsSheet: View {
                 content()
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Voir le profil de \(comment.author.displayName)")
+            .accessibilityLabel(SQElision.apply(String(localized: "Voir le profil de \(comment.author.displayName)"), name: comment.author.displayName))
             .accessibilityIdentifier("comment.author.\(comment.id)")
         } else {
             content()

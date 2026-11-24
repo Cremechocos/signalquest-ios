@@ -1113,7 +1113,7 @@ struct SignalQuestHomeView: View {
                                 StoryBubble(story: item.story, viewed: item.viewed)
                             }
                             .buttonStyle(.plain)
-                            .accessibilityLabel("Story de \(item.story.author.displayName)")
+                            .accessibilityLabel(SQElision.apply(String(localized: "Story de \(item.story.author.displayName)"), name: item.story.author.displayName))
                             .accessibilityValue(item.viewed ? "Déjà vue" : "Pas encore vue")
                             .accessibilityHint("Ouvre le fil")
                         }

@@ -2831,7 +2831,7 @@ struct ConversationDetailView: View {
         // « Photo envoyée » se disait aussi des photos reçues (SOC-31).
         .accessibilityLabel(mine
             ? String(localized: "Ta photo")
-            : String(localized: "Photo de \(message.sender?.displayName ?? MemberIdentity.someone)"))
+            : SQElision.apply(String(localized: "Photo de \(message.sender?.displayName ?? MemberIdentity.someone)"), name: message.sender?.displayName ?? MemberIdentity.someone))
         .accessibilityHint("Toucher pour afficher en plein écran")
     }
 

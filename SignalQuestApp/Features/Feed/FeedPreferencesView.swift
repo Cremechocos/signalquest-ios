@@ -127,7 +127,7 @@ struct FeedPreferencesView: View {
                                     .font(SQType.subhead(.semibold))
                                     .foregroundStyle(SQColor.accentInk)
                                     .frame(minHeight: 44)
-                                    .accessibilityLabel(Text("Afficher de nouveau les stories de \(entry.displayName)"))
+                                    .accessibilityLabel(Text(SQElision.apply(String(localized: "Afficher de nouveau les stories de \(entry.displayName)"), name: entry.displayName)))
                                 }
                                 .padding(.horizontal, SQSpace.md)
                                 .frame(minHeight: 52)

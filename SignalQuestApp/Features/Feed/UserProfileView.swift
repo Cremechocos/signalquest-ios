@@ -1054,7 +1054,7 @@ struct UserProfileView: View {
                     postNotificationsOption(option, current: level)
                 }
             } header: {
-                Text("Notifications des posts de \(profile.displayName)")
+                Text(SQElision.apply(String(localized: "Notifications des posts de \(profile.displayName)"), name: profile.displayName))
             }
             Section {
                 postNotificationsOption(.off, current: level)
@@ -1070,8 +1070,8 @@ struct UserProfileView: View {
         }
         .disabled(model.isSettingPostNotifications)
         .accessibilityLabel(level == .off
-            ? String(localized: "Activer les notifications des posts de \(profile.displayName)")
-            : String(localized: "Notifications des posts de \(profile.displayName) : \(level.label)"))
+            ? SQElision.apply(String(localized: "Activer les notifications des posts de \(profile.displayName)"), name: profile.displayName)
+            : SQElision.apply(String(localized: "Notifications des posts de \(profile.displayName) : \(level.label)"), name: profile.displayName))
         .accessibilityIdentifier("profile.postNotifications.bell")
     }
 
@@ -1098,7 +1098,9 @@ struct UserProfileView: View {
         }
         .sqLikePop(trigger: model.followPopTick)
         .disabled(model.isTogglingFollow)
-        .accessibilityLabel(profile.isFollowing ? "Se désabonner de \(profile.displayName)" : "Suivre \(profile.displayName)")
+        .accessibilityLabel(profile.isFollowing
+            ? SQElision.apply(String(localized: "Se désabonner de \(profile.displayName)"), name: profile.displayName)
+            : String(localized: "Suivre \(profile.displayName)"))
     }
 
     // MARK: Posts
@@ -1667,7 +1669,9 @@ struct MemberFollowListView: View {
         .buttonStyle(.plain)
         .sqLikePop(trigger: person.following)
         .disabled(model.followBusyIds.contains(person.id))
-        .accessibilityLabel(person.following ? Text("Se désabonner de \(person.displayName)") : Text("Suivre \(person.displayName)"))
+        .accessibilityLabel(person.following
+                ? Text(SQElision.apply(String(localized: "Se désabonner de \(person.displayName)"), name: person.displayName))
+                : Text("Suivre \(person.displayName)"))
         .accessibilityIdentifier("followlist.follow.\(person.id)")
     }
 }

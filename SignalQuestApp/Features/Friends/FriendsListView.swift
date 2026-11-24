@@ -210,7 +210,7 @@ struct FriendsListView: View {
                                     .contentShape(Rectangle())
                             }
                             .buttonStyle(SQPressButtonStyle())
-                            .accessibilityHint("Ouvre le profil de \(friend.displayName)")
+                            .accessibilityHint(SQElision.apply(String(localized: "Ouvre le profil de \(friend.displayName)"), name: friend.displayName))
                             .accessibilityValue(friend.presence?.isOnline == true ? Text("En ligne") : Text(verbatim: ""))
                             writeButton(friend)
                         }
@@ -406,7 +406,7 @@ struct FriendsListView: View {
             }
             .buttonStyle(SQPressButtonStyle())
             .disabled(request.user == nil)
-            .accessibilityHint("Ouvre le profil de \(name)")
+            .accessibilityHint(SQElision.apply(String(localized: "Ouvre le profil de \(name)"), name: name))
             Spacer(minLength: SQSpace.sm)
             compactButton("Accepter", label: String(localized: "Accepter \(name)"), accented: true) {
                 Task { await model.accept(request) }

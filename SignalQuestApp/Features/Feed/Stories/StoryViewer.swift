@@ -250,7 +250,7 @@ struct StoryViewer: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Voir le profil de \(story.author.displayName)")
+                .accessibilityLabel(SQElision.apply(String(localized: "Voir le profil de \(story.author.displayName)"), name: story.author.displayName))
             }
             Spacer()
             // Feuille d'actions plutôt qu'un menu : son ouverture se voit, et la
@@ -267,7 +267,7 @@ struct StoryViewer: View {
                 }
                 .accessibilityLabel("Plus d’options")
                 .accessibilityIdentifier("story.more")
-                .confirmationDialog("Story de \(story.author.displayName)", isPresented: $showStoryActions, titleVisibility: .hidden) {
+                .confirmationDialog(SQElision.apply(String(localized: "Story de \(story.author.displayName)"), name: story.author.displayName), isPresented: $showStoryActions, titleVisibility: .hidden) {
                     if story.isMine == true {
                         // La feuille d'actions vaut confirmation, comme dans Photos.
                         Button("Supprimer la story", role: .destructive) {
@@ -277,7 +277,7 @@ struct StoryViewer: View {
                         }
                     }
                     if story.isMine != true, let onHideAuthor {
-                        Button("Masquer les stories de \(story.author.displayName)") { onHideAuthor(story) }
+                        Button(SQElision.apply(String(localized: "Masquer les stories de \(story.author.displayName)"), name: story.author.displayName)) { onHideAuthor(story) }
                     }
                     if story.isMine != true, reports != nil {
                         Button("Signaler la story", role: .destructive) { reportedStory = story }
@@ -575,9 +575,9 @@ struct StoryViewer: View {
     /// Label VoiceOver du média d'une story (aucun n'existait auparavant, A11Y-04).
     private func mediaLabel(for story: SocialStory) -> String {
         if let text = story.text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
-            return String(localized: "Story de \(story.author.displayName) : \(text)")
+            return SQElision.apply(String(localized: "Story de \(story.author.displayName) : \(text)"), name: story.author.displayName)
         }
-        return String(localized: "Story de \(story.author.displayName)")
+        return SQElision.apply(String(localized: "Story de \(story.author.displayName)"), name: story.author.displayName)
     }
 
     private func forward() {

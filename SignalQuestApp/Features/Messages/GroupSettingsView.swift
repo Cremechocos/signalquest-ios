@@ -349,7 +349,7 @@ struct GroupSettingsView: View {
                         .frame(minWidth: 44, minHeight: 44)
                         .contentShape(Rectangle())
                 }
-                .accessibilityLabel("Options de \(participant.user.displayName)")
+                .accessibilityLabel(SQElision.apply(String(localized: "Options de \(participant.user.displayName)"), name: participant.user.displayName))
             }
         }
         .padding(.leading, SQSpace.md)

@@ -384,7 +384,7 @@ struct CardHeader: View {
                         onAuthorTap()
                     }
                     .accessibilityElement(children: .combine)
-                    .accessibilityAction(named: Text("Voir le profil de \(author.displayName)")) { onAuthorTap() }
+                    .accessibilityAction(named: Text(SQElision.apply(String(localized: "Voir le profil de \(author.displayName)"), name: author.displayName))) { onAuthorTap() }
             } else {
                 authorBlock
                     .accessibilityElement(children: .combine)

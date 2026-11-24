@@ -412,3 +412,46 @@ enum SQEnglishSpelling: String, Sendable {
         }
     }
 }
+
+// MARK: - Élision de « de » devant un nom (IOS-039)
+
+/// « Story de Inès » devient « Story d’Inès ». Le catalogue garde une seule clé
+/// (« Story de %@ ») ; l'élision se fait sur le texte déjà traduit, qui ne contient
+/// « de Nom » qu'en français : l'anglais n'est jamais touché. Règle commune à iOS,
+/// Android et au site (24/11) : voyelle avec ou sans accent, œ ou æ ; y seulement
+/// devant une consonne (« d’Yves », « de Yasmine ») ; jamais devant h, un chiffre,
+/// un symbole ou un @. Pour les noms de membres et d'opérateurs, pas les lieux ni
+/// les libellés libres, qui demandent un article.
+enum SQElision {
+    static func elides(_ name: String) -> Bool {
+        let letters = name.drop(while: \.isWhitespace).prefix(2).map { base($0) }
+        guard let first = letters.first else { return false }
+        if vowels.contains(first) { return true }
+        guard first == "y", letters.count == 2 else { return false }
+        let second = letters[1]
+        return second.isLetter && !vowels.contains(second) && second != "y"
+    }
+
+    /// Le premier « de Nom » (ou « De Nom ») du texte devient « d’Nom » quand le nom s'élide.
+    static func apply(_ text: String, name: String) -> String {
+        guard !name.isEmpty, elides(name) else { return text }
+        for (article, elided) in [("de ", "d’"), ("De ", "D’")] {
+            var start = text.startIndex
+            while let range = text.range(of: article + name, range: start..<text.endIndex) {
+                let atWordStart = range.lowerBound == text.startIndex
+                    || !text[text.index(before: range.lowerBound)].isLetter
+                if atWordStart { return text.replacingCharacters(in: range, with: elided + name) }
+                start = range.upperBound
+            }
+        }
+        return text
+    }
+
+    private static let vowels: Set<Character> = ["a", "e", "i", "o", "u", "œ", "æ"]
+
+    /// Lettre minuscule sans accent (« É » → « e ») ; œ et æ restent tels quels.
+    private static func base(_ character: Character) -> Character {
+        let folded = String(character).folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "fr_FR"))
+        return folded.first ?? character
+    }
+}

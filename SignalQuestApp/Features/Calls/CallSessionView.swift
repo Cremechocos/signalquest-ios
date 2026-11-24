@@ -352,7 +352,7 @@ struct CallScreen: View {
         }
         .clipped()
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Vidéo de \(remote.displayName)")
+        .accessibilityLabel(SQElision.apply(String(localized: "Vidéo de \(remote.displayName)"), name: remote.displayName))
     }
 #endif
 
@@ -519,7 +519,7 @@ struct PeerNetworkCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.xs) {
             HStack(spacing: SQSpace.sm) {
-                Text(name.map { String(localized: "Réseau de \($0), en direct") } ?? String(localized: "Réseau d’un participant, en direct"))
+                Text(name.map { SQElision.apply(String(localized: "Réseau de \($0), en direct"), name: $0) } ?? String(localized: "Réseau d’un participant, en direct"))
                     .sqKicker()
                 Spacer(minLength: SQSpace.sm)
                 // Le point vert : la carte se met à jour tant que l'autre partage.

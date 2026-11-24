@@ -249,8 +249,8 @@ struct SharedPostEmbedBubble: View {
         let text = String(bodyText(item).trimmingCharacters(in: .whitespacesAndNewlines).prefix(160))
         let author = item.author.displayName
         return text.isEmpty
-            ? String(localized: "Publication de \(author)")
-            : String(localized: "Publication de \(author) : \(text)")
+            ? SQElision.apply(String(localized: "Publication de \(author)"), name: author)
+            : SQElision.apply(String(localized: "Publication de \(author) : \(text)"), name: author)
     }
 
     private func header(_ item: UnifiedSocialFeedItem) -> some View {

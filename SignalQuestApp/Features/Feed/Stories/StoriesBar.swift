@@ -25,14 +25,14 @@ struct StoriesBar: View {
                         StoryBubble(story: story, viewed: isViewed(story))
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Story de \(story.author.displayName)")
+                    .accessibilityLabel(SQElision.apply(String(localized: "Story de \(story.author.displayName)"), name: story.author.displayName))
                     .accessibilityValue(isViewed(story) ? "Déjà vue" : "Pas encore vue")
                     .contextMenu {
                         if story.isMine != true, let onHide {
                             Button {
                                 onHide(story)
                             } label: {
-                                Label("Masquer les stories de \(story.author.displayName)", systemImage: "eye.slash")
+                                Label(SQElision.apply(String(localized: "Masquer les stories de \(story.author.displayName)"), name: story.author.displayName), systemImage: "eye.slash")
                             }
                         }
                     }

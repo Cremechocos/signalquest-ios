@@ -1138,7 +1138,7 @@ struct SessionDetailView: View {
                         RadioLogActionButton(label: "Détails", ghost: true) {
                             validationTarget = ValidationTarget(siteId: siteId, operatorName: antenna.operatorName)
                         }
-                        .accessibilityLabel(Text("Validations de \(Self.antennaTitle(antenna))"))
+                        .accessibilityLabel(Text(SQElision.apply(String(localized: "Validations de \(Self.antennaTitle(antenna))"), name: Self.antennaTitle(antenna))))
                         .accessibilityIdentifier("sessionDetail.antenna.details")
                     }
                 }

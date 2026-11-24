@@ -46,17 +46,17 @@ struct E2EEV2ThreadPresentation: Equatable {
             case .waitingForEpoch:
                 return String(localized: "En attente de la clé de cette conversation chiffrée.")
             case .deviceRefused(_, let name?):
-                return String(localized: "Un appareil de \(name) ne figure pas tel quel dans le journal des appareils : la conversation passe à une nouvelle clé sans lui.")
+                return SQElision.apply(String(localized: "Un appareil de \(name) ne figure pas tel quel dans le journal des appareils : la conversation passe à une nouvelle clé sans lui."), name: name)
             case .deviceRefused(_, nil):
                 return String(localized: "Un appareil d’un membre ne figure pas tel quel dans le journal des appareils : la conversation passe à une nouvelle clé sans lui.")
             case .keyUnverified:
                 return String(localized: "Une clé de cette conversation n’a pas pu être vérifiée : elle est remplacée par une nouvelle.")
             case .devicesChanged(_, let name?):
-                return String(localized: "Les appareils de \(name) ont changé.")
+                return SQElision.apply(String(localized: "Les appareils de \(name) ont changé."), name: name)
             case .devicesChanged(_, nil):
                 return String(localized: "Les appareils d’un membre ont changé.")
             case .logMismatch(_, let name?):
-                return String(localized: "Le journal des appareils de \(name) ne correspond pas : rien ne lui est envoyé.")
+                return SQElision.apply(String(localized: "Le journal des appareils de \(name) ne correspond pas : rien ne lui est envoyé."), name: name)
             case .logMismatch(_, nil):
                 return String(localized: "Le journal des appareils d’un membre ne correspond pas : rien ne lui est envoyé.")
             }

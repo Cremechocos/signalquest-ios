@@ -1177,7 +1177,7 @@ struct FeedView: View {
         presentedStoryStart = nil
         Haptics.light()
         inAppNotifications.showUndo(
-            body: String(localized: "Tu ne verras plus les stories de \(author.displayName)."),
+            body: SQElision.apply(String(localized: "Tu ne verras plus les stories de \(author.displayName)."), name: author.displayName),
             actionLabel: String(localized: "Annuler")
         ) {
             HiddenStoryAuthorsStore.unhide(authorId: author.id)
@@ -1612,7 +1612,7 @@ struct FeedView: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Voir le profil de \(author.displayName)")
+                        .accessibilityLabel(SQElision.apply(String(localized: "Voir le profil de \(author.displayName)"), name: author.displayName))
                         .accessibilityIdentifier("feed.empty.suggestion")
                     }
                 }
@@ -1733,7 +1733,7 @@ struct FeedView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(Text("Photo de \(tile.item.author.displayName)"))
+                .accessibilityLabel(Text(SQElision.apply(String(localized: "Photo de \(tile.item.author.displayName)"), name: tile.item.author.displayName)))
                 .onAppear {
                     // La grille n'a pas de cartes : c'est sa dernière tuile qui demande la suite.
                     if tile.id == tiles.last?.id {

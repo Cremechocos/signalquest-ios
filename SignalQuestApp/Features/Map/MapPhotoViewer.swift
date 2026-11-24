@@ -440,7 +440,7 @@ struct MapPhotoViewer: View {
         let author = photo?.authorName ?? current?.authorName
         let date = photo?.uploadedAt ?? photo?.createdAt ?? current?.date
         var parts: [String] = []
-        if let author, !author.isEmpty { parts.append(String(localized: "Photo de \(author)")) }
+        if let author, !author.isEmpty { parts.append(SQElision.apply(String(localized: "Photo de \(author)"), name: author)) }
         if let date { parts.append(date.formatted(date: .abbreviated, time: .omitted)) }
         return parts.isEmpty ? String(localized: "Photo") : parts.joined(separator: " · ")
     }
