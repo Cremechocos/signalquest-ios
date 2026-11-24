@@ -114,6 +114,41 @@ final class EncryptedConversationSurfacesTests: XCTestCase {
         XCTAssertFalse(applies(encrypted, writesEnabled: false), "Écriture v2 fermée : rien ne part")
     }
 
+    /// IOS-016 : un nouvel appareil sans sauvegarde d'historique ne lit pas les messages
+    /// d'avant lui ; l'état vide le dit seulement si le serveur en annonce un.
+    func testEmptyThreadSaysEarlierMessagesAreUnreadableOnlyWhenTheServerHasOne() {
+        typealias Surfaces = EncryptedConversationSurfaces
+        var withHistory = conversation("conversation_history_01J7AB", encrypted: true)
+        withHistory.e2eeV2 = E2EEV2ConversationListState(
+            lastMessage: .init(envelopeId: "env_01J7AB", senderUserId: "user_peer_01J7AB", serverTime: nil), unreadCount: 1
+        )
+        let empty = conversation("conversation_empty_01J7AB", encrypted: true)
+        XCTAssertTrue(Surfaces.showsEarlierMessagesUnreadable(withHistory, readableCount: 0))
+        XCTAssertFalse(Surfaces.showsEarlierMessagesUnreadable(withHistory, readableCount: 2), "Des messages se lisent : pas d'état vide")
+        XCTAssertFalse(Surfaces.showsEarlierMessagesUnreadable(empty, readableCount: 0), "Vraiment vide : « Aucun message pour l'instant »")
+    }
+
+    /// IOS-011 : la feuille de partage d'une photo titrait « Alexandre, Camille Durand »
+    /// et prenait l'avatar du premier participant, qui pouvait être le sien.
+    func testShareSheetRowShowsThePeerNameAndAvatarNeverYourOwn() {
+        func member(_ id: String, _ name: String, _ avatar: String) -> ConversationParticipant {
+            ConversationParticipant(
+                userId: id, role: "member", joinedAt: nil, lastReadAt: nil,
+                user: MessageUser(id: id, name: name, email: "", avatarUrl: URL(string: avatar)), presence: nil
+            )
+        }
+        let direct = MessageConversation(
+            id: "conversation_direct_01J7AB", title: nil, isGroup: false, e2eeEnabled: true, groupPhotoUrl: nil,
+            createdAt: nil, updatedAt: nil, lastMessageAt: nil, lastReadAt: nil, pinnedAt: nil,
+            participants: [member("user_me_01J7AB", "Moi", "https://example.org/me.jpg"),
+                           member("user_peer_01J7AB", "Camille", "https://example.org/peer.jpg")],
+            lastMessage: nil
+        )
+        XCTAssertEqual(direct.displayTitle(excluding: "user_me_01J7AB"), "Camille")
+        XCTAssertEqual(direct.displayAvatarURL(excluding: "user_me_01J7AB")?.lastPathComponent, "peer.jpg")
+        XCTAssertEqual(direct.displayAvatarURL(excluding: nil)?.lastPathComponent, "me.jpg", "Sans compte connu : le premier, comme avant")
+    }
+
     private func conversation(_ id: String, encrypted: Bool) -> MessageConversation {
         MessageConversation(
             id: id, title: "Fixture", isGroup: false, e2eeEnabled: encrypted, groupPhotoUrl: nil, createdAt: nil,

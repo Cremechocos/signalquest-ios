@@ -39,6 +39,14 @@ enum EncryptedConversationSurfaces {
         isEncrypted && v2Resolved && !isV2 && !legacyUnlocked
     }
 
+    /// IOS-016 (choix d'Alexandre du 24/11 : « Texte explicite ») : le serveur
+    /// annonce un dernier message chiffré, mais cet appareil n'en lit aucun
+    /// (connecté après eux, sans sauvegarde d'historique). L'état vide le dit au
+    /// lieu de « Aucun message pour l'instant ».
+    static func showsEarlierMessagesUnreadable(_ conversation: MessageConversation, readableCount: Int) -> Bool {
+        readableCount == 0 && conversation.e2eeV2?.lastMessage != nil
+    }
+
     /// Fils, rappels, enregistrés et épingles passent par les routes v1 : ni une
     /// bulle encore locale ni un identifiant v2 (`messageRef`) n'y sont connus.
     static func allowsServerActions(messageId: String, isV2: Bool) -> Bool {

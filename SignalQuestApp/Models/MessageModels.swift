@@ -359,6 +359,14 @@ struct MessageConversation: Decodable, Identifiable, Equatable {
         return names.joined(separator: ", ")
     }
 
+    /// Avatar d'affichage : la photo du groupe, sinon celle du premier autre
+    /// participant — jamais la sienne quand on connaît le compte courant (IOS-011).
+    func displayAvatarURL(excluding currentUserId: String?) -> URL? {
+        if let groupPhotoUrl { return groupPhotoUrl }
+        let other = participants.first { currentUserId == nil || $0.userId != currentUserId }
+        return (other ?? participants.first)?.user.avatarUrl
+    }
+
     /// Badges de l'INTERLOCUTEUR, en tête-à-tête seulement.
     ///
     /// Dans un groupe, empiler les badges de tous les participants à côté du nom

@@ -125132,6 +125132,54 @@
           }
         }
       }
+    },
+    "Messages d’avant cet appareil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messages from before this device"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messages d’avant cet appareil"
+          }
+        }
+      }
+    },
+    "Les messages envoyés avant la connexion de cet appareil ne peuvent pas être lus ici. Les nouveaux s’afficheront normalement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messages sent before this device was signed in can’t be read here. New messages will show up as usual."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les messages envoyés avant la connexion de cet appareil ne peuvent pas être lus ici. Les nouveaux s’afficheront normalement."
+          }
+        }
+      }
+    },
+    "Voir le profil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View profile"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir le profil"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

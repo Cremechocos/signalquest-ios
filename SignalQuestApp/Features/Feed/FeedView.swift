@@ -2168,7 +2168,7 @@ struct PostShareSheet: View {
             Task { await share(conversation) }
         } label: {
             HStack(spacing: SQSpace.md) {
-                SQAvatar(url: conversation.groupPhotoUrl ?? conversation.participants.first?.user.avatarUrl, name: title(of: conversation), size: 36)
+                SQAvatar(url: conversation.displayAvatarURL(excluding: LocalAccountScope.currentUserId), name: title(of: conversation), size: 36)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title(of: conversation).isEmpty ? "Conversation" : title(of: conversation))
                         .font(SQType.body(.bold))

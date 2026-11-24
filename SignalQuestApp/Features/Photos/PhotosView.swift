@@ -1598,13 +1598,15 @@ struct PhotoShareSheet: View {
                             Task { await share(conversation) }
                         } label: {
                             HStack(spacing: SQSpace.md) {
+                                // IOS-011 : sans soi-même, comme la liste des messages et la feuille des publications.
+                                let title = conversation.displayTitle(excluding: LocalAccountScope.currentUserId)
                                 SQAvatar(
-                                    url: conversation.groupPhotoUrl ?? conversation.participants.first?.user.avatarUrl,
-                                    name: conversation.displayTitle,
+                                    url: conversation.displayAvatarURL(excluding: LocalAccountScope.currentUserId),
+                                    name: title,
                                     size: 40
                                 )
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(conversation.displayTitle.isEmpty ? String(localized: "Conversation") : conversation.displayTitle)
+                                    Text(title.isEmpty ? String(localized: "Conversation") : title)
                                         .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
                                         .foregroundStyle(SQColor.label)
                                     Text(isE2EE ? String(localized: "Chiffrée · partage indisponible")

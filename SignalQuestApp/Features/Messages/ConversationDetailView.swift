@@ -216,6 +216,8 @@ struct ConversationDetailView: View {
     /// Enveloppe du dernier message reçu en v2 : de quoi accuser « distribué » depuis le fil (U05).
     @State private var v2LastIncomingEnvelopeId: String?
     @State private var showSearch = false
+    /// IOS-021 : profil de l'autre personne, depuis l'en-tête ou le menu ⋯ (conversation à deux).
+    @State private var showPeerProfile = false
     @State private var showScheduled = false
     @State private var showReminders = false
     @State private var showSaved = false
@@ -599,12 +601,21 @@ struct ConversationDetailView: View {
                                         .padding(.vertical, SQSpace.xl)
                                 }
                             } else if errorMessage == nil, v2Notices.isEmpty {
-                                EmptyStateView(
-                                    title: "Aucun message pour l’instant",
-                                    message: "Les messages de cette conversation apparaîtront ici.",
-                                    systemImage: "bubble.left.and.bubble.right"
-                                )
-                                .accessibilityIdentifier("conversation.empty")
+                                if EncryptedConversationSurfaces.showsEarlierMessagesUnreadable(conversation, readableCount: messages.count) {
+                                    EmptyStateView(
+                                        title: "Messages d’avant cet appareil",
+                                        message: "Les messages envoyés avant la connexion de cet appareil ne peuvent pas être lus ici. Les nouveaux s’afficheront normalement.",
+                                        systemImage: "lock.rotation"
+                                    )
+                                    .accessibilityIdentifier("conversation.earlierUnreadable")
+                                } else {
+                                    EmptyStateView(
+                                        title: "Aucun message pour l’instant",
+                                        message: "Les messages de cette conversation apparaîtront ici.",
+                                        systemImage: "bubble.left.and.bubble.right"
+                                    )
+                                    .accessibilityIdentifier("conversation.empty")
+                                }
                             }
                         }
                         // PERF-MSG-04 — Itère directement sur `messages` (identité
@@ -936,6 +947,11 @@ struct ConversationDetailView: View {
         }
         .navigationDestination(isPresented: $showMedia) {
             ConversationMediaView(conversation: conversation, service: service, subtitle: conversationTitle)
+        }
+        .navigationDestination(isPresented: $showPeerProfile) {
+            if let peerId = otherParticipantId {
+                UserProfileView(userId: peerId, service: services.feed)
+            }
         }
         .navigationDestination(isPresented: $showScheduled) {
             ScheduledMessagesView(conversation: conversation, service: service, e2ee: e2ee, subtitle: conversationTitle, usesV2: usesV2)
@@ -1431,6 +1447,7 @@ struct ConversationDetailView: View {
                 }
             }
             .accessibilityElement(children: .combine)
+            .modifier(PeerProfileAction(isEnabled: otherParticipantId != nil) { showPeerProfile = true })
             .modifier(EncryptionInfoAction(isEnabled: isE2EE) { showEncryptionInfo = true })
             .sheet(isPresented: $showEncryptionInfo) { SQGlossarySheet(term: .endToEndEncryption) }
 
@@ -1477,6 +1494,11 @@ struct ConversationDetailView: View {
             }
 
             Menu {
+                if otherParticipantId != nil {
+                    Button { showPeerProfile = true } label: {
+                        Label("Voir le profil", systemImage: "person.crop.circle")
+                    }
+                }
                 Button { showSearch = true } label: {
                     Label("Rechercher", systemImage: "magnifyingglass")
                 }
@@ -6734,6 +6756,28 @@ private struct LiveShareMapPoint: Identifiable {
 /// Suppression demandée depuis le menu d'un message, en attente de confirmation.
 /// Action VoiceOver nommée de l'en-tête d'une conversation chiffrée : l'explication
 /// du chiffrement, aussi disponible dans le menu ⋯.
+/// IOS-021 (choix d'Alexandre du 24/11 : « En-tête + menu ») : dans une conversation
+/// à deux, toucher l'avatar ou le nom ouvre le profil de l'autre personne ; VoiceOver
+/// l'expose en action par défaut. Rien pour un groupe.
+private struct PeerProfileAction: ViewModifier {
+    let isEnabled: Bool
+    let action: () -> Void
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isEnabled {
+            content
+                .contentShape(Rectangle())
+                .onTapGesture(perform: action)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityHint(Text("Ouvre son profil"))
+                .accessibilityAction(.default, action)
+        } else {
+            content
+        }
+    }
+}
+
 private struct EncryptionInfoAction: ViewModifier {
     let isEnabled: Bool
     let action: () -> Void
