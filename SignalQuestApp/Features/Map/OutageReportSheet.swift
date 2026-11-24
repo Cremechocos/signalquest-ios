@@ -104,6 +104,14 @@ struct OutageReportSheet: View {
         .task {
             restoreDraft()
             measureDistance()
+            // Sans position récente (app ouverte droit sur la carte, cache expiré), le
+            // signalement partait « position inconnue » et le serveur le refusait près du
+            // site (IOS-045). Une position est demandée, sans jamais poser la question
+            // d'autorisation depuis cette feuille ; `$lastLocation` remesure à son arrivée.
+            if services.location.cachedLocation() == nil,
+               LocationFixPolicy.isAuthorized(services.location.authorizationStatus) {
+                _ = await services.location.currentLocation(timeoutSeconds: 8)
+            }
         }
         .onReceive(services.location.$lastLocation) { _ in measureDistance() }
         .onChangeCompat(of: draft) { _, _ in scheduleDraftSave() }

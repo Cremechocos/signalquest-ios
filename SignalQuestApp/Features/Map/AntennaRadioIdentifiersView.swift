@@ -336,41 +336,42 @@ struct FlowLayout: Layout {
     var spacing: CGFloat = 6
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let maxWidth = proposal.width ?? .infinity
-        var lineWidth: CGFloat = 0
-        var lineHeight: CGFloat = 0
-        var total = CGSize.zero
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if lineWidth > 0, lineWidth + spacing + size.width > maxWidth {
-                total.width = max(total.width, lineWidth)
-                total.height += lineHeight + spacing
-                lineWidth = size.width
-                lineHeight = size.height
-            } else {
-                lineWidth += (lineWidth > 0 ? spacing : 0) + size.width
-                lineHeight = max(lineHeight, size.height)
-            }
-        }
-        total.width = max(total.width, lineWidth)
-        total.height += lineHeight
-        return total
+        Self.arrange(subviews.map { $0.sizeThatFits(.unspecified) },
+                     maxWidth: proposal.width ?? .infinity, spacing: spacing).size
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var x = bounds.minX
-        var y = bounds.minY
+        // Les retours à la ligne viennent de la MÊME largeur que la mesure (la proposition),
+        // pas de `bounds`, que SwiftUI arrondit au pixel : un dernier élément qui tenait au
+        // point près passait à la ligne et chevauchait la vue suivante, mesurée pour une
+        // seule ligne (IOS-046, bandes d'un site).
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        let maxWidth = proposal.width ?? bounds.width
+        for (index, origin) in Self.arrange(sizes, maxWidth: maxWidth, spacing: spacing).origins.enumerated() {
+            subviews[index].place(at: CGPoint(x: bounds.minX + origin.x, y: bounds.minY + origin.y),
+                                  proposal: ProposedViewSize(sizes[index]))
+        }
+    }
+
+    /// Position de chaque élément et taille totale, pour une largeur donnée.
+    static func arrange(_ sizes: [CGSize], maxWidth: CGFloat, spacing: CGFloat) -> (origins: [CGPoint], size: CGSize) {
+        var origins: [CGPoint] = []
+        var x: CGFloat = 0
+        var y: CGFloat = 0
         var lineHeight: CGFloat = 0
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if x > bounds.minX, x + size.width > bounds.maxX {
-                x = bounds.minX
+        var width: CGFloat = 0
+        for size in sizes {
+            if x > 0, x + spacing + size.width > maxWidth {
                 y += lineHeight + spacing
+                x = 0
                 lineHeight = 0
             }
-            subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
-            x += size.width + spacing
+            if x > 0 { x += spacing }
+            origins.append(CGPoint(x: x, y: y))
+            x += size.width
             lineHeight = max(lineHeight, size.height)
+            width = max(width, x)
         }
+        return (origins, CGSize(width: width, height: y + lineHeight))
     }
 }

@@ -169,4 +169,18 @@ final class FhAzimuthsTests: XCTestCase {
         """).core)
         XCTAssertFalse(legacy.isDistributedSystem)
     }
+
+    /// IOS-046 : la disposition en flux coupe ses lignes sur la largeur proposée. Des éléments
+    /// qui remplissent la ligne au point près y restent ; un de trop passe à la ligne, et la
+    /// hauteur annoncée compte bien deux lignes.
+    func testFlowLayoutKeepsAnExactFitOnOneLineAndCountsWrappedLines() {
+        let chip = CGSize(width: 30, height: 20)
+        let exact = FlowLayout.arrange([chip, chip, chip], maxWidth: 100, spacing: 5)
+        XCTAssertEqual(exact.size, CGSize(width: 100, height: 20))
+        XCTAssertEqual(exact.origins.map(\.y), [0, 0, 0])
+        let wrapped = FlowLayout.arrange([chip, chip, chip], maxWidth: 99, spacing: 5)
+        XCTAssertEqual(wrapped.origins.map(\.y), [0, 0, 25])
+        XCTAssertEqual(wrapped.size.height, 45)
+        XCTAssertEqual(FlowLayout.arrange([], maxWidth: 100, spacing: 5).size, .zero)
+    }
 }
