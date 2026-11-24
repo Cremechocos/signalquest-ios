@@ -1,3 +1,4 @@
+import os
 import SwiftUI
 import UIKit
 import UserNotifications
@@ -151,7 +152,9 @@ struct AppRootView: View {
         // No-op au tout premier login (token pas encore livré).
         await services.callManager.registerVoIPTokenForSession()
         // Rattrape un appel entrant déjà en attente au moment où l'on devient authentifié.
-        await services.callManager.reconcilePendingIncomingCall()
+        if LaunchRefreshGate.shouldRun("pending-calls") {
+            await services.callManager.reconcilePendingIncomingCall()
+        }
     }
 
     private var signedInUser: AuthUser? {
@@ -247,7 +250,8 @@ struct AppRootView: View {
                     }
                 }
                 if case .authenticated = session.state {
-                    if let preferences = await addressStore.refresh(using: services.privacy) {
+                    if LaunchRefreshGate.shouldRun("preferences"),
+                       let preferences = await addressStore.refresh(using: services.privacy) {
                         unitsStore.apply(preferences.unitsSystem)
                         MapMarketStore.saveAccountDefault(preferences.defaultMarket)
                     }
@@ -256,11 +260,11 @@ struct AppRootView: View {
                 }
                 // La présence est indépendante des coordonnées : le mode local
                 // pilote seulement l'ajout de la position au heartbeat.
-                if case .authenticated = session.state {
+                if case .authenticated = session.state, LaunchRefreshGate.shouldRun("presence-settings") {
                     await services.livePresence.refreshSharingSettings()
                 }
                 // §14.2 : les conversations chiffrées prêtes passent en v2 sans attendre leur ouverture.
-                if case .authenticated = session.state {
+                if case .authenticated = session.state, LaunchRefreshGate.shouldRun("migrate-ready") {
                     await services.migrateReadyConversations()
                 }
             }
@@ -284,12 +288,15 @@ struct AppRootView: View {
                 }
                 if case .authenticated = newState {
                     // E2EE-AUTO §4.1 : l'appareil s'inscrit seul à la connexion.
-                    Task { await services.enrollE2EEAutoDevice() }
+                    if LaunchRefreshGate.shouldRun("e2ee-enroll") {
+                        Task { await services.enrollE2EEAutoDevice() }
+                    }
                     refreshEmailVerificationIfPossible()
                     services.epochRotations.resume()
                     appLock.lockOnActivationIfNeeded()
                     Task {
-                        if let preferences = await addressStore.refresh(using: services.privacy) {
+                        if LaunchRefreshGate.shouldRun("preferences"),
+                           let preferences = await addressStore.refresh(using: services.privacy) {
                             unitsStore.apply(preferences.unitsSystem)
                             MapMarketStore.saveAccountDefault(preferences.defaultMarket)
                         }
@@ -379,9 +386,13 @@ struct AppRootView: View {
                     // Le ton a pu changer depuis un autre appareil.
                     if case .authenticated = session.state {
                         // E2EE-AUTO §4.3 : rotation de la clé d'accord au premier plan.
-                        Task { await services.enrollE2EEAutoDevice() }
+                        if LaunchRefreshGate.shouldRun("e2ee-enroll") {
+                            Task { await services.enrollE2EEAutoDevice() }
+                        }
                         Task {
-                            await addressStore.refresh(using: services.privacy)
+                            if LaunchRefreshGate.shouldRun("preferences") {
+                                await addressStore.refresh(using: services.privacy)
+                            }
                             addressStore.applyTone()
                         }
                     }
@@ -390,10 +401,16 @@ struct AppRootView: View {
                     if case .authenticated = session.state {
                         Task {
                             await services.callManager.retryVoIPTokenRegistrationIfNeeded()
-                            await services.callManager.reconcilePendingIncomingCall()
-                            await services.livePresence.refreshSharingSettings()
-                            await services.push.refreshE2eeV2NotificationContext()
-                            await services.refreshEncryptedNotificationMirrors()
+                            if LaunchRefreshGate.shouldRun("pending-calls") {
+                                await services.callManager.reconcilePendingIncomingCall()
+                            }
+                            if LaunchRefreshGate.shouldRun("presence-settings") {
+                                await services.livePresence.refreshSharingSettings()
+                            }
+                            if LaunchRefreshGate.shouldRun("e2ee-notification-context") {
+                                await services.push.refreshE2eeV2NotificationContext()
+                                await services.refreshEncryptedNotificationMirrors()
+                            }
                         }
                     }
                     services.enterForeground()
@@ -635,7 +652,7 @@ struct RootView: View {
 
     /// `seq` annoncé par un push et pas encore atteint : relu au premier plan.
     private func readOwnDevicesAfterAddedPush() {
-        guard isAuthenticated, !AppEnvironment.usesDemoData else { return }
+        guard isAuthenticated, !AppEnvironment.usesDemoData, LaunchRefreshGate.shouldRun("own-devices") else { return }
         let services = services
         Task { await services.readOwnDevicesAfterAddedPush() }
     }
@@ -1535,6 +1552,27 @@ struct MainTabView: View {
         case "messages": router.route(toConversation: nil)
         case "community", "communaute": router.selectedTab = .community
         default: break
+        }
+    }
+}
+
+/// Au lancement à froid, la tâche de démarrage, l'arrivée de la session et le
+/// passage au premier plan demandaient chacun les mêmes relectures, à quelques
+/// secondes d'écart (audit IOS-051). Une relecture déjà faite pour la même
+/// session ne repart pas avant `window` ; une autre session, ou un retour au
+/// premier plan plus tard, repartent normalement.
+enum LaunchRefreshGate {
+    private static let lastRun = OSAllocatedUnfairLock<[String: ContinuousClock.Instant]>(initialState: [:])
+
+    static func shouldRun(_ key: String, window: Duration = .seconds(10),
+                          sessionId: String? = LocalAccountScope.sessionSnapshot()?.sessionId,
+                          now: ContinuousClock.Instant = ContinuousClock().now) -> Bool {
+        guard let sessionId else { return true }
+        let scoped = sessionId + "|" + key
+        return lastRun.withLock { runs in
+            if let previous = runs[scoped], now - previous < window { return false }
+            runs[scoped] = now
+            return true
         }
     }
 }

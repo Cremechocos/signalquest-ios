@@ -752,3 +752,21 @@ final class ConversationPinUnreadTests: XCTestCase {
         return result
     }
 }
+
+/// IOS-051 : au lancement à froid, trois déclencheurs demandaient les mêmes relectures.
+final class LaunchRefreshGateTests: XCTestCase {
+    func testTheSameRefreshRunsOncePerSessionWithinTheWindow() {
+        let start = ContinuousClock().now
+        let session = "session-" + UUID().uuidString
+        XCTAssertTrue(LaunchRefreshGate.shouldRun("preferences", sessionId: session, now: start))
+        XCTAssertFalse(LaunchRefreshGate.shouldRun("preferences", sessionId: session, now: start + .seconds(3)),
+                       "le deuxième déclencheur du lancement ne relit pas")
+        XCTAssertTrue(LaunchRefreshGate.shouldRun("presence-settings", sessionId: session, now: start + .seconds(3)),
+                      "une autre relecture a sa propre garde")
+        XCTAssertTrue(LaunchRefreshGate.shouldRun("preferences", sessionId: "other-" + session, now: start + .seconds(3)),
+                      "une nouvelle session relit tout de suite")
+        XCTAssertTrue(LaunchRefreshGate.shouldRun("preferences", sessionId: session, now: start + .seconds(11)),
+                      "un retour au premier plan plus tard relit")
+        XCTAssertTrue(LaunchRefreshGate.shouldRun("preferences", sessionId: nil, now: start), "sans session, pas de garde")
+    }
+}

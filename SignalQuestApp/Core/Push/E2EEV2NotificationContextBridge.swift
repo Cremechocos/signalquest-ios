@@ -72,13 +72,42 @@ struct E2EEV2NotificationContextBridgeDependencies: Sendable {
 /// account/preference change invalidates all earlier in-flight preparations.
 actor E2EEV2NotificationContextCoordinator {
     private var generation: UInt64 = 0
+    /// Audit IOS-051 : au lancement, l'inscription des notifications, l'arrivée du jeton
+    /// et le premier plan demandaient chacun ce contexte, et chaque demande relisait les
+    /// appareils et les conversations. Pour le même compte (session, jeton, aperçus, avis),
+    /// une demande de premier plan ou de préférences rejoint celle en cours, ou s'arrête
+    /// si le contexte vient d'être écrit ou confirmé. Identité et jeton relisent toujours.
+    private var running: (account: E2EEV2NotificationAccountSnapshot, task: Task<E2EEV2NotificationContextRefreshResult, Never>)?
+    private var settled: (account: E2EEV2NotificationAccountSnapshot, at: Date)?
+    static let reuseWindow: TimeInterval = 10
 
     func refreshRuntime(
         reason: E2EEV2NotificationContextRefreshReason,
         dependencies: E2EEV2NotificationContextBridgeDependencies
     ) async -> E2EEV2NotificationContextRefreshResult {
         guard E2EEV2ServerGate.autoActive else { return .dormant }
-        return await refreshContractPreview(reason: reason, dependencies: dependencies)
+        return await refreshShared(reason: reason, dependencies: dependencies)
+    }
+
+    func refreshShared(
+        reason: E2EEV2NotificationContextRefreshReason,
+        dependencies d: E2EEV2NotificationContextBridgeDependencies
+    ) async -> E2EEV2NotificationContextRefreshResult {
+        guard reason == .foreground || reason == .preferences, let account = d.snapshot() else {
+            settled = nil
+            return await refreshContractPreview(reason: reason, dependencies: d)
+        }
+        if let settled, settled.account == account {
+            let age = d.now().timeIntervalSince(settled.at)
+            if age >= 0, age < Self.reuseWindow { return .unchanged }
+        }
+        if let running, running.account == account { return await running.task.value }
+        let task = Task { await self.refreshContractPreview(reason: reason, dependencies: d) }
+        running = (account, task)
+        let result = await task.value
+        if running?.task == task { running = nil }
+        if result == .ready || result == .unchanged { settled = (account, d.now()) }
+        return result
     }
 
     func refreshContractPreview(

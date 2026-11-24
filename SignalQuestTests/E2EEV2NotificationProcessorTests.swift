@@ -594,6 +594,37 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
         XCTAssertEqual(try store.load(now: now)?.revisionId, revision)
     }
 
+    /// IOS-051 : les demandes de lancement pour le même compte ne relisent qu'une fois.
+    func testLaunchRefreshesOfTheSameAccountReadTheServerOnce() async throws {
+        let fixture = try fixture(), state = AccountBox(account(fixture)), reads = Counter()
+        let store = E2EEV2NotificationContextStore(tokenStore: InMemoryTokenStore())
+        let coordinator = E2EEV2NotificationContextCoordinator()
+        let dependencies = bridgeDependencies(fixture, state: state, store: store, approval: { _ in
+            reads.increment()
+            try? await Task.sleep(for: .milliseconds(100))
+            return .approved(fixture.descriptor)
+        })
+        async let first = coordinator.refreshShared(reason: .foreground, dependencies: dependencies)
+        async let second = coordinator.refreshShared(reason: .preferences, dependencies: dependencies)
+        async let third = coordinator.refreshShared(reason: .foreground, dependencies: dependencies)
+        let results = await [first, second, third]
+        XCTAssertEqual(results, [.ready, .ready, .ready])
+        let joined = await coordinator.refreshShared(reason: .foreground, dependencies: dependencies)
+        XCTAssertEqual(joined, .unchanged)
+        XCTAssertEqual(reads.count, 1)
+        var afterWindow = dependencies
+        afterWindow.now = { fixture.now.addingTimeInterval(E2EEV2NotificationContextCoordinator.reuseWindow) }
+        let expired = await coordinator.refreshShared(reason: .foreground, dependencies: afterWindow)
+        XCTAssertEqual(expired, .unchanged)
+        XCTAssertEqual(reads.count, 2)
+        let identity = await coordinator.refreshShared(reason: .identity, dependencies: afterWindow)
+        XCTAssertEqual(identity, .unchanged)
+        XCTAssertEqual(reads.count, 3)
+        state.set(account(fixture, privacy: .hidden))
+        let hidden = await coordinator.refreshShared(reason: .preferences, dependencies: afterWindow)
+        XCTAssertEqual(hidden, .hidden)
+    }
+
     func testChangedAccountDuringApprovalCannotPublish() async throws {
         let fixture = try fixture(), state = AccountBox(account(fixture))
         let store = E2EEV2NotificationContextStore(tokenStore: InMemoryTokenStore())
