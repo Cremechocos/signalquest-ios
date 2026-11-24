@@ -277,7 +277,6 @@ struct ANFRTrendSeries: Identifiable {
 // MARK: - View
 
 struct ANFRStatsView: View {
-    @EnvironmentObject private var services: AppServices
     @StateObject private var model: ANFRStatsViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dismiss) private var dismiss

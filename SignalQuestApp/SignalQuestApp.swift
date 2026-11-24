@@ -999,11 +999,6 @@ struct RootView: View {
             locked: appLock.isLocked, hasExternalRoute: router.hasPendingContentRoute || hasPriorityAuthRoute)
     }
 
-    private var onboardingGuestRequest: OnboardingEntryRequest? {
-        if case .guest(let request) = onboardingResolution { return request }
-        return nil
-    }
-
     private func consumeOnboardingDestination() {
         switch onboardingResolution {
         case .authenticated(let request):

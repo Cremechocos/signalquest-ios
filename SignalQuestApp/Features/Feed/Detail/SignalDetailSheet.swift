@@ -790,13 +790,6 @@ struct SignalDetailSheet: View {
         }
     }
 
-    private func coordinatesText(lat: Double?, lon: Double?) -> String {
-        guard let lat, let lon else { return "" }
-        // Le détail précis (5 décimales, environ 1 m) reste pour l'auteur ; les
-        // autres lecteurs voient la position arrondie (3 décimales, environ 100 m).
-        return String(format: item.canManage ? "%.5f, %.5f" : "%.3f, %.3f", lat, lon)
-    }
-
     private func loadExperienceDetailIfNeeded() async {
         guard let id = experience?.testId else { return }
         experienceState = .loading

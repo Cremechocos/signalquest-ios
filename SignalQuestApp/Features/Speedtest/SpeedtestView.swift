@@ -1913,12 +1913,6 @@ private func ms(_ value: Double?) -> String {
     return SQUnits.milliseconds(value)
 }
 
-/// Gigue : la règle de `SQUnits` (une décimale sous 10 ms), la même qu'au détail du test.
-private func jitterLabel(_ value: Double?) -> String {
-    guard let value else { return "—" }
-    return SQUnits.jitter(value)
-}
-
 // MARK: - Phase extensions
 
 // MARK: - Server picker (iPerf3 OVH + Bouygues)

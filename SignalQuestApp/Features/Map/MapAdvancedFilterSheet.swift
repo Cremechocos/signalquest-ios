@@ -28,7 +28,6 @@ extension MapFilterSelection {
 /// Feuille Filtres : seulement les réglages des couches affichées. Pays,
 /// opérateur et couches se choisissent dans la feuille Carte.
 struct MapAdvancedFilterSheet: View {
-    @State private var baseline: MapFilterSelection
     @State private var draft: MapFilterSelection
     @State private var applyError: String?
     private let dromRegion: DromRegion?
@@ -38,7 +37,6 @@ struct MapAdvancedFilterSheet: View {
 
     init(selection: MapFilterSelection, allMarkets: [MarketRegistryEntry],
          dromRegion: DromRegion?, onApply: @escaping (MapFilterSelection) -> Bool) {
-        _baseline = State(initialValue: selection)
         _draft = State(initialValue: selection)
         self.dromRegion = dromRegion
         self.allMarkets = allMarkets

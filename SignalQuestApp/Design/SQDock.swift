@@ -129,7 +129,6 @@ private struct SQDockPressStyle: ButtonStyle {
 /// racine de chaque onglet. iOS 18+ (API scroll geometry) ; no-op avant.
 /// Le dock se redéploie dès que la racine quitte l'écran (push, onglet).
 private struct SQDockAutoMinimize: ViewModifier {
-    @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var router: AppRouter
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Distance cumulée dans la direction courante : hystérésis pour qu'un

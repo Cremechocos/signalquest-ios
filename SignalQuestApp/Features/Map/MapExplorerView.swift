@@ -2825,14 +2825,6 @@ struct MapExplorerView: View {
     /// grand vide entre les boutons et la barre.
     private var mapControlsBottomInset: CGFloat { SQDock.floatingContentInset }
 
-    private static var forcesLegacyDock: Bool {
-        #if DEBUG
-        AppEnvironment.usesLegacyDock
-        #else
-        false
-        #endif
-    }
-
     /// Une seule rangée compacte ; les réglages et explications s'ouvrent au toucher.
     /// Les grandes tailles de texte se replient sans réduire les cibles tactiles.
     private var mapBottomControls: some View {

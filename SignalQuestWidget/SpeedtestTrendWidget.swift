@@ -33,7 +33,6 @@ struct SpeedtestTrendProvider: TimelineProvider {
 
 struct SpeedtestTrendEntryView: View {
     var entry: SpeedtestTrendEntry
-    @Environment(\.colorScheme) private var scheme
 
     private var series: [SpeedtestWidgetSnapshot] {
         // Du plus ancien au plus récent pour lire le graphique de gauche à droite.

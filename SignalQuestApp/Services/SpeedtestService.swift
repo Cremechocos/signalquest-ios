@@ -5441,12 +5441,6 @@ class StreamReceiver: @unchecked Sendable {
 
 // MARK: - Helpers
 
-private func boundedMbps(bytes: Int, durationMs: Double) -> Double {
-    guard bytes > 0, durationMs > 0 else { return 0 }
-    let mbps = (Double(bytes) * 8.0 / 1_000_000.0) / (durationMs / 1_000)
-    return mbps.isFinite && mbps >= 0 ? mbps : 0
-}
-
 /// Échelle de repli de l'upload, du plus ambitieux au plus prudent.
 ///
 /// Fonction libre pour rester testable : la configuration du moteur est `private`, et

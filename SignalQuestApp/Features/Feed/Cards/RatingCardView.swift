@@ -18,7 +18,6 @@ struct RatingCardView: View {
 
     private var signal: SocialSignalSummary? { item.signal }
     private var stars: Int { max(0, min(5, signal?.ratingStars ?? 0)) }
-    private var accent: Color { TechAccent.color(for: signal?.technology) }
 
     var body: some View {
         Button(action: onTap) {

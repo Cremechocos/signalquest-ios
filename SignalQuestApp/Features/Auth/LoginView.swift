@@ -29,7 +29,6 @@ struct LoginView: View {
 
     @EnvironmentObject private var session: AuthSessionViewModel
     @EnvironmentObject private var services: AppServices
-    @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var onboardingEntry: OnboardingEntryState
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme

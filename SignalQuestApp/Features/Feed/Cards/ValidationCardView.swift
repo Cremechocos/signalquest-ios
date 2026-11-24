@@ -17,7 +17,6 @@ struct ValidationCardView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var signal: SocialSignalSummary? { item.signal }
-    private var accent: Color { TechAccent.color(for: signal?.technology) }
 
     var body: some View {
         Button(action: onTap) {
