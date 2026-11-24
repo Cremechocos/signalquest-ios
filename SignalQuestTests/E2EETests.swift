@@ -4703,6 +4703,44 @@ final class SocialPostOutboxTests: XCTestCase {
         XCTAssertTrue(afterReplay.isEmpty)
     }
 
+    /// IOS-054 : la lecture d'un profil attend le suivi en cours sur ce membre, et deux
+    /// bascules du même membre partent l'une après l'autre.
+    func testProfileReadWaitsForAFollowInProgress() async throws {
+        let queue = FollowToggleQueue()
+        let log = OSAllocatedUnfairLock<[String]>(initialState: [])
+        func toggle(_ name: String, following: Bool) -> Task<SocialFollowResult, Error> {
+            Task {
+                try await queue.run(userId: "u1") {
+                    log.withLock { $0.append(name + "-start") }
+                    try await Task.sleep(for: .milliseconds(300))
+                    log.withLock { $0.append(name + "-end") }
+                    return SocialFollowResult(following: following, followersCount: nil, followingCount: nil, requestId: nil)
+                }
+            }
+        }
+        let follow = toggle("follow", following: true)
+        try await Task.sleep(for: .milliseconds(50))
+        let read = Task {
+            await queue.waitForPending(userId: "u1")
+            log.withLock { $0.append("read") }
+        }
+        let other = Task {
+            await queue.waitForPending(userId: "u2")
+            log.withLock { $0.append("other-read") }
+        }
+        await other.value
+        _ = try await follow.value
+        await read.value
+        XCTAssertEqual(log.withLock { $0 }, ["follow-start", "other-read", "follow-end", "read"])
+
+        log.withLock { $0.removeAll() }
+        let undo = toggle("undo", following: false)
+        try await Task.sleep(for: .milliseconds(20))
+        let redo = toggle("redo", following: true)
+        _ = try await (undo.value, redo.value)
+        XCTAssertEqual(log.withLock { $0 }, ["undo-start", "undo-end", "redo-start", "redo-end"])
+    }
+
     func testImageMetadataAndReceiptSurviveRecreationThenAckPurgesFiles() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("social-post-outbox-\(UUID().uuidString)", isDirectory: true)

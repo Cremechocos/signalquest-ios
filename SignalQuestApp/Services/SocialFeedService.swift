@@ -177,6 +177,32 @@ struct SharePostResponse: Decodable {
     }
 }
 
+/// Audit IOS-054 : suivre est une bascule côté serveur. Un profil ouvert pendant un suivi
+/// lancé ailleurs (Explorer) lisait l'état d'avant et montrait « Suivre » : un appui
+/// désabonnait. Les bascules d'un même membre partent l'une après l'autre, et la lecture
+/// de son profil attend celle en cours.
+final class FollowToggleQueue: Sendable {
+    private let toggles = OSAllocatedUnfairLock<[String: Task<SocialFollowResult, Error>]>(initialState: [:])
+
+    func run(userId: String, _ operation: @escaping @Sendable () async throws -> SocialFollowResult) async throws -> SocialFollowResult {
+        let task: Task<SocialFollowResult, Error> = toggles.withLock { toggles in
+            let previous = toggles[userId]
+            let next = Task {
+                _ = try? await previous?.value
+                return try await operation()
+            }
+            toggles[userId] = next
+            return next
+        }
+        defer { toggles.withLock { if $0[userId] == task { $0[userId] = nil } } }
+        return try await task.value
+    }
+
+    func waitForPending(userId: String) async {
+        if let pending = toggles.withLock({ $0[userId] }) { _ = try? await pending.value }
+    }
+}
+
 final class SocialFeedService: SocialFeedServicing {
     private let api: APIClient
     private let postOutbox: SocialPostOutboxStore
@@ -735,6 +761,8 @@ final class SocialFeedService: SocialFeedServicing {
     // MARK: - Profils & follow
 
     func userProfile(userId: String) async throws -> SocialUserProfile {
+        // Un suivi en cours sur ce membre passe d'abord : sinon le profil montrerait l'état d'avant.
+        await followQueue.waitForPending(userId: userId)
         let response: SocialUserProfileResponse = try await api.request(
             APIEndpoint(path: "/api/users/\(userId)/profile"),
             as: SocialUserProfileResponse.self
@@ -742,11 +770,16 @@ final class SocialFeedService: SocialFeedServicing {
         return response.profile
     }
 
+    private let followQueue = FollowToggleQueue()
+
     func toggleFollow(userId: String) async throws -> SocialFollowResult {
-        try await api.request(
-            APIEndpoint(path: "/api/social/follows/\(userId)", method: .post),
-            as: SocialFollowResult.self
-        )
+        let api = api
+        return try await followQueue.run(userId: userId) {
+            try await api.request(
+                APIEndpoint(path: "/api/social/follows/\(userId)", method: .post),
+                as: SocialFollowResult.self
+            )
+        }
     }
 
     /// Cloche du profil (SOCIAL-BELL-1) : renvoie le niveau posé par le serveur.
