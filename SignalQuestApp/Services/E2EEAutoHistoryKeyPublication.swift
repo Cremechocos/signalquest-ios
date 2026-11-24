@@ -384,4 +384,14 @@ extension E2EEAutoHistoryKeyPublication.Outcome {
         case .failed(let reason): return reason
         }
     }
+
+    /// IOS-003 : seuls les échecs partent vers Crashlytics. Une clé présente, une
+    /// clé à obtenir sur un nouvel appareil, un appareil en attente ou une coupure
+    /// réseau (réessai) sont l'ordinaire d'un lancement.
+    var tracesAsFailure: Bool {
+        switch self {
+        case .unexpected, .unvouched, .logRefused, .failed: return true
+        case .present, .missing, .cancelled, .notActive, .tooRecent, .retryLater: return false
+        }
+    }
 }

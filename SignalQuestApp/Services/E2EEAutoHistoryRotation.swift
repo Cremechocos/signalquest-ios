@@ -183,6 +183,13 @@ actor E2EEAutoHistoryRotation {
             if chained > 0 { parts.append("chained-\(chained)") }
             return parts.isEmpty ? "idle" : parts.joined(separator: "+")
         }
+
+        /// IOS-003 : seul un passage arrêté par un échec part vers Crashlytics ;
+        /// appareil en attente et coupure réseau (réessai) n'en sont pas.
+        var tracesAsFailure: Bool {
+            guard let stopped else { return false }
+            return stopped != "not-active" && stopped != "retry-later"
+        }
     }
 
     private let dependencies: Dependencies

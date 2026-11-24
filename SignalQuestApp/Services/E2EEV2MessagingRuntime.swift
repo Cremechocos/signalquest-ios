@@ -694,8 +694,8 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         case .refreshed?:
             return (try? parts.stateStore.isV2(conversationId: conversation.id, ownerNamespace: namespace)) == true ? .v2 : .v1
         case .failure(let failure)? where failure.code == "E2EE_CONVERSATION_NOT_V2":
+            // Genèse remise à plus tard : l'ordinaire, pas un échec (IOS-003).
             guard Self.allowsGenesis(conversation, trigger: trigger, autoActive: E2EEV2ServerGate.autoActive) else {
-                Self.traceV2("migration", "genesis_deferred")
                 return .v1
             }
         case .failure(let failure)?:
@@ -724,7 +724,7 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         }
         switch result {
         case .created?:
-            Self.traceV2("migration", "created")
+            // Succès : rien vers Crashlytics (IOS-003).
             return .v2
         case .failure(let failure)? where failure.code == "E2EE_CONVERSATION_ALREADY_V2" && E2EEV2ServerGate.autoActive:
             // Perdant d'une genèse auto (§8) : la conversation se relit, et

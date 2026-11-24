@@ -76,6 +76,37 @@ final class Lot1ReliabilityTests: XCTestCase {
             APIError.http(status: 500, code: nil, message: "", requestId: nil, retryAfter: nil)))
     }
 
+    /// IOS-003 (choix d'Alexandre du 24/11 : « Ne garder que les échecs ») : les
+    /// succès E2EE du lancement épuisaient le quota avant les vrais échecs.
+    func testOnlyE2EEFailuresAreTracedAndEachOperationHasItsOwnQuota() {
+        XCTAssertFalse(E2EEAutoEnrollment.Outcome.active(deviceId: "d", rotated: false).tracesAsFailure)
+        XCTAssertFalse(E2EEAutoEnrollment.Outcome.pending(deviceId: "d").tracesAsFailure)
+        XCTAssertFalse(E2EEAutoEnrollment.Outcome.retryLater.tracesAsFailure)
+        XCTAssertTrue(E2EEAutoEnrollment.Outcome.failed("boom").tracesAsFailure)
+        XCTAssertTrue(E2EEAutoEnrollment.Outcome.logRefused.tracesAsFailure)
+
+        XCTAssertFalse(E2EEAutoHistoryKeyPublication.Outcome.present(hkPubB64: "k").tracesAsFailure)
+        XCTAssertFalse(E2EEAutoHistoryKeyPublication.Outcome.missing(hkPubB64: "k").tracesAsFailure)
+        XCTAssertTrue(E2EEAutoHistoryKeyPublication.Outcome.unvouched(hkPubB64: "k").tracesAsFailure)
+        XCTAssertTrue(E2EEAutoHistoryKeyPublication.Outcome.failed("boom").tracesAsFailure)
+
+        XCTAssertFalse(E2EEAutoHistoryEpochBackup.Outcome.backedUp(0).tracesAsFailure)
+        XCTAssertFalse(E2EEAutoHistoryEpochBackup.Outcome.restored(3, missingEpochCount: 0).tracesAsFailure)
+        XCTAssertTrue(E2EEAutoHistoryEpochBackup.Outcome.restored(3, missingEpochCount: 1).tracesAsFailure)
+        XCTAssertTrue(E2EEAutoHistoryEpochBackup.Outcome.failed("boom").tracesAsFailure)
+
+        var rotation = E2EEAutoHistoryRotation.Report()
+        XCTAssertFalse(rotation.tracesAsFailure, "Un passage sans arrêt est un succès")
+        rotation.stopped = "retry-later"
+        XCTAssertFalse(rotation.tracesAsFailure)
+        rotation.stopped = "log-refused"
+        XCTAssertTrue(rotation.tracesAsFailure)
+
+        XCTAssertEqual(SQDiagnostics.quotaKey(area: .e2eeV2), "e2ee_v2")
+        XCTAssertNotEqual(SQDiagnostics.quotaKey(area: .e2eeV2, name: "auto-enrollment"),
+                          SQDiagnostics.quotaKey(area: .e2eeV2, name: "migration"))
+    }
+
     /// Crashlytics du 04/10 : un bilan MetricKit sans mesure partait quand même.
     func testAnEmptyMetricKitReportIsNotSent() {
         XCTAssertFalse(MetricKitReporter.hasMeasurements(["build": "161", "hours": "0.0"]))

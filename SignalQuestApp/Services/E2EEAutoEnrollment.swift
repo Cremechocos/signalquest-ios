@@ -576,4 +576,15 @@ extension E2EEAutoEnrollment.Outcome {
         case .failed(let reason): return reason
         }
     }
+
+    /// IOS-003 : seuls les échecs partent vers Crashlytics. Appareil actif ou en
+    /// attente, session à rafraîchir, compte supprimé ou coupure réseau
+    /// (réessai) ne disent rien d'un défaut.
+    var tracesAsFailure: Bool {
+        switch self {
+        case .identityReplaced, .revoked, .updateRequired, .logClosed, .logRefused, .failed: return true
+        case .active, .pending, .registered, .accountDeleted, .reauthenticate, .sessionRefreshRequired, .retryLater:
+            return false
+        }
+    }
 }

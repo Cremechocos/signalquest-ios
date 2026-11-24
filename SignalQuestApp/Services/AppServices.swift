@@ -610,7 +610,7 @@ final class AppServices: ObservableObject {
         if case .logClosed(let seconds) = outcome {
             autoEnrollmentNotBefore = Date().addingTimeInterval(TimeInterval(seconds))
         }
-        E2EEV2MessagingRuntime.traceV2("auto-enrollment", outcome.traceStep)
+        if outcome.tracesAsFailure { E2EEV2MessagingRuntime.traceV2("auto-enrollment", outcome.traceStep) }
         // Nouvel appareil inscrit (`ADD`, jamais `GENESIS`) : il fait lui-même
         // tourner chacune de ses conversations pour s'y ajouter (E2EE-AUTO §7).
         if case .registered(_, .active) = outcome, E2EEV2ServerGate.autoActive {
@@ -641,10 +641,11 @@ final class AppServices: ObservableObject {
         guard let session = LocalAccountScope.sessionSnapshot(),
               let publication = E2EEAutoHistoryKeyPublication.live(session: session, api: api) else { return }
         if let rotation = E2EEAutoHistoryRotation.live(session: session, api: api) {
-            E2EEV2MessagingRuntime.traceV2("auto-history-rotation", await rotation.run().traceStep)
+            let report = await rotation.run()
+            if report.tracesAsFailure { E2EEV2MessagingRuntime.traceV2("auto-history-rotation", report.traceStep) }
         }
         let historyKey = await publication.run()
-        E2EEV2MessagingRuntime.traceV2("auto-history-key", historyKey.traceStep)
+        if historyKey.tracesAsFailure { E2EEV2MessagingRuntime.traceV2("auto-history-key", historyKey.traceStep) }
         // Alerte « Nouvelle clé d'historique » (§5.1 r23) : levée, tombée, ou gardée.
         E2EEAutoHistoryKeyAlertCoordinator.post(historyKey, ownerNamespace: session.ownerNamespace)
         if case .missing(let hkPubB64) = historyKey {
@@ -662,8 +663,14 @@ final class AppServices: ObservableObject {
         default: return
         }
         guard let backup = E2EEAutoHistoryEpochBackup.live(session: session, api: api) else { return }
-        if held { E2EEV2MessagingRuntime.traceV2("auto-history-restore", await backup.restore().traceStep) }
-        E2EEV2MessagingRuntime.traceV2("auto-history-backfill", await backup.backfill().traceStep)
+        if held { Self.traceBackupFailure("auto-history-restore", await backup.restore()) }
+        Self.traceBackupFailure("auto-history-backfill", await backup.backfill())
+    }
+
+    /// IOS-003 : seuls les échecs de sauvegarde ou de restauration partent vers Crashlytics.
+    private static func traceBackupFailure(_ operation: String, _ outcome: E2EEAutoHistoryEpochBackup.Outcome) {
+        guard outcome.tracesAsFailure else { return }
+        E2EEV2MessagingRuntime.traceV2(operation, outcome.traceStep)
     }
 
     private var historyBackfillTask: Task<Void, Never>?
@@ -694,7 +701,7 @@ final class AppServices: ObservableObject {
             historyBackfillPending = false
             guard let session = LocalAccountScope.sessionSnapshot(), session.ownerNamespace == ownerNamespace,
                   let backup = E2EEAutoHistoryEpochBackup.live(session: session, api: api) else { return }
-            E2EEV2MessagingRuntime.traceV2("auto-history-backfill", await backup.backfill().traceStep)
+            Self.traceBackupFailure("auto-history-backfill", await backup.backfill())
         } while historyBackfillPending
     }
 

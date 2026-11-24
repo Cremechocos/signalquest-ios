@@ -26,22 +26,30 @@ enum SQDiagnostics {
         case qa
     }
 
-    /// Plafond par domaine et par lancement : un échec répété en boucle (réseau
-    /// instable, écran rouvert) ne doit ni noyer le tableau de bord ni coûter
-    /// de la bande passante.
+    /// Plafond par lancement : un échec répété en boucle (réseau instable, écran
+    /// rouvert) ne doit ni noyer le tableau de bord ni coûter de la bande
+    /// passante. Compté par domaine pour les erreurs, et par domaine + opération
+    /// pour les rapports nommés (IOS-003) : un rapport fréquent n'épuise plus le
+    /// quota d'une autre opération du même domaine.
     static let perAreaLimit = 5
-    private static let counts = OSAllocatedUnfairLock(initialState: [Area: Int]())
+    private static let counts = OSAllocatedUnfairLock(initialState: [String: Int]())
     private static let logger = Logger(subsystem: "fr.signalquest.ios", category: "diagnostics")
 
+    /// Clé du plafond : le domaine seul, ou le domaine et l'opération.
+    static func quotaKey(area: Area, name: String? = nil) -> String {
+        guard let name else { return area.rawValue }
+        return "\(area.rawValue).\(name)"
+    }
+
     static func record(_ error: Error, area: Area, context: [String: String] = [:]) {
-        guard shouldReport(error), reserve(area) else { return }
+        guard shouldReport(error), reserve(quotaKey(area: area)) else { return }
         send(sanitized(error, area: area, context: context))
     }
 
     /// Rapport fait de compteurs (MetricKit, preuve de la chaîne) : un non-fatal
     /// dont seules les clés comptent.
     static func recordReport(_ name: String, area: Area, info: [String: String]) {
-        guard reserve(area) else { return }
+        guard reserve(quotaKey(area: area, name: name)) else { return }
         var userInfo: [String: Any] = ["area": area.rawValue]
         for (key, value) in info { userInfo[key] = value }
         send(NSError(domain: "SQ.\(area.rawValue).\(name)", code: 0, userInfo: userInfo))
@@ -61,11 +69,11 @@ enum SQDiagnostics {
         return context
     }
 
-    private static func reserve(_ area: Area) -> Bool {
+    private static func reserve(_ key: String) -> Bool {
         counts.withLock { counts -> Bool in
-            let sent = counts[area, default: 0]
+            let sent = counts[key, default: 0]
             guard sent < perAreaLimit else { return false }
-            counts[area] = sent + 1
+            counts[key] = sent + 1
             return true
         }
     }

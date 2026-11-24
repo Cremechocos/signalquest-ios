@@ -426,6 +426,16 @@ extension E2EEAutoHistoryEpochBackup.Outcome {
         case .failed(let reason): return reason
         }
     }
+
+    /// IOS-003 : seuls les échecs partent vers Crashlytics, dont une
+    /// restauration à laquelle il manque des époques.
+    var tracesAsFailure: Bool {
+        switch self {
+        case .unvouched, .logRefused, .failed: return true
+        case .restored(_, let missing): return missing > 0
+        case .backedUp, .noHistoryKey, .rotationDue, .notActive, .retryLater: return false
+        }
+    }
 }
 
 extension E2EEAutoHistoryEpochBackup {
