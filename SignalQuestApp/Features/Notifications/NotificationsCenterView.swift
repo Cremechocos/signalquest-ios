@@ -445,7 +445,15 @@ struct NotificationsCenterView: View {
                 if let date = item.createdAt {
                     Group {
                         switch period {
-                        case .today: Text(date, format: .relative(presentation: .named))
+                        // IOS-020 : recalculée chaque minute ; sinon une ligne restée
+                        // à l'écran gardait « il y a 20 secondes » plusieurs minutes.
+                        // `.id` : à entrées égales (même date, même format), SwiftUI
+                        // gardait le texte déjà dessiné malgré le nouveau tic.
+                        case .today:
+                            TimelineView(.everyMinute) { context in
+                                Text(date, format: .relative(presentation: .named))
+                                    .id(context.date)
+                            }
                         // Le jour seul ne départage pas deux notifications : l'heure s'y ajoute,
                         // et l'année quand ce n'est pas l'année courante.
                         case .thisWeek: Text(date, format: .dateTime.weekday(.wide).hour().minute())
