@@ -40,6 +40,12 @@ struct AntennaSite: Decodable, Identifiable, Equatable {
     /// Systèmes de chaque opérateur sur un support partagé (TECH-BY-OP §3),
     /// libellés bruts. Une clé absente veut dire « inconnu ».
     var technologiesByOperator: [String: [String]] = [:]
+    /// Filtres de la carte (IOS-037) : dernière mise en service ANFR ; au Canada, puissance
+    /// d'émission (W), gain d'antenne (dBi) et hauteur de structure (m) des émetteurs ISED.
+    var commissionedAt: Date?
+    var caTxPowerW: Double?
+    var caAntennaGainDbi: Double?
+    var caStructureHeightMeters: Double?
 
     /// Empreinte du site quand la réponse la porte (`site_key` du registre ISED) :
     /// un résultat de la recherche rapide n'a sinon que son `sup_id`.
@@ -142,6 +148,7 @@ struct AntennaSite: Decodable, Identifiable, Equatable {
         case height, sup_nm_haut, hauteur_antenne, structure_height
         case owner, proprietaire, sta_nm_anfr
         case siteKey, site_key
+        case derniere_mise_en_service
     }
 
     init(
@@ -188,6 +195,10 @@ struct AntennaSite: Decodable, Identifiable, Equatable {
         siteId = c.decodeFlexibleString(forKey: .siteId) ?? c.decodeFlexibleString(forKey: .sup_id)
         anfrCode = c.decodeFlexibleString(forKey: .anfrCode) ?? c.decodeFlexibleString(forKey: .sta_nm_anfr)
         siteKey = c.decodeFlexibleString(forKey: .siteKey) ?? c.decodeFlexibleString(forKey: .site_key)
+        // La liste filtrée côté serveur (mode minimal) la sert aussi : le filtre « Mise en service »
+        // vaut donc avec un filtre de technologie, de bande ou de partage (IOS-037).
+        commissionedAt = c.decodeFlexibleString(forKey: .derniere_mise_en_service)
+            .flatMap(AndroidAntennaMarker.commissioningDate)
         let latPrimary: Double? = (try? c.decodeIfPresent(Double.self, forKey: .latitude)) ?? nil
         let latFallback: Double? = (try? c.decodeIfPresent(Double.self, forKey: .lat)) ?? nil
         latitude = latPrimary ?? latFallback

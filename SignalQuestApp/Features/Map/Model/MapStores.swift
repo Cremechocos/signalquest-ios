@@ -312,6 +312,27 @@ enum MapSpeedtestMetricStore {
     }
 }
 
+/// Filtres de sites gardés d'une visite à l'autre, comme Android : photos et tranches ISED du
+/// Canada. Identification, hauteur et mise en service ne valent que pour la session.
+enum MapSiteFiltersStore {
+    static let key = "map.siteFilters.v1"
+
+    static func load() -> MapSiteFilters {
+        var filters = MapSiteFilters()
+        guard let stored = UserDefaults.standard.dictionary(forKey: key) as? [String: String] else { return filters }
+        filters.photos = stored["photos"].flatMap(MapSiteFilters.Photos.init(rawValue:)) ?? .all
+        filters.caPower = stored["caPower"].flatMap(MapSiteFilters.Bucket.init(rawValue:)) ?? .all
+        filters.caGain = stored["caGain"].flatMap(MapSiteFilters.Bucket.init(rawValue:)) ?? .all
+        filters.caHeight = stored["caHeight"].flatMap(MapSiteFilters.Bucket.init(rawValue:)) ?? .all
+        return filters
+    }
+
+    static func save(_ filters: MapSiteFilters) {
+        UserDefaults.standard.set(["photos": filters.photos.rawValue, "caPower": filters.caPower.rawValue,
+                                   "caGain": filters.caGain.rawValue, "caHeight": filters.caHeight.rawValue], forKey: key)
+    }
+}
+
 enum MapPhotosFriendsOnlyStore {
     static let key = "map.photosFriendsOnly.v1"
 

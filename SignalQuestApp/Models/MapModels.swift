@@ -865,9 +865,22 @@ struct AndroidAntennaMarker: Decodable, Identifiable, Equatable, Sendable {
     /// Systèmes radio déclarés (« LTE 800 », « 5G NR 3500 ») : ils donnent la
     /// bande la plus basse, celle qui sert au calcul de Fresnel.
     let radioSystems: [String]
+    /// Dernière mise en service ANFR (`derniere_mise_en_service`) : filtre « Mise en service »
+    /// de la carte (IOS-037, comme Android).
+    let commissionedAt: Date?
+    /// Canada (ISED) : puissance d'émission maximale en watts (seule valeur normalisée,
+    /// `tx_power_max` mêle dBm et W), gain d'antenne maximal en dBi et hauteur de structure.
+    let caTxPowerW: Double?
+    let caAntennaGainDbi: Double?
+    let caStructureHeightMeters: Double?
 
     enum CodingKeys: String, CodingKey {
         case id, supId, anfrCode, lat, lng, `operator`, operators, sharingType, crozonLeader, zbLeader, technologies, azimuts, azimutsByOperator, operators5G, technologiesByOperator, bands, address, isZTD, photoCount, validationCount, hasEnb, hasGnb
+        case commissionedAt = "derniere_mise_en_service"
+        case txPowerMaxW
+        case txAntennaGainMax = "tx_antenna_gain_max"
+        case structureHeight = "structure_height"
+        case hauteurAntenne = "hauteur_antenne"
         // Le backend n'émet PAS de clé `address` : il envoie les composants ANFR
         // séparément. Sans eux, l'adresse d'un site venu des tuiles restait vide.
         case adrLbAdd1 = "adr_lb_add1"
@@ -938,6 +951,28 @@ struct AndroidAntennaMarker: Decodable, Identifiable, Equatable, Sendable {
         supportHeightMeters = support?.meters
         supportNature = support?.resolvedNature
         radioSystems = c.decodeLossyArray([String].self, forKey: .emrLbSysteme)
+        commissionedAt = c.decodeFlexibleString(forKey: .commissionedAt).flatMap(Self.commissioningDate)
+        caTxPowerW = Self.number(c, .txPowerMaxW)
+        caAntennaGainDbi = Self.number(c, .txAntennaGainMax)
+        caStructureHeightMeters = Self.number(c, .structureHeight) ?? Self.number(c, .hauteurAntenne)
+    }
+
+    private static func number(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> Double? {
+        guard let raw = c.decodeFlexibleString(forKey: key),
+              let value = Double(raw.replacingOccurrences(of: ",", with: ".")), value.isFinite else { return nil }
+        return value
+    }
+
+    /// Une date ISO complète, ou un jour seul (« 2024-03-12 », minuit UTC, comme Android).
+    static func commissioningDate(_ raw: String) -> Date? {
+        let full = ISO8601DateFormatter()
+        full.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = full.date(from: raw) { return date }
+        full.formatOptions = [.withInternetDateTime]
+        if let date = full.date(from: raw) { return date }
+        let day = ISO8601DateFormatter()
+        day.formatOptions = [.withFullDate]
+        return day.date(from: String(raw.prefix(10)))
     }
 
     /// Adresse lisible reconstituée depuis les champs ANFR : rue (ou lieu-dit),

@@ -21,6 +21,7 @@ extension MapFilterSelection {
         if coverageDays != 0 { count += 1 }
         if !includeObserved { count += 1 }
         if layers.contains(.planned), plannedStatuses != Set(PlannedActivationStatus.allCases) { count += 1 }
+        if layers.contains(.antenna) { count += siteFilters.activeCount }
         return count
     }
 }
@@ -60,6 +61,8 @@ struct MapAdvancedFilterSheet: View {
     private var showsRadio: Bool { !shownFilterableLayers.isEmpty }
     private var showsSharing: Bool { draft.layers.contains(.antenna) && !sharingOptions.isEmpty }
     private var showsPlanned: Bool { plannedAvailable && draft.layers.contains(.planned) }
+    /// Filtres de sites (IOS-037) : sur les antennes officielles, pas dans un pays sans référentiel.
+    private var showsSiteFilters: Bool { draft.layers.contains(.antenna) && selectedEntry?.isCommunityOnly != true }
     private var showsObserved: Bool {
         communityAvailable && (draft.layers.contains(.antenna) || draft.layers.contains(.communitySite))
     }
@@ -88,6 +91,8 @@ struct MapAdvancedFilterSheet: View {
                         }
                         if showsRadio { technologySection }
                         if showsRadio || showsSharing { refineSection }
+                        if showsSiteFilters { siteSection }
+                        if showsSiteFilters && catalogMarket.uppercased() == "CA" { isedSection }
                         if draft.layers.contains(.speedtest) || draft.layers.contains(.coverage) { periodSection }
                         if showsPlanned { plannedSection }
                         if showsObserved { observedSection }
@@ -172,6 +177,91 @@ struct MapAdvancedFilterSheet: View {
                 }
             }
         }
+    }
+
+    /// Comme Android : photos et identification partout, hauteur et mise en service sur les
+    /// données ANFR (France, DROM). Le filtrage se fait sur la carte, sans requête.
+    private var siteSection: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            Text("Sites").sqKicker().accessibilityAddTraits(.isHeader)
+            segmentedRow("Identification", selection: $draft.siteFilters.identification,
+                         options: [(.all, String(localized: "Tous")), (.notIdentified, String(localized: "Non identifiés")),
+                                   (.identified, String(localized: "Identifiés"))],
+                         identifier: "map.filters.identification")
+            segmentedRow("Photos", selection: $draft.siteFilters.photos,
+                         options: [(.all, String(localized: "Toutes")), (.with, String(localized: "Avec photo")),
+                                   (.without, String(localized: "Sans photo"))],
+                         identifier: "map.filters.photos")
+            Text("Photos et identification se lisent à l’échelle du quartier : zoome pour les filtrer.")
+                .font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if MapSiteFilters.isANFRMarket(catalogMarket) {
+                segmentedRow("Hauteur du support", selection: $draft.siteFilters.supportHeight,
+                             options: [(.all, String(localized: "Toutes")), (.under20, "< 20 m"),
+                                       (.from20To40, "20–40 m"), (.over40, "> 40 m")],
+                             identifier: "map.filters.supportHeight")
+                segmentedRow("Mise en service", selection: commissioningChoice,
+                             options: [(0, String(localized: "Toutes")), (6, String(localized: "6 mois")),
+                                       (12, String(localized: "1 an")), (-1, String(localized: "Date"))],
+                             identifier: "map.filters.commissioned")
+                if draft.siteFilters.commissionedSince != nil {
+                    DatePicker("Depuis le", selection: commissionedSince, in: ...Date(), displayedComponents: .date)
+                        .font(SQType.callout(.semibold))
+                        .foregroundStyle(SQColor.label)
+                        .tint(SQColor.accent)
+                        .accessibilityIdentifier("map.filters.commissionedSince")
+                }
+            }
+        }
+    }
+
+    /// Canada : tranches des émetteurs ISED, seuils d'Android (puissance en watts, gain en dBi).
+    private var isedSection: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            Text("Émetteurs").sqKicker().accessibilityAddTraits(.isHeader)
+            segmentedRow("Puissance d’émission", selection: $draft.siteFilters.caPower,
+                         options: bucketOptions("≤ 10 W", "10–40 W", "> 40 W"), identifier: "map.filters.caPower")
+            segmentedRow("Gain d’antenne", selection: $draft.siteFilters.caGain,
+                         options: bucketOptions("≤ 5 dBi", "5–20 dBi", "> 20 dBi"), identifier: "map.filters.caGain")
+            segmentedRow("Hauteur de structure", selection: $draft.siteFilters.caHeight,
+                         options: bucketOptions("≤ 10 m", "10–40 m", "> 40 m"), identifier: "map.filters.caHeight")
+        }
+    }
+
+    private func bucketOptions(_ low: String, _ mid: String, _ high: String) -> [(MapSiteFilters.Bucket, String)] {
+        [(.all, String(localized: "Tout")), (.low, low), (.mid, mid), (.high, high)]
+    }
+
+    private func segmentedRow<Value: Hashable>(_ title: String, selection: Binding<Value>,
+                                               options: [(Value, String)], identifier: String) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs2) {
+            Text(LocalizedStringKey(title)).font(SQType.subhead).foregroundStyle(SQColor.labelSecondary)
+            MapSegmented(selection: selection, options: options, identifier: identifier)
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel(Text(LocalizedStringKey(title)))
+        }
+    }
+
+    /// 0, 6 ou 12 mois ; -1 : un jour choisi au calendrier (un an en arrière d'abord).
+    private var commissioningChoice: Binding<Int> {
+        Binding(get: { draft.siteFilters.commissionedSince != nil ? -1 : draft.siteFilters.commissionedWithinMonths },
+                set: { value in
+                    if value == -1 {
+                        draft.siteFilters.commissionedWithinMonths = 0
+                        if draft.siteFilters.commissionedSince == nil {
+                            let today = Calendar.current.startOfDay(for: Date())
+                            draft.siteFilters.commissionedSince = Calendar.current.date(byAdding: .year, value: -1, to: today)
+                        }
+                    } else {
+                        draft.siteFilters.commissionedSince = nil
+                        draft.siteFilters.commissionedWithinMonths = value
+                    }
+                })
+    }
+
+    private var commissionedSince: Binding<Date> {
+        Binding(get: { draft.siteFilters.commissionedSince ?? Date() },
+                set: { draft.siteFilters.commissionedSince = Calendar.current.startOfDay(for: $0) })
     }
 
     private var periodSection: some View {

@@ -117640,6 +117640,190 @@
           }
         }
       }
+    },
+    "Non identifiés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not identified"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non identifiés"
+          }
+        }
+      }
+    },
+    "Avec photo" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "With photo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avec photo"
+          }
+        }
+      }
+    },
+    "Sans photo" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No photo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sans photo"
+          }
+        }
+      }
+    },
+    "Photos et identification se lisent à l’échelle du quartier : zoome pour les filtrer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos and identification are computed at neighborhood scale: zoom in to filter by them."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos et identification se lisent à l’échelle du quartier : zoome pour les filtrer."
+          }
+        }
+      }
+    },
+    "6 mois" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "6 months"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "6 mois"
+          }
+        }
+      }
+    },
+    "Depuis le" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Since"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Depuis le"
+          }
+        }
+      }
+    },
+    "Émetteurs" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transmitters"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Émetteurs"
+          }
+        }
+      }
+    },
+    "Gain d’antenne" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antenna gain"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gain d’antenne"
+          }
+        }
+      }
+    },
+    "Hauteur de structure" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Structure height"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hauteur de structure"
+          }
+        }
+      }
+    },
+    "SQFormal|Photos et identification se lisent à l’échelle du quartier : zoome pour les filtrer." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos et identification se lisent à l’échelle du quartier : zoomez pour les filtrer."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Les groupes comptent tous les sites : zoome pour ne voir que ceux qui répondent aux filtres." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clusters count every site: zoom in to see only the ones that match the filters."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les groupes comptent tous les sites : zoome pour ne voir que ceux qui répondent aux filtres."
+          }
+        }
+      }
+    },
+    "SQFormal|Les groupes comptent tous les sites : zoome pour ne voir que ceux qui répondent aux filtres." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les groupes comptent tous les sites : zoomez pour ne voir que ceux qui répondent aux filtres."
+          }
+        }
+      },
+      "shouldTranslate" : false
     }
   },
   "version" : "1.0"

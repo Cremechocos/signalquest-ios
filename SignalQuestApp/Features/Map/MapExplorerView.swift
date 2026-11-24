@@ -86,6 +86,13 @@ final class MapExplorerViewModel: ObservableObject {
     @Published var antennas: [AntennaSite] = []
     @Published var antennaClusters: [AndroidMapCluster] = []
     private var retainedAntennaTiles: [AndroidAntennaTileResponse] = []
+    /// Photos et identifiants ne sont servis qu'à partir des tuiles de zoom 13 : en dessous (ou
+    /// pour la liste filtrée côté serveur), leurs filtres sont suspendus, comme sur Android.
+    var antennasCameFromTiles: Bool { !retainedAntennaTiles.isEmpty }
+    var antennaContributionDataAvailable: Bool {
+        !retainedAntennaTiles.isEmpty
+            && retainedAntennaTiles.allSatisfy { $0.tile.z >= MapSiteFilters.contributionMinTileZoom }
+    }
     @Published var speedtestTiles: [AndroidSpeedtestTileResponse] = []
     @Published var coverageTiles: [AndroidCoverageTileResponse] = []
     @Published var communitySiteTiles: [AndroidCommunitySiteTileResponse] = []
@@ -152,6 +159,8 @@ final class MapExplorerViewModel: ObservableObject {
         didSet { if speedtestMetric != oldValue { MapSpeedtestMetricStore.save(speedtestMetric) } }
     }
     @Published var coverageDays = 0
+    /// Filtres de sites (IOS-037) : appliqués aux antennes chargées, sans requête.
+    @Published var siteFilters = MapSiteFiltersStore.load()
     @Published var searchQuery: String = ""
     @Published var searchResults: [MapSearchResult] = []
     /// Recherche en cours (spinner de la barre) — distinct du chargement des tuiles.
@@ -583,7 +592,8 @@ final class MapExplorerViewModel: ObservableObject {
             technologies: techFilters, bands: bandFilters, bandMatch: bandMatch,
             azimuthStyle: azimuthStyle, sharing: sharingFilters, speedtestDays: speedtestDays,
             coverageDays: coverageDays, layers: layers, includeObserved: includeObservedSites,
-            plannedStatuses: plannedStatusFilters, photosFriendsOnly: photosFriendsOnly)
+            plannedStatuses: plannedStatusFilters, photosFriendsOnly: photosFriendsOnly,
+            siteFilters: siteFilters)
     }
 
     /// Commits a complete value on the main actor, before any scheduled load.
@@ -616,6 +626,7 @@ final class MapExplorerViewModel: ObservableObject {
         includeObservedSites = result.includeObserved
         plannedStatusFilters = result.plannedStatuses
         photosFriendsOnly = result.photosFriendsOnly
+        siteFilters = result.siteFilters
         MapMarketStore.saveManual(market: result.market, operator: result.operatorName)
         return result
     }
@@ -1696,6 +1707,10 @@ final class MapExplorerViewModel: ObservableObject {
             site.azimuthsByOperator = marker.azimutsByOperator
             site.operators5G = marker.operators5G
             site.technologiesByOperator = marker.technologiesByOperator
+            site.commissionedAt = marker.commissionedAt
+            site.caTxPowerW = marker.caTxPowerW
+            site.caAntennaGainDbi = marker.caAntennaGainDbi
+            site.caStructureHeightMeters = marker.caStructureHeightMeters
             return site
         }
     }
@@ -2850,7 +2865,7 @@ struct MapExplorerView: View {
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
                 if showsCoverageKey { coverageFocusBanner }
-                MapContextControls(limitMessages: showsDisplayLimit ? model.displayLimitMessages : [])
+                MapContextControls(limitMessages: showsDisplayLimit ? limitMessages : [])
                 mapStatusToast
             }
             // Deux rangées : la pastille d'état ne partage la sienne qu'avec le recentrage.
@@ -2998,8 +3013,17 @@ struct MapExplorerView: View {
     }
 
     private var showsDisplayLimit: Bool {
-        model.errorMessage == nil && !model.displayLimitMessages.isEmpty
+        model.errorMessage == nil && !limitMessages.isEmpty
     }
+
+    /// Les groupes du serveur comptent tous les sites : un filtre de sites ne s'applique qu'aux
+    /// sites affichés un par un. Sans cet avis, un groupe de 122 laissait croire au filtre (IOS-037).
+    private var siteFilterClusterNotice: String? {
+        guard filters.contains(.antenna), model.siteFilters.activeCount > 0, !model.antennaClusters.isEmpty else { return nil }
+        return String(localized: "Les groupes comptent tous les sites : zoome pour ne voir que ceux qui répondent aux filtres.")
+    }
+
+    private var limitMessages: [String] { model.displayLimitMessages + [siteFilterClusterNotice].compactMap { $0 } }
 
     /// Notice transitoire dans la même pile : elle ne masque aucun contrôle.
     private var marketSwitchNotice: some View {
@@ -3443,7 +3467,7 @@ struct MapExplorerView: View {
         if let issue = locationIssue { return .location(issue) }
         if let error = model.errorMessage { return .error(error) }
         // Le contrôle « Vue partielle » porte cet état et son explication.
-        if !model.displayLimitMessages.isEmpty { return nil }
+        if !limitMessages.isEmpty { return nil }
         if viewportGate.admitted == nil {
             return .info(String(localized: "Préparation de la carte…"), icon: "map")
         }
@@ -3547,8 +3571,9 @@ struct MapExplorerView: View {
         if previous.layers != current.layers { MapFilterStore.save(current.layers) }
         if previous.plannedStatuses != current.plannedStatuses { MapPlannedStatusStore.save(current.plannedStatuses) }
         if previous.photosFriendsOnly != current.photosFriendsOnly { MapPhotosFriendsOnlyStore.save(current.photosFriendsOnly) }
+        if previous.siteFilters != current.siteFilters { MapSiteFiltersStore.save(current.siteFilters) }
         if previous.layers != current.layers || previous.azimuthStyle != current.azimuthStyle
-            || previous.plannedStatuses != current.plannedStatuses {
+            || previous.plannedStatuses != current.plannedStatuses || previous.siteFilters != current.siteFilters {
             refreshMapRender()
         }
         guard !model.consumeInitialSelectionObservation(current), !model.initialSelectionInProgress else { return }
@@ -4149,6 +4174,9 @@ struct MapExplorerView: View {
                 showsBadges ? communityOutageMarksBySite : [:]
             let incidentMarks: [String: OperatorIncidentMark] =
                 showsBadges ? operatorIncidentMarksByAntenna : [:]
+            let siteFilters = model.siteFilters
+            let contributionDataAvailable = model.antennaContributionDataAvailable
+            let isedDataAvailable = model.antennasCameFromTiles
             let antennaPayloads: [MapAnnotationPayload] = model.antennas.compactMap { site in
                 // La liste `/api/antennas` (mode minimal) ne renvoie PAS les
                 // bandes par site : le filtrage bande est fait CÔTÉ SERVEUR. On ne
@@ -4158,6 +4186,9 @@ struct MapExplorerView: View {
                 // bande masque tout »).
                 guard site.bands.isEmpty || matchesSelectedBands(site.bands) else { return nil }
                 guard matchesSelectedSharing(site) else { return nil }
+                guard siteFilters.matches(site, market: model.marketFilter,
+                                          contributionDataAvailable: contributionDataAvailable,
+                                          isedDataAvailable: isedDataAvailable) else { return nil }
                 guard let lat = site.latitude, let lng = site.longitude else { return nil }
                 return MapAnnotationPayload(
                     id: "antenna-\(site.id)",

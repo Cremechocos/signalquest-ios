@@ -26,9 +26,12 @@ extension View {
         elevation: SQCardElevation = .card
     ) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        return background(fill, in: shape)
+        // L'ombre est portée par la FORME du fond, pas par la carte : posée sur la carte entière,
+        // SwiftUI la calculait pour chaque texte et chaque filet du contenu (≈ 360 rendus hors
+        // écran par image en faisant défiler la fiche speedtest, iPhone du 24/11). Même dessin,
+        // une seule ombre par carte.
+        return background { shape.fill(fill).modifier(SQCardShadow(elevation: elevation)) }
             .overlay { shape.strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
-            .modifier(SQCardShadow(elevation: elevation))
     }
 
     /// Fond plein posé directement (tuile, chip, pastille, bouton), sans ombre.

@@ -1,6 +1,7 @@
 import XCTest
 import CoreLocation
 import MapKit
+import SwiftUI
 @testable import SignalQuest
 
 @MainActor
@@ -560,5 +561,133 @@ final class SpeedtestMapMetricTests: XCTestCase {
             XCTAssertTrue(metric.legendRows.allSatisfy { contractHexes.contains($0.hex) }, "jamais de cyan ni de bleu : \(metric)")
         }
         XCTAssertEqual(SpeedtestMapMetric.ping.legendRows.first?.hex, SQQualityScale.Throughput.exceptional.hex)
+    }
+}
+
+/// IOS-037 lot 3 : filtres de sites appliqués sur la carte, sans requête, comme Android.
+final class MapSiteFiltersTests: XCTestCase {
+    private let now = Date(timeIntervalSince1970: 1_795_000_000)
+
+    private func site(height: Double? = 30, photos: Int = 0, enb: Bool = false, commissioned: Date? = nil,
+                      power: Double? = nil, gain: Double? = nil, structure: Double? = nil) -> AntennaSite {
+        var site = AntennaSite(id: "s", siteId: "1", latitude: 44.8, longitude: -0.6, operators: ["ORANGE"],
+                               technologies: ["4G"], bands: [], azimuths: [], sharingType: nil, crozonLeader: nil,
+                               address: nil, height: height, owner: nil)
+        site.photoCount = photos
+        site.hasEnb = enb
+        site.commissionedAt = commissioned
+        site.caTxPowerW = power
+        site.caAntennaGainDbi = gain
+        site.caStructureHeightMeters = structure
+        return site
+    }
+
+    func testPhotosAndIdentificationFilterOnlyWithNeighbourhoodData() {
+        var filters = MapSiteFilters()
+        filters.photos = .with
+        XCTAssertTrue(filters.matches(site(photos: 2), market: "FR", contributionDataAvailable: true))
+        XCTAssertFalse(filters.matches(site(photos: 0), market: "FR", contributionDataAvailable: true))
+        XCTAssertTrue(filters.matches(site(photos: 0), market: "FR", contributionDataAvailable: false),
+                      "sous le zoom 13, rien n'est servi : le filtre est suspendu, il ne vide pas la carte")
+        filters = MapSiteFilters()
+        filters.identification = .notIdentified
+        XCTAssertTrue(filters.matches(site(enb: false), market: "FR", contributionDataAvailable: true))
+        XCTAssertFalse(filters.matches(site(enb: true), market: "FR", contributionDataAvailable: true))
+    }
+
+    func testSupportHeightAndCommissioningFollowANFRDataOnly() {
+        var filters = MapSiteFilters()
+        filters.supportHeight = .from20To40
+        XCTAssertTrue(filters.matches(site(height: 20), market: "FR", contributionDataAvailable: true))
+        XCTAssertTrue(filters.matches(site(height: 40), market: "DROM", contributionDataAvailable: true))
+        XCTAssertFalse(filters.matches(site(height: 40.5), market: "FR", contributionDataAvailable: true))
+        XCTAssertFalse(filters.matches(site(height: nil), market: "FR", contributionDataAvailable: true), "hauteur inconnue")
+        XCTAssertTrue(filters.matches(site(height: nil), market: "BE", contributionDataAvailable: true), "hors ANFR, sans effet")
+
+        filters = MapSiteFilters()
+        filters.commissionedWithinMonths = 6
+        XCTAssertTrue(filters.matches(site(commissioned: now.addingTimeInterval(-100 * 86_400)), market: "FR",
+                                      contributionDataAvailable: true, now: now))
+        XCTAssertFalse(filters.matches(site(commissioned: now.addingTimeInterval(-200 * 86_400)), market: "FR",
+                                       contributionDataAvailable: true, now: now), "6 mois = 180 jours")
+        XCTAssertFalse(filters.matches(site(commissioned: nil), market: "FR", contributionDataAvailable: true, now: now))
+        filters.commissionedSince = now.addingTimeInterval(-300 * 86_400)
+        XCTAssertTrue(filters.matches(site(commissioned: now.addingTimeInterval(-200 * 86_400)), market: "FR",
+                                      contributionDataAvailable: true, now: now), "la date choisie prime sur les mois")
+    }
+
+    func testCanadaBucketsUseInclusiveUpperBounds() {
+        var filters = MapSiteFilters()
+        filters.caPower = .low
+        filters.caGain = .mid
+        filters.caHeight = .high
+        let inside = site(power: 10, gain: 20, structure: 40.1)
+        XCTAssertTrue(filters.matches(inside, market: "CA", contributionDataAvailable: true))
+        XCTAssertFalse(filters.matches(site(power: 10.1, gain: 20, structure: 41), market: "CA", contributionDataAvailable: true))
+        XCTAssertFalse(filters.matches(site(power: nil, gain: 20, structure: 41), market: "CA", contributionDataAvailable: true),
+                       "valeur inconnue exclue")
+        XCTAssertTrue(filters.matches(site(power: nil), market: "CA", contributionDataAvailable: true, isedDataAvailable: false),
+                      "liste filtrée côté serveur, sans champs ISED : suspendu")
+        XCTAssertTrue(filters.matches(site(power: nil), market: "FR", contributionDataAvailable: true), "hors Canada")
+    }
+
+    func testCountrySpecificFiltersResetOnAnotherMarket() {
+        var filters = MapSiteFilters()
+        filters.supportHeight = .over40
+        filters.commissionedWithinMonths = 12
+        filters.caGain = .high
+        filters.photos = .with
+        let belgium = filters.normalized(forMarket: "BE")
+        XCTAssertEqual(belgium.supportHeight, .all)
+        XCTAssertEqual(belgium.commissionedWithinMonths, 0)
+        XCTAssertEqual(belgium.caGain, .all)
+        XCTAssertEqual(belgium.photos, .with, "photos et identification valent partout")
+        XCTAssertEqual(filters.normalized(forMarket: "FR").supportHeight, .over40)
+        XCTAssertEqual(filters.normalized(forMarket: "CA").caGain, .high)
+    }
+
+    func testTileMarkerReadsCommissioningAndISEDValues() throws {
+        let json = Data(#"""
+        {"id":"a","lat":44.8,"lng":-0.6,"derniere_mise_en_service":"2025-06-01","txPowerMaxW":"12,5",
+         "tx_antenna_gain_max":17.2,"structure_height":null,"hauteur_antenne":"35"}
+        """#.utf8)
+        let marker = try JSONDecoder().decode(AndroidAntennaMarker.self, from: json)
+        XCTAssertEqual(marker.commissionedAt, ISO8601DateFormatter().date(from: "2025-06-01T00:00:00Z"))
+        XCTAssertEqual(marker.caTxPowerW, 12.5)
+        XCTAssertEqual(marker.caAntennaGainDbi, 17.2)
+        XCTAssertEqual(marker.caStructureHeightMeters, 35, "repli sur la hauteur d'antenne, comme Android")
+        XCTAssertNotNil(AndroidAntennaMarker.commissioningDate("2024-03-12T08:30:00.000Z"))
+        XCTAssertNil(AndroidAntennaMarker.commissioningDate("inconnue"))
+    }
+}
+
+/// IOS-057 : l'ombre d'une carte est portée par la forme de son fond. Posée sur la carte
+/// entière, SwiftUI la calculait pour chaque texte du contenu (≈ 360 rendus hors écran par
+/// image en faisant défiler la fiche speedtest sur un iPhone, le 24/11).
+@MainActor
+final class CardShadowLayerTests: XCTestCase {
+    func testCardShadowIsCastByTheBackgroundOnly() async throws {
+        let card = VStack(alignment: .leading, spacing: 4) {
+            ForEach(0..<12, id: \.self) { index in Text(verbatim: "Ligne \(index) · valeur") }
+        }
+        .padding(14)
+        .sqCardBackground()
+        .padding(20)
+        let host = UIHostingController(rootView: card)
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(x: 0, y: 0, width: 320, height: 480)
+        window.rootViewController = host
+        window.isHidden = false
+        host.view.layoutIfNeeded()
+        try await Task.sleep(for: .milliseconds(150))
+        host.view.layoutIfNeeded()
+        func shadowed(_ layer: CALayer) -> Int {
+            (layer.shadowOpacity > 0 && layer.shadowColor != nil ? 1 : 0)
+                + (layer.sublayers ?? []).reduce(0) { $0 + shadowed($1) }
+        }
+        let count = shadowed(host.view.layer)
+        window.isHidden = true
+        XCTAssertLessThanOrEqual(count, 1, "\(count) calques portent une ombre : une seule est attendue, celle du fond")
     }
 }

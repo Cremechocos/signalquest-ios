@@ -334,14 +334,9 @@ struct LoadingSkeleton: View {
             .padding(.top, 2)
         }
         .padding(SQSpace.lg)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        // Liseré visible UNIQUEMENT en mode OLED, où la carte et le fond sont tous
-        // deux noirs : sans lui, les tuiles fusionneraient en un seul aplat.
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
-                .strokeBorder(SQOledPalette.cardStroke, lineWidth: 1)
-        }
-        .sqShadowCard()
+        // Même fond que les cartes (liseré OLED compris), ombre portée par la forme seule :
+        // sur la carte entière, chaque bloc animé du squelette avait la sienne (24/11).
+        .sqCardBackground()
     }
 }
 
