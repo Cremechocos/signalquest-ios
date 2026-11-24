@@ -320,6 +320,60 @@ final class FeedComposerTests: XCTestCase {
         XCTAssertFalse(visible.followListsHidden)
     }
 
+    /// SOCIAL-BELL-1 : champ absent = cloche masquée ; une valeur inconnue s'affiche « Désactivées ».
+    func testProfileDecodesPostNotificationsAbsentServedAndUnknown() throws {
+        func profile(_ extra: String) throws -> SocialUserProfile {
+            let json = #"{"id":"u1","name":"Léa","isSelf":false,"isFollowing":true\#(extra)}"#
+            return try JSONDecoder.signalQuest.decode(SocialUserProfile.self, from: Data(json.utf8))
+        }
+        XCTAssertNil(try profile("").postNotifications, "Non servi : pas de cloche")
+        XCTAssertNil(try profile(#","postNotifications":null"#).postNotifications)
+        XCTAssertEqual(try profile(#","postNotifications":"all""#).postNotifications, .all)
+        XCTAssertEqual(try profile(#","postNotifications":"posts_reposts""#).postNotifications, .postsReposts)
+        XCTAssertEqual(try profile(#","postNotifications":"posts""#).postNotifications, .posts)
+        XCTAssertEqual(try profile(#","postNotifications":"off""#).postNotifications, .off)
+        XCTAssertEqual(try profile(#","postNotifications":"everything""#).postNotifications, .off)
+
+        let follow = try JSONDecoder.signalQuest.decode(
+            SocialFollowResult.self, from: Data(#"{"following":true,"followersCount":3,"postNotifications":"off"}"#.utf8))
+        XCTAssertEqual(follow.postNotifications, "off")
+        let olderServer = try JSONDecoder.signalQuest.decode(SocialFollowResult.self, from: Data(#"{"following":false}"#.utf8))
+        XCTAssertNil(olderServer.postNotifications)
+    }
+
+    /// SOCIAL-BELL-1 : PUT /api/social/follows/[userId]/notifications, corps {"level": …}.
+    func testSettingPostNotificationsPutsTheLevel() async throws {
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("synthetic-bell")
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        let service = SocialFeedService(api: APIClient(config: .test, credentials: credentials, session: URLSession(configuration: config)))
+        nonisolated(unsafe) var seen: (method: String?, path: String, body: [String: String]?)?
+        MockURLProtocol.requestHandler = { request in
+            var data = request.httpBody ?? Data()
+            if data.isEmpty, let stream = request.httpBodyStream {
+                stream.open(); defer { stream.close() }
+                var buffer = [UInt8](repeating: 0, count: 1024)
+                while stream.hasBytesAvailable {
+                    let read = stream.read(&buffer, maxLength: buffer.count)
+                    if read <= 0 { break }
+                    data.append(buffer, count: read)
+                }
+            }
+            seen = (request.httpMethod, request.url?.path ?? "", try? JSONDecoder().decode([String: String].self, from: data))
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+            return (response, Data(#"{"following":true,"postNotifications":"posts_reposts"}"#.utf8))
+        }
+        defer { MockURLProtocol.requestHandler = nil }
+
+        let saved = try await service.setPostNotifications(userId: "user_followed_1", level: .postsReposts)
+
+        XCTAssertEqual(saved, .postsReposts)
+        XCTAssertEqual(seen?.method, "PUT")
+        XCTAssertEqual(seen?.path, "/api/social/follows/user_followed_1/notifications")
+        XCTAssertEqual(seen?.body, ["level": "posts_reposts"])
+    }
+
     /// `profile.statsHidden` : les nombres restent servis, l'app ne les montre
     /// pas ; absent = visibles ; son propre profil les montre toujours.
     func testProfileStatsHiddenKeepsNumbersButHidesThem() throws {
@@ -519,6 +573,7 @@ private final class ComposerFeedFixture: SocialFeedServicing, @unchecked Sendabl
     var userProfileError: Error = ComposerFixtureError.unused
     func userProfile(userId: String) async throws -> SocialUserProfile { throw userProfileError }
     func toggleFollow(userId: String) async throws -> SocialFollowResult { throw ComposerFixtureError.unused }
+    func setPostNotifications(userId: String, level: PostNotificationLevel) async throws -> PostNotificationLevel { throw ComposerFixtureError.unused }
     /// Pages servies dans l'ordre ; une erreur prend le pas quand elle est posée.
     var followPages: [SocialFollowPage] = []
     var followListError: Error?

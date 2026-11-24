@@ -78,6 +78,7 @@ protocol SocialFeedServicing: Sendable {
     /// La route backend est un toggle unique (POST /api/social/follows/[userId]) :
     /// le même appel suit ou désabonne selon l'état courant.
     func toggleFollow(userId: String) async throws -> SocialFollowResult
+    func setPostNotifications(userId: String, level: PostNotificationLevel) async throws -> PostNotificationLevel
     /// Une page des abonnés ou des abonnements d'un membre. `cursor` est le
     /// `nextCursor` de la page précédente, renvoyé tel quel (nil pour la première).
     /// Refus : 403 PROFILE_PRIVATE, 403 FOLLOW_LISTS_HIDDEN, 403 FORBIDDEN, 404.
@@ -724,6 +725,14 @@ final class SocialFeedService: SocialFeedServicing {
             APIEndpoint(path: "/api/social/follows/\(userId)", method: .post),
             as: SocialFollowResult.self
         )
+    }
+
+    /// Cloche du profil (SOCIAL-BELL-1) : renvoie le niveau posé par le serveur.
+    func setPostNotifications(userId: String, level: PostNotificationLevel) async throws -> PostNotificationLevel {
+        let result: PostNotificationsResult = try await api.requestJSON(
+            "/api/social/follows/\(userId)/notifications", method: .put, body: ["level": level.rawValue]
+        )
+        return PostNotificationLevel(served: result.postNotifications)
     }
 
     func followList(_ kind: SocialFollowListKind, userId: String, cursor: String?, limit: Int) async throws -> SocialFollowPage {

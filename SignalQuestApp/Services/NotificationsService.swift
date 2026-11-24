@@ -106,13 +106,25 @@ struct NotificationTextKey: Equatable {
         "notif.recap.ready": ["month": .month],
     ]
 
+    /// Cloche d'un profil suivi : clés du contrat SOCIAL-BELL-1, hors de notification-text-keys v1 (figé).
+    private static let socialBellCatalog: [String: [String: Kind]] = [
+        "notif.social.followed_post": ["actorName": .string],
+        "notif.social.followed_repost": ["actorName": .string],
+        "notif.social.followed_activity": ["actorName": .string],
+        "notif.social.followed_activity_group": ["actorName": .string, "count": .count],
+    ]
+
     /// Schéma au format du contrat (`string` / `integer`), pour le test qui le compare.
     static var contractArgs: [String: [String: String]] {
         catalog.mapValues { $0.mapValues { $0 == .count ? "integer" : "string" } }
     }
 
+    static var socialBellContractArgs: [String: [String: String]] {
+        socialBellCatalog.mapValues { $0.mapValues { $0 == .count ? "integer" : "string" } }
+    }
+
     init?(key: String?, args: [String: JSONValue]?) {
-        guard let key, let schema = Self.catalog[key] else { return nil }
+        guard let key, let schema = Self.catalog[key] ?? Self.socialBellCatalog[key] else { return nil }
         let args = args ?? [:]
         for (name, kind) in schema {
             switch (kind, args[name]) {
@@ -150,6 +162,9 @@ struct NotificationTextKey: Equatable {
         case "notif.progress.badge": return String(localized: "Nouveau badge")
         case "notif.progress.level": return String(localized: "Niveau \(count("newLevel"))")
         case "notif.recap.ready": return String(localized: "Ton bilan est prêt")
+        case "notif.social.followed_post": return String(localized: "Nouveau post")
+        case "notif.social.followed_repost": return String(localized: "Nouvelle republication")
+        case "notif.social.followed_activity", "notif.social.followed_activity_group": return String(localized: "Nouvelle activité")
         default: return ""
         }
     }
@@ -190,6 +205,11 @@ struct NotificationTextKey: Equatable {
         case "notif.recap.ready":
             let month = MonthlyRecapPresentation.monthOf(string("month"))
             return String(localized: "Découvre ton mois \(month).")
+        case "notif.social.followed_post": return String(localized: "\(actor) a publié un nouveau post.")
+        case "notif.social.followed_repost": return String(localized: "\(actor) a republié un post.")
+        case "notif.social.followed_activity": return String(localized: "\(actor) a une nouvelle activité.")
+        case "notif.social.followed_activity_group":
+            return String(localized: "\(actor) a \(count("count")) nouvelles activités.")
         default: return ""
         }
     }

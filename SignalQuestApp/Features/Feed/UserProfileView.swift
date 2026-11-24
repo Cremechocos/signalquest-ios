@@ -11,6 +11,7 @@ final class UserProfileViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var isLoadingMore = false
     @Published var isTogglingFollow = false
+    @Published var isSettingPostNotifications = false
     @Published var errorMessage: String?
     /// Profil réglé sur « personne » (403 PROFILE_PRIVATE) : un état calme,
     /// pas « Profil indisponible » avec un « Réessayer » qui n'y peut rien.
@@ -77,6 +78,8 @@ final class UserProfileViewModel: ObservableObject {
         // Bascule optimiste, corrigée par la réponse serveur.
         current.isFollowing.toggle()
         current.followersCount = max(0, current.followersCount + (current.isFollowing ? 1 : -1))
+        // Abonnement neuf ou désabonnement : la cloche repart de « Désactivées » (SOCIAL-BELL-1).
+        if current.postNotifications != nil { current.postNotifications = .off }
         profile = current
         if AppEnvironment.usesDemoData { return }
         isTogglingFollow = true
@@ -89,6 +92,9 @@ final class UserProfileViewModel: ObservableObject {
                     if let followers = result.followersCount {
                         updated.followersCount = followers
                     }
+                    if let served = result.postNotifications {
+                        updated.postNotifications = PostNotificationLevel(served: served)
+                    }
                     profile = updated
                 }
             } catch {
@@ -98,6 +104,35 @@ final class UserProfileViewModel: ObservableObject {
                     reverted.followersCount = max(0, reverted.followersCount + (reverted.isFollowing ? 1 : -1))
                     profile = reverted
                 }
+                actionError = error.userFacingMessage
+                Haptics.error()
+            }
+        }
+    }
+
+    /// Cloche du profil (SOCIAL-BELL-1) : choix affiché tout de suite, corrigé par la
+    /// réponse ; en cas d'échec, retour au choix précédent avec le message habituel.
+    func setPostNotifications(_ level: PostNotificationLevel) {
+        guard var current = profile, current.isFollowing, let previous = current.postNotifications,
+              previous != level, !isSettingPostNotifications else { return }
+        current.postNotifications = level
+        profile = current
+        if AppEnvironment.usesDemoData { return }
+        isSettingPostNotifications = true
+        Task {
+            defer { isSettingPostNotifications = false }
+            do {
+                let saved = try await service.setPostNotifications(userId: userId, level: level)
+                profile?.postNotifications = saved
+            } catch let APIError.http(status, code, _, _, _) where status == 409 && code == "NOT_FOLLOWING" {
+                // Plus abonné (désabonnement ailleurs, blocage) : la cloche repasse à « Désactivées »
+                // et le bouton propose de suivre (contrat).
+                profile?.isFollowing = false
+                profile?.postNotifications = .off
+                Haptics.error()
+            } catch {
+                if error.isCancellation { return }
+                profile?.postNotifications = previous
                 actionError = error.userFacingMessage
                 Haptics.error()
             }
@@ -970,6 +1005,10 @@ struct UserProfileView: View {
     private func actionRow(_ profile: SocialUserProfile) -> some View {
         HStack(spacing: SQSpace.sm) {
             followButton(profile)
+            // Cloche seulement pour un abonné, et seulement si le serveur la sert (SOCIAL-BELL-1).
+            if profile.isFollowing, !profile.isSelf, let level = profile.postNotifications {
+                postNotificationsBell(profile, level: level)
+            }
             if profile.canMessage == true {
                 GradientButton(
                     "Message",
@@ -1003,6 +1042,47 @@ struct UserProfileView: View {
             // le profil — un contresens, le profil s'est bien chargé.
             conversationError = error.userFacingMessage
             Haptics.error()
+        }
+    }
+
+    /// Cloche du profil (SOCIAL-BELL-1, maquette web validée le 24/11) : au trait coupée,
+    /// pleine avec ses ondes allumée ; coche devant le choix retenu, filet avant « Désactivées ».
+    private func postNotificationsBell(_ profile: SocialUserProfile, level: PostNotificationLevel) -> some View {
+        Menu {
+            Section {
+                ForEach([PostNotificationLevel.all, .postsReposts, .posts], id: \.self) { option in
+                    postNotificationsOption(option, current: level)
+                }
+            } header: {
+                Text("Notifications des posts de \(profile.displayName)")
+            }
+            Section {
+                postNotificationsOption(.off, current: level)
+            }
+        } label: {
+            Image(systemName: level == .off ? "bell" : "bell.and.waves.left.and.right.fill")
+                .font(SQFont.body(16, .semibold, relativeTo: .body))
+                .foregroundStyle(SQColor.label)
+                .frame(width: SQSpace.primaryActionHeight, height: SQSpace.primaryActionHeight)
+                .background(SQColor.surface, in: Circle())
+                .overlay { Circle().strokeBorder(SQColor.separator, lineWidth: 1) }
+                .contentShape(Circle())
+        }
+        .disabled(model.isSettingPostNotifications)
+        .accessibilityLabel(level == .off
+            ? String(localized: "Activer les notifications des posts de \(profile.displayName)")
+            : String(localized: "Notifications des posts de \(profile.displayName) : \(level.label)"))
+        .accessibilityIdentifier("profile.postNotifications.bell")
+    }
+
+    /// Un choix du menu : la coche native d'un interrupteur, et le sous-titre de « Tous ses posts ».
+    private func postNotificationsOption(_ option: PostNotificationLevel, current: PostNotificationLevel) -> some View {
+        Toggle(isOn: Binding(
+            get: { option == current },
+            set: { isOn in if isOn { model.setPostNotifications(option) } }
+        )) {
+            Text(option.label)
+            if let subtitle = option.subtitle { Text(subtitle) }
         }
     }
 

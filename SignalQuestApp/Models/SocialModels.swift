@@ -880,6 +880,9 @@ struct SocialUserProfile: Codable, Equatable {
     /// restent servis pour les versions installées, l'app ne les montre pas.
     /// Toujours faux sur son propre profil.
     let statsHidden: Bool
+    /// Cloche du profil (SOCIAL-BELL-1). `nil` : champ absent, fonctionnalité non servie,
+    /// la cloche reste masquée et aucun appel n'est fait.
+    var postNotifications: PostNotificationLevel?
 
     var displayName: String {
         MemberIdentity.displayName(name, handle: handle)
@@ -895,7 +898,7 @@ struct SocialUserProfile: Codable, Equatable {
     enum CodingKeys: String, CodingKey {
         case id, name, handle, bio, avatarUrl, createdAt, isSelf, isFriend
         case isFollowing, followersCount, followingCount, canMessage, stats
-        case accountBadges, networks, privacy, statsHidden
+        case accountBadges, networks, privacy, statsHidden, postNotifications
     }
 
     init(
@@ -915,7 +918,8 @@ struct SocialUserProfile: Codable, Equatable {
         accountBadges: [SocialUserBadge] = [],
         networks: SocialProfileNetworks? = nil,
         privacy: SocialUserProfilePrivacy? = nil,
-        statsHidden: Bool = false
+        statsHidden: Bool = false,
+        postNotifications: PostNotificationLevel? = nil
     ) {
         self.id = id
         self.name = name
@@ -934,6 +938,7 @@ struct SocialUserProfile: Codable, Equatable {
         self.networks = networks
         self.privacy = privacy
         self.statsHidden = statsHidden
+        self.postNotifications = postNotifications
     }
 
     init(from decoder: Decoder) throws {
@@ -955,6 +960,35 @@ struct SocialUserProfile: Codable, Equatable {
         networks = try? c.decodeIfPresent(SocialProfileNetworks.self, forKey: .networks)
         privacy = try? c.decodeIfPresent(SocialUserProfilePrivacy.self, forKey: .privacy)
         statsHidden = (try? c.decodeIfPresent(Bool.self, forKey: .statsHidden)) ?? false
+        postNotifications = (try? c.decodeIfPresent(String.self, forKey: .postNotifications)).flatMap { $0 }
+            .map(PostNotificationLevel.init(served:))
+    }
+}
+
+/// Niveau de la cloche d'un profil suivi (SOCIAL-BELL-1, choix d'Alexandre du 24/11).
+enum PostNotificationLevel: String, Codable, CaseIterable, Sendable {
+    case all
+    case postsReposts = "posts_reposts"
+    case posts
+    case off
+
+    /// Une valeur inconnue s'affiche « Désactivées » et n'est jamais renvoyée (contrat).
+    init(served raw: String) {
+        self = PostNotificationLevel(rawValue: raw) ?? .off
+    }
+
+    /// Libellés validés par Alexandre (SOCIAL-BELL-1, A3), communs aux trois plateformes.
+    var label: String {
+        switch self {
+        case .all: String(localized: "Tous ses posts")
+        case .postsReposts: String(localized: "Posts et republications")
+        case .posts: String(localized: "Ses posts seulement")
+        case .off: String(localized: "Désactivées")
+        }
+    }
+
+    var subtitle: String? {
+        self == .all ? String(localized: "Posts, republications et activité automatique (badges, speedtests…)") : nil
     }
 }
 
@@ -1158,6 +1192,14 @@ struct SocialFollowResult: Codable, Equatable {
     let followersCount: Int?
     let followingCount: Int?
     let requestId: String?
+    /// Toujours « off » après un abonnement ou un désabonnement (SOCIAL-BELL-1) ; absent si non servi.
+    var postNotifications: String? = nil
+}
+
+/// Réponse de PUT /api/social/follows/[userId]/notifications.
+struct PostNotificationsResult: Decodable, Equatable {
+    let following: Bool
+    let postNotifications: String
 }
 
 /// Résultat de GET /api/users/search (tableau JSON brut).

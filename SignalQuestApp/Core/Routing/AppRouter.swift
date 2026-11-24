@@ -374,7 +374,9 @@ final class AppRouter: ObservableObject {
         case "social_mention" where postId == nil:
             selectedTab = .community
         case "post", "reaction", "comment", "like", "favorite", "repost", "mention",
-             "social_reaction", "social_comment", "social_repost", "social_mention":
+             "social_reaction", "social_comment", "social_repost", "social_mention",
+             // Cloche d'un profil suivi (SOCIAL-BELL-1) : le post annoncé, d'origine pour une republication.
+             "social_followed_post", "social_followed_repost", "social_followed_activity":
             route(toPost: postId)
         // Pas d'écran dédié aux stories : leur rail est en tête de Communauté.
         case "story":

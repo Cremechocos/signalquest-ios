@@ -79,6 +79,45 @@ final class NotificationMutationTests: XCTestCase {
 
     /// Tout ou rien : la ligne garde le texte du serveur dès qu'un argument manque,
     /// est vide ou mal typé, ou que la clé est inconnue.
+    /// SOCIAL-BELL-1 : les clés de la cloche, hors du catalogue v1 figé, avec leurs gabarits.
+    func testSocialBellTextKeysRenderLikeTheContract() throws {
+        XCTAssertEqual(NotificationTextKey.socialBellContractArgs, [
+            "notif.social.followed_post": ["actorName": "string"],
+            "notif.social.followed_repost": ["actorName": "string"],
+            "notif.social.followed_activity": ["actorName": "string"],
+            "notif.social.followed_activity_group": ["actorName": "string", "count": "integer"],
+        ])
+        XCTAssertTrue(Set(NotificationTextKey.contractArgs.keys).isDisjoint(with: NotificationTextKey.socialBellContractArgs.keys))
+        let name: JSONValue = .string("Léa B.")
+        let cases: [(String, [String: JSONValue], String, String)] = [
+            ("notif.social.followed_post", ["actorName": name], "Nouveau post", "Léa B. a publié un nouveau post."),
+            ("notif.social.followed_repost", ["actorName": name], "Nouvelle republication", "Léa B. a republié un post."),
+            ("notif.social.followed_activity", ["actorName": name], "Nouvelle activité", "Léa B. a une nouvelle activité."),
+            ("notif.social.followed_activity_group", ["actorName": name, "count": .number(3)], "Nouvelle activité",
+             "Léa B. a 3 nouvelles activités."),
+        ]
+        for (key, args, title, message) in cases {
+            let text = try XCTUnwrap(NotificationTextKey(key: key, args: args), key)
+            XCTAssertEqual(text.title, title, key)
+            XCTAssertEqual(text.message, message, key)
+        }
+        XCTAssertNil(NotificationTextKey(key: "notif.social.followed_activity_group", args: ["actorName": name, "count": .number(0)]))
+        for type in ["social_followed_post", "social_followed_repost", "social_followed_activity"] {
+            XCTAssertNotEqual(NotificationsCenterView.title(for: type), String(localized: "Notification"), type)
+        }
+
+        let english = try XCTUnwrap(Bundle.main.path(forResource: "en", ofType: "lproj").flatMap(Bundle.init(path:)))
+        let missing = "\u{1}missing"
+        for sentence in ["Nouveau post", "Nouvelle republication", "Nouvelle activité", "%@ a publié un nouveau post.",
+                         "%@ a republié un post.", "%@ a une nouvelle activité.", "%@ a %lld nouvelles activités.",
+                         "Tous ses posts", "Posts et republications", "Ses posts seulement", "Désactivées",
+                         "Posts, republications et activité automatique (badges, speedtests…)",
+                         "Notifications des posts de %@", "Activer les notifications des posts de %@",
+                         "Notifications des posts de %@ : %@"] {
+            XCTAssertNotEqual(english.localizedString(forKey: sentence, value: missing, table: nil), missing, sentence)
+        }
+    }
+
     func testNotificationTextKeyRefusesWhatItCannotSay() {
         let name: JSONValue = .string("Léa B.")
         XCTAssertNil(NotificationTextKey(key: "notif.social.unknown", args: ["actorName": name]))

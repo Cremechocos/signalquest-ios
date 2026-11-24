@@ -351,6 +351,7 @@ private final class FeedContextFixture: SocialFeedServicing, @unchecked Sendable
     func share(postId: String, conversationId: String) async throws -> String? { throw FeedFixtureError.unused }
     func userProfile(userId: String) async throws -> SocialUserProfile { throw FeedFixtureError.unused }
     func toggleFollow(userId: String) async throws -> SocialFollowResult { throw FeedFixtureError.unused }
+    func setPostNotifications(userId: String, level: PostNotificationLevel) async throws -> PostNotificationLevel { throw FeedFixtureError.unused }
     func followList(_ kind: SocialFollowListKind, userId: String, cursor: String?, limit: Int) async throws -> SocialFollowPage { throw FeedFixtureError.unused }
     func userPosts(userId: String, cursor: String?, mine: Bool) async throws -> SocialFeedPage { throw FeedFixtureError.unused }
     func trendingHashtags() async throws -> [TrendingHashtag] { throw FeedFixtureError.unused }
