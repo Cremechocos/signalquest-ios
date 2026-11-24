@@ -49,6 +49,9 @@ struct SignalQuestHomeView: View {
     /// réinstallation ou sur un nouvel iPhone, et ne voit pas les tests faits sur
     /// Android (UI-06, UI-12).
     @State private var accountLatest: SocialShareableSpeedtest?
+    /// Le dernier test du compte n'a pas pu être lu : sans test local, la tuile le dit
+    /// au lieu d'inviter à un « premier test » (IOS-042).
+    @State private var accountLatestFailed = false
     @State private var lastAccountRefreshAt: Date = .distantPast
     @State private var stories: [SocialStory] = []
     @State private var trending: [TrendingHashtag] = []
@@ -904,10 +907,16 @@ struct SignalQuestHomeView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
                     bigValue("—", unit: nil)
-                    Text("Lance un premier test pour créer ton repère.")
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.ink2)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Group {
+                        if accountLatestFailed {
+                            Text("Indisponible pour l’instant")
+                        } else {
+                            Text("Lance un premier test pour créer ton repère.")
+                        }
+                    }
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -1518,8 +1527,11 @@ struct SignalQuestHomeView: View {
         }
         if !forceFresh, Date().timeIntervalSince(lastAccountRefreshAt) < 60 { return }
         lastAccountRefreshAt = Date()
-        if let latest = try? await services.feed.myLatestSpeedtest() {
-            accountLatest = latest
+        do {
+            if let latest = try await services.feed.myLatestSpeedtest() { accountLatest = latest }
+            accountLatestFailed = false
+        } catch {
+            if !error.isCancellation { accountLatestFailed = true }
         }
     }
 
