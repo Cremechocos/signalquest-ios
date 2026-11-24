@@ -686,6 +686,9 @@ struct SQStatTile: View {
 struct SQFactRow: View {
     let label: String
     let value: String
+    /// Symbole après la valeur (copie d'une ligne de la fiche d'un site) ; décoratif.
+    var accessorySystemImage: String? = nil
+    var accessoryTint: Color = SQColor.accentInk
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
@@ -693,20 +696,39 @@ struct SQFactRow: View {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: SQSpace.xxs) {
                     labelText
-                    valueText
+                    HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs) {
+                        valueText
+                        accessory
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             } else {
+                // Avec un accessoire, l'icône prenait sa part de largeur au libellé, qui passait sur
+                // deux lignes : libellé d'abord, puis valeur et icône, les points prennent le reste.
                 HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
                     labelText
+                        .layoutPriority(accessorySystemImage == nil ? 0 : 2)
                     SQDotLeader()
                         .frame(height: 1)
                         .alignmentGuide(.firstTextBaseline) { $0[.bottom] }
                     valueText
+                        .layoutPriority(accessorySystemImage == nil ? 0 : 1)
+                    accessory
+                        .layoutPriority(1)
                 }
             }
         }
         .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder
+    private var accessory: some View {
+        if let accessorySystemImage {
+            Image(systemName: accessorySystemImage)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(accessoryTint)
+                .accessibilityHidden(true)
+        }
     }
 
     private var labelText: some View {

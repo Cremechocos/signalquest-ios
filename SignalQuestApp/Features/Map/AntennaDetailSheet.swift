@@ -195,6 +195,10 @@ struct AntennaDetailSheet: View {
     /// Historique ANFR du support, pour « Dernier changement ANFR » (choix d'Alexandre du 20/11).
     @State private var anfrHistory: ANFRSiteHistory?
     @State private var anfrHistorySupId: String?
+    /// Historique ANFR complet du support (IOS-037, comme le Web), ouvert depuis la carte de dernière évolution.
+    @State private var showsAnfrHistory = false
+    /// Champ de la fiche copié à l'instant (coche 2 s) : n° du support, code ANFR, n° ARCEP, coordonnées.
+    @State private var copiedField: String?
     /// Message notifié, montré une fois chargé dans l'onglet Discussion.
     private let focusCommentId: String?
     @State private var showReportSheet = false
@@ -388,6 +392,11 @@ struct AntennaDetailSheet: View {
         }
         // Le texte arrive prérempli dans la conversation choisie, qui s'ouvre : la fiche se ferme.
         .siteSharePicker($siteShareDraft) { close() }
+        .sheet(isPresented: $showsAnfrHistory) {
+            if let anfrHistory {
+                AntennaAnfrHistorySheet(history: anfrHistory)
+            }
+        }
         .sheet(isPresented: $showOutageReport) {
             OutageReportSheet(
                 siteId: site.writeSiteId,
@@ -738,7 +747,7 @@ struct AntennaDetailSheet: View {
                 ?? SQColor.labelSecondary,
             operators: supportOperators.map { MapPhotoSite.Operator(label: photoOperatorLabel($0), color: registryColor($0)) },
             technologies: displayedTechnologies,
-            height: (core?.siteInfo.supportHeightMeters ?? core?.siteInfo.pylonHeight).map { SQUnits.height(meters: $0) }
+            height: core?.siteInfo.displayedSupportHeightMeters.map { SQUnits.height(meters: $0) }
         )
     }
 
@@ -998,7 +1007,10 @@ struct AntennaDetailSheet: View {
                 SQSpinner().tint(SQColor.brandRed).frame(maxWidth: .infinity)
             }
             if let latest = Self.latestAnfrChange(anfrHistory) {
-                AntennaLatestChangeCard(text: latest)
+                AntennaLatestChangeCard(text: latest, entryCount: anfrHistory?.entries.count ?? 0) {
+                    Haptics.selection()
+                    showsAnfrHistory = true
+                }
             }
             if let details = model.details {
                 communityBlock(details, proxy)
@@ -2012,14 +2024,26 @@ struct AntennaDetailSheet: View {
 
     private func siteContent(_ core: AntennaCoreDetails) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-                detailRow("Numéro du support", core.supId)
+                copyableRow("Numéro du support", core.supId, id: "supId")
                 // Le libellé suit le régulateur du marché : « Code ANFR » devant un
                 // identifiant ISED ou OFCOM serait faux.
-                detailRow(core.registryLabel, core.anfrCode.isEmpty ? nil : core.anfrCode,
-                          term: !core.isCustomSite && ["FR", "DROM"].contains(core.market?.uppercased() ?? "") ? .anfr : nil)
+                copyableRow(core.registryLabel, core.anfrCode.isEmpty ? nil : core.anfrCode,
+                            term: !core.isCustomSite && ["FR", "DROM"].contains(core.market?.uppercased() ?? "") ? .anfr : nil,
+                            id: "registry")
+                // N° de site ARCEP de chaque opérateur du support, à copier (demande d'Alexandre du 24/11) ;
+                // seulement les numéros publiés, « non publié » reste lisible dans Radio et Bandes.
+                ForEach(supportOperatorsActiveFirst, id: \.self) { op in
+                    if case .some(.some(let number)) = operatorSiteNumber(op) {
+                        copyableRow(String(localized: "N° ARCEP \(shortOperatorLabel(op))"), number, id: "arcep.\(op)")
+                    }
+                }
                 // « France » plutôt que « FR ».
                 detailRow("Marché", core.market.map { Locale.current.localizedString(forRegionCode: $0) ?? $0 })
                 detailRow(core.localityLabel, core.localityValue)
+                // Valeur du serveur (code INSEE), jamais déduite du code postal ; France et DROM seulement.
+                if !core.isCustomSite, ["FR", "DROM"].contains(core.market?.uppercased() ?? "") {
+                    detailRow("Département", core.department?.label)
+                }
                 detailRow("Adresse", core.address)
                 detailRow("Partage", sharingDescription(core), term: .siteSharing)
                 if leaderReport != nil {
@@ -2037,9 +2061,53 @@ struct AntennaDetailSheet: View {
                     .tint(SQColor.accentInk)
                     .accessibilityIdentifier("antenna.report.leader")
                 }
-                detailRow("Coordonnées", String(format: "%.5f, %.5f", core.lat, core.lng))
+                coordinatesRow(core)
         }
         .foregroundStyle(SQColor.label)
+    }
+
+    /// Coordonnées copiables (IOS-037, comme Android) : « 46.94218, 2.47031 », point décimal et
+    /// cinq décimales quelle que soit la langue, pour coller dans une autre app.
+    private func coordinatesRow(_ core: AntennaCoreDetails) -> some View {
+        copyableRow("Coordonnées", Self.posixCoordinates(lat: core.lat, lng: core.lng), id: "coordinates")
+    }
+
+    /// Ligne de la fiche qu'un appui copie : la valeur part dans le presse-papiers, l'icône passe à
+    /// la coche deux secondes et VoiceOver annonce « Copié ». Le ⓘ du glossaire reste à part.
+    @ViewBuilder
+    private func copyableRow(_ label: String, _ value: String?, term: SQTerm? = nil, id: String) -> some View {
+        let normalized = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !normalized.isEmpty, normalized != "—" {
+            HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs) {
+                // Un geste plutôt qu'un `Button` : dans un bouton, la ligne coupait son libellé en deux.
+                SQFactRow(label: label, value: normalized,
+                          accessorySystemImage: copiedField == id ? "checkmark" : "doc.on.doc")
+                    .contentShape(Rectangle())
+                    .onTapGesture { copy(normalized, field: id) }
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction { copy(normalized, field: id) }
+                    .accessibilityHint(Text("Touche pour copier"))
+                    .accessibilityIdentifier("antenna.detail.copy.\(id)")
+                if let term {
+                    SQInfoButton(term: term)
+                }
+            }
+        }
+    }
+
+    private func copy(_ text: String, field: String) {
+        Haptics.light()
+        UIPasteboard.general.string = text
+        copiedField = field
+        UIAccessibility.post(notification: .announcement, argument: String(localized: "Copié"))
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            if copiedField == field { copiedField = nil }
+        }
+    }
+
+    nonisolated static func posixCoordinates(lat: Double, lng: Double) -> String {
+        String(format: "%.5f, %.5f", locale: Locale(identifier: "en_US_POSIX"), lat, lng)
     }
 
     /// Les dates du site, sans répétition.
@@ -2082,9 +2150,11 @@ struct AntennaDetailSheet: View {
                 // l'afficher telle quelle donnait une hauteur sans unité.
                 detailRow(
                     "Hauteur support",
-                    (core.siteInfo.supportHeightMeters ?? core.siteInfo.pylonHeight)
-                        .map { SQUnits.height(meters: $0) }
+                    core.siteInfo.displayedSupportHeightMeters.map { SQUnits.height(meters: $0) }
                 )
+                // Hauteur des antennes elles-mêmes, par génération (IOS-037, comme Android).
+                detailRow("Hauteur antennes 4G", core.siteInfo.antennaHeight4g.map { SQUnits.height(meters: $0) })
+                detailRow("Hauteur antennes 5G", core.siteInfo.antennaHeight5g.map { SQUnits.height(meters: $0) })
                 detailRow("Types d'antennes", core.siteInfo.antennaTypes.joined(separator: " · "))
                 detailRow("Propriétaire", core.siteInfo.supportOwner ?? core.rawLicenseeName)
                 detailRow("Secteurs", core.siteInfo.sectorCount.map(String.init), term: .sector)
@@ -2263,8 +2333,6 @@ struct AntennaDetailSheet: View {
     /// envoie (TRX-26).
     private func sharingDescription(_ core: AntennaCoreDetails) -> String? {
         switch core.sharingKind?.lowercased() {
-        case "single":
-            return String(localized: "Non partagé")
         case "crozon":
             guard let leader = core.crozonLeader else { return String(localized: "Réseau partagé SFR et Bouygues Telecom (Crozon)") }
             return String(localized: "Réseau partagé SFR et Bouygues Telecom (Crozon), opéré par \(photoOperatorLabel(leader))")
@@ -2277,10 +2345,20 @@ struct AntennaDetailSheet: View {
             let names = core.mutualiseOperators.map(photoOperatorLabel)
             guard !names.isEmpty else { return String(localized: "Antenne mutualisée entre opérateurs") }
             return String(localized: "Mutualisée : \(names.formatted(.list(type: .and)))")
-        case nil, "":
-            return nil
         default:
-            return core.sharingKind
+            return Self.sharingLabel(kind: core.sharingKind)
+        }
+    }
+
+    /// Types de partage sans opérateur porteur. Un type que l'app ne connaît pas encore ne
+    /// s'affiche pas : la fiche montrait la valeur brute du serveur (« ztd_same_support », IOS-056).
+    nonisolated static func sharingLabel(kind: String?) -> String? {
+        switch kind?.lowercased() {
+        case "single": return String(localized: "Non partagé")
+        // Plusieurs opérateurs sur le même support, chacun avec ses antennes (pas de réseau partagé).
+        case "same_support": return String(localized: "Même support, réseaux séparés")
+        case "ztd_same_support": return String(localized: "Même support en zone très dense, réseaux séparés")
+        default: return nil
         }
     }
 
@@ -2461,19 +2539,62 @@ private struct AntennaEssentialSection<Content: View>: View {
 /// « Dernier changement ANFR » de l'Essentiel (choix d'Alexandre du 20/11, comme le Web).
 struct AntennaLatestChangeCard: View {
     let text: String
+    /// Relevés de l'historique ANFR du support ; le lien vers l'historique complet n'apparaît qu'au-delà d'un.
+    var entryCount: Int = 0
+    var onOpenHistory: (() -> Void)? = nil
 
     var body: some View {
         AntennaEssentialSection(title: "Dernier changement ANFR") {
-            Text(verbatim: text)
-                .font(SQType.body)
-                .foregroundStyle(SQColor.label)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(SQSpace.md)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                Text(verbatim: text)
+                    .font(SQType.body)
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("antenna.detail.latestChange")
+                if entryCount > 1, let onOpenHistory {
+                    Button(action: onOpenHistory) {
+                        Label("Voir tout l’historique (\(entryCount) relevés)", systemImage: "clock.arrow.circlepath")
+                            .font(SQType.subhead(.semibold))
+                            .frame(minHeight: 44, alignment: .leading)
+                    }
+                    .tint(SQColor.accentInk)
+                    .accessibilityIdentifier("antenna.detail.anfrHistory")
+                }
+            }
+            .padding(SQSpace.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("antenna.detail.latestChange")
+    }
+}
+
+/// Historique ANFR complet d'un support, ouvert depuis la fiche (IOS-037, comme l'onglet
+/// historique du Web) : la même frise que l'écran ANFR, sur les données déjà chargées.
+struct AntennaAnfrHistorySheet: View {
+    let history: ANFRSiteHistory
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(Array(history.entries.enumerated()), id: \.element.id) { index, entry in
+                        ANFRTimelineRow(entry: entry, isFirst: index == 0,
+                                        isLast: index == history.entries.count - 1, isShownOnMap: false)
+                    }
+                }
+                .padding(SQSpace.lg)
+            }
+            .background(SQColor.bg.ignoresSafeArea())
+            .navigationTitle("Historique des modifications")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Fermer") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.large])
     }
 }
 

@@ -617,7 +617,7 @@ struct ANFRSiteDetailSheet: View {
 
 // MARK: - Timeline row
 
-private struct ANFRTimelineRow: View {
+struct ANFRTimelineRow: View {
     let entry: ANFRSiteHistoryEntry
     let isFirst: Bool
     let isLast: Bool

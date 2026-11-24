@@ -486,6 +486,9 @@ struct AntennaCoreDetails: Decodable, Equatable {
     let address: String?
     let commune: String?
     let postalCode: String?
+    /// Département du site (France et DROM), servi par le serveur depuis le code INSEE, jamais
+    /// déduit du code postal (IOS-037, comme Android). `nil` hors France ou sur un serveur antérieur.
+    let department: AntennaDepartment?
     let operators: [String]
     let operatorScope: String?
     let operatorFacets: [String]
@@ -711,6 +714,7 @@ struct AntennaCoreDetails: Decodable, Equatable {
         case datasetPublishedAt, operatorBrand, licences, municipality, provinceCode
         case isCustomSite, validationStatus, source, displayName, description
         case frequencyBlocks, operatorSiteId, operatorSiteIds
+        case department
     }
 
     /// `technologies_projet` arrive en objet `{ lte: [...], "5g": [...] }` : on
@@ -748,6 +752,7 @@ struct AntennaCoreDetails: Decodable, Equatable {
         address = c.decodeFlexibleString(forKey: .address)
         commune = c.decodeFlexibleString(forKey: .commune)
         postalCode = c.decodeFlexibleString(forKey: .postalCode)
+        department = (try? c.decodeIfPresent(AntennaDepartment.self, forKey: .department)).flatMap { $0 }
         operators = c.decodeLossyArray([String].self, forKey: .operators)
         operatorScope = c.decodeFlexibleString(forKey: .operatorScope)
         operatorFacets = c.decodeLossyArray([String].self, forKey: .operatorFacets)
@@ -791,6 +796,32 @@ struct AntennaCoreDetails: Decodable, Equatable {
             .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
         operatorSiteIds = c.decodeLossyArray([String].self, forKey: .operatorSiteIds)
             .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    }
+}
+
+/// Département d’un site : « Gironde (33) » dans la fiche, comme Android.
+struct AntennaDepartment: Decodable, Equatable {
+    let code: String
+    let name: String
+
+    var label: String { "\(name) (\(code))" }
+
+    init(code: String, name: String) {
+        self.code = code
+        self.name = name
+    }
+
+    private enum CodingKeys: String, CodingKey { case code, name }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let code = c.decodeFlexibleString(forKey: .code)?.trimmingCharacters(in: .whitespaces) ?? ""
+        let name = c.decodeFlexibleString(forKey: .name)?.trimmingCharacters(in: .whitespaces) ?? ""
+        guard !code.isEmpty, !name.isEmpty else {
+            throw DecodingError.dataCorrupted(.init(codingPath: c.codingPath, debugDescription: "département incomplet"))
+        }
+        self.code = code
+        self.name = name
     }
 }
 
@@ -969,8 +1000,10 @@ struct AntennaSiteInfo: Decodable, Equatable {
     let supportHeight: String?
     let supportOwner: String?
     let sectorCount: Int?
-    let antennaHeight4g: Int?
-    let antennaHeight5g: Int?
+    /// Hauteurs d'antenne servies en mètres, décimales possibles (« 29,5 ») : en entier, une
+    /// telle valeur échouait au décodage et la visée retombait sur la hauteur du support.
+    let antennaHeight4g: Double?
+    let antennaHeight5g: Double?
     let firstActivation: String?
     let lastCommissioned: String?
     /// Hauteur du pylône (m). Repli quand `supportHeight` est absent — un calcul
@@ -987,8 +1020,8 @@ struct AntennaSiteInfo: Decodable, Equatable {
         supportHeight: String? = nil,
         supportOwner: String? = nil,
         sectorCount: Int? = nil,
-        antennaHeight4g: Int? = nil,
-        antennaHeight5g: Int? = nil,
+        antennaHeight4g: Double? = nil,
+        antennaHeight5g: Double? = nil,
         firstActivation: String? = nil,
         lastCommissioned: String? = nil,
         pylonHeight: Double? = nil,
@@ -1024,8 +1057,8 @@ struct AntennaSiteInfo: Decodable, Equatable {
         supportHeight = c.decodeFlexibleString(forKey: .supportHeight)
         supportOwner = c.decodeFlexibleString(forKey: .supportOwner)
         sectorCount = try? c.decodeIfPresent(Int.self, forKey: .sectorCount)
-        antennaHeight4g = try? c.decodeIfPresent(Int.self, forKey: .antennaHeight4g)
-        antennaHeight5g = try? c.decodeIfPresent(Int.self, forKey: .antennaHeight5g)
+        antennaHeight4g = try? c.decodeIfPresent(Double.self, forKey: .antennaHeight4g)
+        antennaHeight5g = try? c.decodeIfPresent(Double.self, forKey: .antennaHeight5g)
         firstActivation = c.decodeFlexibleString(forKey: .firstActivation)
         lastCommissioned = c.decodeFlexibleString(forKey: .lastCommissioned)
         pylonHeight = try? c.decodeIfPresent(Double.self, forKey: .pylonHeight)
@@ -1035,11 +1068,19 @@ struct AntennaSiteInfo: Decodable, Equatable {
         lastUpdated = c.decodeFlexibleString(forKey: .lastUpdated)
     }
 
+    /// Hauteur du support en mètres ; `nil` quand elle est inconnue. Le registre écrit « 0 » pour
+    /// un support souterrain ou intérieur : la fiche affichait « Hauteur support 0 m ».
     var supportHeightMeters: Double? {
         guard let supportHeight else { return nil }
         let normalized = supportHeight.replacingOccurrences(of: ",", with: ".")
         let value = normalized.filter { $0.isNumber || $0 == "." || $0 == "-" }
-        return Double(value)
+        guard let meters = Double(value), meters > 0 else { return nil }
+        return meters
+    }
+
+    /// Hauteur à afficher pour le support : la sienne, sinon celle du pylône, jamais un zéro.
+    var displayedSupportHeightMeters: Double? {
+        [supportHeightMeters, pylonHeight].compactMap { $0 }.first { $0 > 0 }
     }
 
     /// Hauteur à laquelle rayonne l'antenne, du plus précis au plus grossier :
@@ -1047,8 +1088,8 @@ struct AntennaSiteInfo: Decodable, Equatable {
     /// `nil` quand rien n'est connu — auquel cas l'interface doit le dire plutôt
     /// que de laisser croire à une mesure.
     var radiatingHeightMeters: Double? {
-        if let antennaHeight5g, antennaHeight5g > 0 { return Double(antennaHeight5g) }
-        if let antennaHeight4g, antennaHeight4g > 0 { return Double(antennaHeight4g) }
+        if let antennaHeight5g, antennaHeight5g > 0 { return antennaHeight5g }
+        if let antennaHeight4g, antennaHeight4g > 0 { return antennaHeight4g }
         if let supportHeightMeters, supportHeightMeters > 0 { return supportHeightMeters }
         if let pylonHeight, pylonHeight > 0 { return pylonHeight }
         return nil

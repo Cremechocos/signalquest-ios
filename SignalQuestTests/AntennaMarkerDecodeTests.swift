@@ -155,6 +155,44 @@ final class AntennaMarkerDecodeTests: XCTestCase {
         XCTAssertNil(unknown.radiatingHeightMeters)
         XCTAssertFalse(unknown.radiatingHeightIsEstimated, "Rien à estimer quand rien n'est connu")
     }
+
+    /// IOS-037 : hauteurs d'antenne décimales (le serveur sert 29,5), département servi, coordonnées
+    /// copiables au format POSIX quelle que soit la langue.
+    func testSiteSheetReadsDecimalHeightsDepartmentAndPosixCoordinates() throws {
+        let core = try JSONDecoder.signalQuest.decode(AntennaCoreDetails.self, from: Data("""
+        {"id":"s1","supId":"123","market":"FR","lat":44.83781,"lng":-0.57918,
+         "department":{"code":"33","name":"Gironde"},
+         "siteInfo":{"antennaHeight4g":29.5,"antennaHeight5g":31}}
+        """.utf8))
+        XCTAssertEqual(core.siteInfo.antennaHeight4g, 29.5)
+        XCTAssertEqual(core.siteInfo.antennaHeight5g, 31)
+        XCTAssertEqual(core.siteInfo.radiatingHeightMeters, 31)
+        XCTAssertFalse(core.siteInfo.radiatingHeightIsEstimated)
+        XCTAssertEqual(core.department?.label, "Gironde (33)")
+        let none = try JSONDecoder.signalQuest.decode(AntennaCoreDetails.self, from: Data("""
+        {"id":"s2","department":{"code":"","name":"Gironde"}}
+        """.utf8))
+        XCTAssertNil(none.department, "un département incomplet ne s'affiche pas")
+        XCTAssertNil(try JSONDecoder.signalQuest.decode(AntennaCoreDetails.self, from: Data(#"{"id":"s3","department":null}"#.utf8)).department)
+        XCTAssertEqual(AntennaDetailSheet.posixCoordinates(lat: 44.837811, lng: -0.579183), "44.83781, -0.57918")
+        // Un support souterrain porte « 0 » au registre : aucune hauteur affichée, repli sur le pylône.
+        XCTAssertNil(AntennaSiteInfo(supportHeight: "0").displayedSupportHeightMeters)
+        XCTAssertEqual(AntennaSiteInfo(supportHeight: "0", pylonHeight: 12).displayedSupportHeightMeters, 12)
+        XCTAssertEqual(AntennaSiteInfo(supportHeight: "29,5").displayedSupportHeightMeters, 29.5)
+    }
+
+    /// IOS-056 : les six types de partage servis ont un libellé ou une ligne dédiée ; un type
+    /// inconnu ne s'affiche pas brut.
+    func testSharingKindsNeverShowARawServerValue() {
+        XCTAssertNotNil(AntennaDetailSheet.sharingLabel(kind: "same_support"))
+        XCTAssertNotNil(AntennaDetailSheet.sharingLabel(kind: "ztd_same_support"))
+        XCTAssertNotNil(AntennaDetailSheet.sharingLabel(kind: "single"))
+        XCTAssertNil(AntennaDetailSheet.sharingLabel(kind: "future_kind"))
+        XCTAssertNil(AntennaDetailSheet.sharingLabel(kind: nil))
+        for kind in ["same_support", "ztd_same_support", "single"] {
+            XCTAssertFalse(AntennaDetailSheet.sharingLabel(kind: kind)?.contains("_") ?? true, kind)
+        }
+    }
 }
 
 /// La fiche s'ouvre avant que le détail du site ne réponde. Ce que la tuile
