@@ -161,19 +161,19 @@ final class AuthTransportTests: XCTestCase {
             log.append(request)
             let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Self.bodyData(request)) as? [String: Any])
             if request.url?.path == "/api/auth/login" {
-                XCTAssertEqual(payload["identifier"] as? String, "alex38")
+                XCTAssertEqual(payload["identifier"] as? String, "lucie_b")
                 XCTAssertNil(payload["email"])
             } else {
                 XCTAssertEqual(request.url?.path, "/api/auth/apple")
-                XCTAssertEqual(payload["handle"] as? String, "alex38")
+                XCTAssertEqual(payload["handle"] as? String, "lucie_b")
                 XCTAssertEqual(payload["acceptedTerms"] as? Bool, true)
             }
             return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
                 headerFields: ["Content-Type": "application/json"])!, Data("{\"requires2FA\":false}".utf8))
         }
         let service = AuthService(api: client, sessionStore: InMemoryTokenStore())
-        _ = try await service.login(identifier: "alex38", password: "synthetic-password")
-        _ = try await service.signInWithApple(identityToken: "synthetic", fullName: nil, handle: "alex38", acceptedTerms: true)
+        _ = try await service.login(identifier: "lucie_b", password: "synthetic-password")
+        _ = try await service.signInWithApple(identityToken: "synthetic", fullName: nil, handle: "lucie_b", acceptedTerms: true)
         XCTAssertEqual(log.count, 2)
     }
 

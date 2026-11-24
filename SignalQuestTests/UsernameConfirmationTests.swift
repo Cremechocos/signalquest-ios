@@ -14,11 +14,11 @@ final class UsernameConfirmationTests: XCTestCase {
     }
 
     func testDueUntilConfirmedAndAlwaysWithoutAUsername() throws {
-        XCTAssertTrue(try user(#"{"id":"u1","handle":"alex38","handleConfirmedAt":null}"#).needsHandleConfirmation)
-        XCTAssertTrue(try user(#"{"id":"u1","handle":"alex38"}"#).needsHandleConfirmation, "Ancien cache sans le champ")
+        XCTAssertTrue(try user(#"{"id":"u1","handle":"lucie_b","handleConfirmedAt":null}"#).needsHandleConfirmation)
+        XCTAssertTrue(try user(#"{"id":"u1","handle":"lucie_b"}"#).needsHandleConfirmation, "Ancien cache sans le champ")
         XCTAssertTrue(try user(#"{"id":"u1","handle":null,"handleConfirmedAt":"2026-11-13T10:00:00.000Z"}"#)
             .needsHandleConfirmation)
-        XCTAssertFalse(try user(#"{"id":"u1","handle":"alex38","handleConfirmedAt":"2026-11-13T10:00:00.000Z"}"#)
+        XCTAssertFalse(try user(#"{"id":"u1","handle":"lucie_b","handleConfirmedAt":"2026-11-13T10:00:00.000Z"}"#)
             .needsHandleConfirmation)
     }
 
@@ -54,7 +54,7 @@ final class UsernameConfirmationTests: XCTestCase {
     }
 
     func testSessionShowsTheScreenOnlyAfterAServerReadAndHidesItOnceSaved() async throws {
-        let unconfirmed = try user(#"{"id":"\#(AuthUser.mock.id)","email":"synthetic@example.invalid","handle":"alex38"}"#)
+        let unconfirmed = try user(#"{"id":"\#(AuthUser.mock.id)","email":"synthetic@example.invalid","handle":"lucie_b"}"#)
         let mock = MockAuthService()
         mock.storedCredentials = true
         mock.cacheUser(unconfirmed)
@@ -65,7 +65,7 @@ final class UsernameConfirmationTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 50_000_000)
         XCTAssertNil(session.serverProfileUserID, "Hors ligne, sur le seul cache : pas d'écran bloquant")
 
-        let confirmed = try user(#"{"id":"\#(AuthUser.mock.id)","handle":"alex38","handleConfirmedAt":"2026-11-13T10:00:00.000Z"}"#)
+        let confirmed = try user(#"{"id":"\#(AuthUser.mock.id)","handle":"lucie_b","handleConfirmedAt":"2026-11-13T10:00:00.000Z"}"#)
         session.applyProfileIdentity(confirmed)
         XCTAssertEqual(session.serverProfileUserID, AuthUser.mock.id)
         guard case .authenticated(let shown) = session.state else { return XCTFail("Session perdue") }

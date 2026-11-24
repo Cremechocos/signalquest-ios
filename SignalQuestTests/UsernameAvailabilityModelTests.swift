@@ -24,13 +24,13 @@ final class UsernameAvailabilityModelTests: XCTestCase {
     }
 
     func testLocalStatesNeedNoRequest() {
-        let model = makeModel(current: "alex38")
+        let model = makeModel(current: "lucie_b")
         model.input = "  "
         XCTAssertEqual(model.status, .idle)
         XCTAssertNil(model.statusText)
         model.input = "a"
         XCTAssertEqual(model.status, .invalid)
-        model.input = "@Alex38"
+        model.input = "@Lucie_B"
         XCTAssertEqual(model.status, .unchanged, "Ressaisir son nom actuel n'est pas un changement")
         XCTAssertFalse(model.canSubmit)
     }
@@ -56,7 +56,7 @@ final class UsernameAvailabilityModelTests: XCTestCase {
     }
 
     func testCooldownAndServerRefusal() async {
-        let model = makeModel(current: "alex38", cooldownDays: 12)
+        let model = makeModel(current: "lucie_b", cooldownDays: 12)
         model.input = "alex-g"
         let status = await settled(model)
         XCTAssertEqual(status, .cooldown(days: 12))
@@ -68,7 +68,7 @@ final class UsernameAvailabilityModelTests: XCTestCase {
 
     func testNoCheckRouteIsAnError() {
         let model = UsernameAvailabilityModel()
-        model.input = "alex38"
+        model.input = "lucie_b"
         XCTAssertEqual(model.status, .error)
     }
 }

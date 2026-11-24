@@ -181,7 +181,7 @@ struct LoginView: View {
                 AuthFieldGroup {
                     AuthFieldRow("E-mail ou nom d’utilisateur", isFocused: focus == .identifier) {
                         TextField("E-mail ou nom d’utilisateur", text: $identifier,
-                                  prompt: SQFormPrompt.text("nom@exemple.fr ou alex38"))
+                                  prompt: SQFormPrompt.text("nom@exemple.fr ou lucie_b"))
                             .textInputAutocapitalization(.never)
                             .keyboardType(.emailAddress)
                             .textContentType(.username)

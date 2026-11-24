@@ -9457,22 +9457,6 @@
         }
       }
     },
-    "Par exemple : Alexandre G." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "For example: Alexandre G."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Par exemple : Alexandre G."
-          }
-        }
-      }
-    },
     "Nom affiché, facultatif" : {
       "localizations" : {
         "en" : {
@@ -9957,22 +9941,6 @@
       },
       "shouldTranslate" : false
     },
-    "Ex. alex38" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "E.g. alex38"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ex. alex38"
-          }
-        }
-      }
-    },
     "E-mail ou nom d’utilisateur" : {
       "localizations" : {
         "en" : {
@@ -9985,22 +9953,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "E-mail ou nom d’utilisateur"
-          }
-        }
-      }
-    },
-    "nom@exemple.fr ou alex38" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "name@example.com or alex38"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "nom@exemple.fr ou alex38"
           }
         }
       }
@@ -125111,6 +125063,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Photo publiée — merci !"
+          }
+        }
+      }
+    },
+    "Ex. lucie_b" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "E.g. lucie_b"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ex. lucie_b"
+          }
+        }
+      }
+    },
+    "nom@exemple.fr ou lucie_b" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "name@example.com or lucie_b"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nom@exemple.fr ou lucie_b"
+          }
+        }
+      }
+    },
+    "Par exemple : Lucie B." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "For example: Lucie B."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Par exemple : Lucie B."
           }
         }
       }

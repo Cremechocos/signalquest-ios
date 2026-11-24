@@ -210,17 +210,17 @@ final class AuthSessionTests: XCTestCase {
         let session = AuthSessionViewModel(service: service)
         await session.bootstrap()
 
-        let refused = await session.signInWithApple(identityToken: "synthetic", fullName: nil, handle: "alex",
+        let refused = await session.signInWithApple(identityToken: "synthetic", fullName: nil, handle: "lucie",
                                                     acceptedTerms: true)
         XCTAssertEqual(refused, .handleRejected)
         XCTAssertEqual(session.state, .loggedOut)
         XCTAssertNil(session.errorMessage)
         XCTAssertEqual(session.handleErrorMessage, String(localized: "Déjà pris : choisis-en un autre."))
-        let accepted = await session.signInWithApple(identityToken: "synthetic", fullName: nil, handle: "alex38",
+        let accepted = await session.signInWithApple(identityToken: "synthetic", fullName: nil, handle: "lucie_b",
                                                      acceptedTerms: true)
         XCTAssertEqual(accepted, .continued)
         XCTAssertNil(session.handleErrorMessage)
-        XCTAssertEqual(service.appleHandlesSent, ["alex", "alex38"])
+        XCTAssertEqual(service.appleHandlesSent, ["lucie", "lucie_b"])
     }
 
     func testWrongCredentialsNameBothWaysOfSigningIn() async {
@@ -228,7 +228,7 @@ final class AuthSessionTests: XCTestCase {
         service.loginError = APIError.http(status: 401, code: "INVALID_CREDENTIALS",
                                            message: "Email ou mot de passe incorrect", requestId: nil, retryAfter: nil)
         let session = AuthSessionViewModel(service: service)
-        await session.login(identifier: "alex38", password: "synthetic-password")
+        await session.login(identifier: "lucie_b", password: "synthetic-password")
         XCTAssertEqual(session.errorMessage, String(localized: "Identifiant ou mot de passe incorrect."))
     }
 

@@ -146,7 +146,7 @@ struct UsernameConfirmationView: View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             AuthFieldGroup {
                 AuthFieldRow("Nom affiché (facultatif)", isFocused: focus == .displayName) {
-                    TextField("Nom affiché", text: $displayName, prompt: SQFormPrompt.text("Par exemple : Alexandre G."))
+                    TextField("Nom affiché", text: $displayName, prompt: SQFormPrompt.text("Par exemple : Lucie B."))
                         .textContentType(.name)
                         .submitLabel(.done)
                         .focused($focus, equals: .displayName)
@@ -275,7 +275,7 @@ struct UsernameConfirmationQAScreen: View {
         let none = AppEnvironment.hasQAFlag("username-confirmation-none")
         let json = none
             ? #"{"id":"qa-user","email":"synthetic@example.invalid","name":"Camille","handle":null}"#
-            : #"{"id":"qa-user","email":"synthetic@example.invalid","name":null,"handle":"alex38"}"#
+            : #"{"id":"qa-user","email":"synthetic@example.invalid","name":null,"handle":"lucie_b"}"#
         return try! JSONDecoder().decode(AuthUser.self, from: Data(json.utf8))
     }
     #else

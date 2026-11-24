@@ -145,7 +145,7 @@ struct UsernameTextField: View {
     var contentType: UITextContentType? = .username
 
     var body: some View {
-        TextField("Nom d’utilisateur", text: $text, prompt: SQFormPrompt.text("Ex. alex38"))
+        TextField("Nom d’utilisateur", text: $text, prompt: SQFormPrompt.text("Ex. lucie_b"))
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
             .textContentType(contentType)

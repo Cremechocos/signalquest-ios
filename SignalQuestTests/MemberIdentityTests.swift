@@ -35,9 +35,9 @@ final class MemberIdentityTests: XCTestCase {
     }
 
     func testDisplayNameFallback() {
-        XCTAssertEqual(MemberIdentity.displayName("Alexandre G.", handle: "alex38"), "Alexandre G.")
-        XCTAssertEqual(MemberIdentity.displayName("  ", handle: "alex38"), "@alex38")
-        XCTAssertEqual(MemberIdentity.displayName(nil, handle: "@alex38"), "@alex38")
+        XCTAssertEqual(MemberIdentity.displayName("Alexandre G.", handle: "lucie_b"), "Alexandre G.")
+        XCTAssertEqual(MemberIdentity.displayName("  ", handle: "lucie_b"), "@lucie_b")
+        XCTAssertEqual(MemberIdentity.displayName(nil, handle: "@lucie_b"), "@lucie_b")
         XCTAssertEqual(MemberIdentity.displayName(nil, handle: ""), MemberIdentity.someone)
         XCTAssertNil(MemberIdentity.name(nil, handle: nil))
     }
@@ -48,8 +48,8 @@ final class MemberIdentityTests: XCTestCase {
         XCTAssertNil(user.knownName)
         XCTAssertEqual(user.displayName, MemberIdentity.someone)
         let withHandle = try JSONDecoder().decode(MessageUser.self, from: Data(
-            #"{"id":"u1","name":"","handle":"alex38","email":"synthetic@example.invalid"}"#.utf8))
-        XCTAssertEqual(withHandle.displayName, "@alex38")
+            #"{"id":"u1","name":"","handle":"lucie_b","email":"synthetic@example.invalid"}"#.utf8))
+        XCTAssertEqual(withHandle.displayName, "@lucie_b")
     }
 
     func testOwnAccountNeverFallsBackToTheEmail() throws {
@@ -61,8 +61,8 @@ final class MemberIdentityTests: XCTestCase {
     func testLeaderboardReadsTheHandleServedAsName() throws {
         // Option « nom d'utilisateur au classement » : `name` porte aussi le handle (anciens clients).
         let shown = try JSONDecoder().decode(PointsLeaderboardEntry.self, from: Data(
-            #"{"rank":4,"userId":"u1","name":"alex38","handle":"alex38","points":12480}"#.utf8))
-        XCTAssertEqual(shown.displayName, "@alex38")
+            #"{"rank":4,"userId":"u1","name":"lucie_b","handle":"lucie_b","points":12480}"#.utf8))
+        XCTAssertEqual(shown.displayName, "@lucie_b")
         let named = try JSONDecoder().decode(PointsLeaderboardEntry.self, from: Data(
             #"{"rank":5,"userId":"u2","name":"Camille","handle":null,"points":100}"#.utf8))
         XCTAssertEqual(named.displayName, "Camille")

@@ -51,7 +51,7 @@ struct EditProfileView: View {
 
                 AuthFieldGroup {
                     AuthFieldRow("Nom affiché (facultatif)", isFocused: focus == .name) {
-                        TextField("Nom affiché", text: $name, prompt: SQFormPrompt.text("Par exemple : Alexandre G."))
+                        TextField("Nom affiché", text: $name, prompt: SQFormPrompt.text("Par exemple : Lucie B."))
                             .textContentType(.name)
                             .submitLabel(.next)
                             .focused($focus, equals: .name)

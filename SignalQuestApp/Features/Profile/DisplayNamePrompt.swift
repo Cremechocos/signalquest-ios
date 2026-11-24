@@ -58,7 +58,7 @@ struct DisplayNamePromptView: View {
 
                 AuthFieldGroup {
                     AuthFieldRow("Nom affiché", isFocused: focused) {
-                        TextField("Nom affiché", text: $name, prompt: SQFormPrompt.text("Par exemple : Alexandre G."))
+                        TextField("Nom affiché", text: $name, prompt: SQFormPrompt.text("Par exemple : Lucie B."))
                             .textContentType(.name)
                             .submitLabel(.done)
                             .focused($focused)
@@ -118,11 +118,11 @@ struct DisplayNamePromptQAScreen: View {
         } else {
             DisplayNamePromptView(
                 user: try! JSONDecoder().decode(AuthUser.self, from: Data(
-                    #"{"id":"qa-user","email":"synthetic@example.invalid","name":null,"handle":"alex38","handleConfirmedAt":"2026-11-13T00:00:00.000Z"}"#.utf8)),
+                    #"{"id":"qa-user","email":"synthetic@example.invalid","name":null,"handle":"lucie_b","handleConfirmedAt":"2026-11-13T00:00:00.000Z"}"#.utf8)),
                 save: { patch in
                     try await Task.sleep(nanoseconds: 300_000_000)
                     return try JSONDecoder().decode(AuthUser.self, from: JSONSerialization.data(withJSONObject: [
-                        "id": "qa-user", "name": patch.name ?? "", "handle": "alex38",
+                        "id": "qa-user", "name": patch.name ?? "", "handle": "lucie_b",
                         "handleConfirmedAt": "2026-11-13T00:00:00.000Z",
                     ]))
                 },

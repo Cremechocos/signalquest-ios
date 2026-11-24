@@ -11,7 +11,7 @@ final class DisplayNamePromptPolicyTests: XCTestCase {
         return defaults
     }
 
-    private func user(name: String?, handle: String? = "alex38", confirmed: Bool = true, id: String = "u1") throws -> AuthUser {
+    private func user(name: String?, handle: String? = "lucie_b", confirmed: Bool = true, id: String = "u1") throws -> AuthUser {
         var object: [String: Any] = ["id": id]
         if let name { object["name"] = name }
         if let handle { object["handle"] = handle }
