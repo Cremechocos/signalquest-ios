@@ -333,4 +333,39 @@ final class LocalizationBundleTests: XCTestCase {
             XCTAssertTrue(profile.contains("Inès"), profile)
         }
     }
+
+    /// IOS-039 : chaque phrase « de %@ » du catalogue est classée. Une phrase qui reçoit un nom de
+    /// membre ou d'opérateur passe par `SQElision` à son appel ; les autres reçoivent un nombre, une
+    /// distance, une date, un lieu ou un libellé libre. Une nouvelle phrase fait échouer ce test
+    /// tant qu'elle n'est pas classée (même garde qu'Android, FrenchElisionTest).
+    func testEveryDeBeforeAnArgumentIsClassified() throws {
+        let url = try XCTUnwrap(Bundle.main.url(forResource: "Localizable", withExtension: "strings",
+            subdirectory: "fr.lproj"))
+        let french = try XCTUnwrap(PropertyListSerialization.propertyList(
+            from: Data(contentsOf: url), options: [], format: nil) as? [String: String])
+        let pattern = try NSRegularExpression(pattern: "(^|[^\\p{L}’'])[dD]e %(\\d+\\$)?@")
+        let found = Set(french.keys.filter { key in
+            !key.contains("|") && pattern.firstMatch(in: key, range: NSRange(key.startIndex..., in: key)) != nil
+        })
+        let elided: Set<String> = [
+            "Publication de %@", "Publication de %@ : %@", "Validations de %@", "Réseau de %@, en direct",
+            "Masquer les stories de %@", "Afficher de nouveau les stories de %@", "Tu ne verras plus les stories de %@.",
+            "Options de %@", "Ouvre le profil de %@", "Voir le profil de %@", "Se désabonner de %@",
+            "Photo de %@", "Photo de %@, %@", "Vidéo de %@", "Story de %@", "Story de %@ : %@",
+            "Un appareil de %@ ne figure pas tel quel dans le journal des appareils : la conversation passe à une nouvelle clé sans lui.",
+            "Les appareils de %@ ont changé.", "Le journal des appareils de %@ ne correspond pas : rien ne lui est envoyé.",
+            "Notifications des posts de %@", "Activer les notifications des posts de %@", "Notifications des posts de %@ : %@",
+        ]
+        // Nombres, distances, plages, dates, lieux et libellés libres : jamais élidés.
+        let excluded = found.subtracting(elided).filter { key in
+            key.contains("à moins de %@") || key.contains("plus de %@") || key.contains("moins de %@")
+                || key.range(of: "de %(\\d+\\$)?@ à %", options: .regularExpression) != nil
+                || key.contains("de %@°") || key.contains("près de %@") || key.contains("distants de %@")
+                || key.contains("rayon de %@")
+                || ["%@ de %@", "Protection de %@"].contains(key)
+        }
+        XCTAssertTrue(elided.isSubset(of: found), "Phrase élidée absente du catalogue : \(elided.subtracting(found).sorted())")
+        XCTAssertEqual(found.subtracting(elided).subtracting(excluded).sorted(), [],
+                       "Phrase « de %@ » à classer : nom de membre ou d'opérateur (SQElision à l'appel), sinon exclue ici")
+    }
 }
