@@ -152,6 +152,29 @@ final class FhAzimuthsTests: XCTestCase {
     /// IOS-032 : un système intérieur ou distribué (métro, tunnel) garde ses azimuts
     /// au registre, mais le drapeau dit qu'ils ne sont pas des directions ; absent sur
     /// un serveur antérieur, il vaut faux.
+    /// IOS-049 : le serveur publie la photo tout de suite mais sert la fiche depuis un
+    /// cache de 5 min ; la photo envoyée passe en tête, une seule fois.
+    func testUploadedPhotoIsPrependedOnceToTheSheet() throws {
+        let cached = try details("""
+        {
+          "antenna": { "id": "7", "supId": "7", "lat": 48.8566, "lng": 2.3522, "operators": ["ORANGE"] },
+          "photos": [{ "id": "old", "imageUrl": "https://example.com/old.jpg" }]
+        }
+        """)
+        XCTAssertEqual(cached.photos.map(\.id), ["old"], "la fiche décode ses photos")
+        let uploaded = try JSONDecoder.signalQuest.decode(Photo.self, from: Data("""
+        {"id":"new","siteId":"7","imageUrl":"https://example.com/new.jpg","thumbnailUrl":"https://example.com/new-t.jpg","approved":true}
+        """.utf8))
+        let shown = try XCTUnwrap(AntennaDetailViewModel.prependingUploaded(uploaded, to: cached))
+        XCTAssertEqual(shown.photos.map(\.id), ["new", "old"])
+        XCTAssertEqual(shown.photosCount, 2, "le compteur de l'onglet suit")
+        XCTAssertEqual(shown.photos.first?.thumbnailUrl?.absoluteString, "https://example.com/new-t.jpg")
+        let again = try XCTUnwrap(AntennaDetailViewModel.prependingUploaded(uploaded, to: shown))
+        XCTAssertEqual(again.photos.map(\.id), ["new", "old"], "une fiche qui porte déjà la photo ne la double pas")
+        XCTAssertEqual(again.photosCount, 2)
+        XCTAssertNil(AntennaDetailViewModel.prependingUploaded(uploaded, to: nil))
+    }
+
     func testDistributedSystemFlagDecodesAndDefaultsToFalse() throws {
         let indoor = try XCTUnwrap(try details("""
         {

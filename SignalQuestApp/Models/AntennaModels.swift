@@ -326,7 +326,7 @@ struct AntennaDetails: Decodable {
     let address: String?
     let height: Double?
     let validationsCount: Int?
-    let photosCount: Int?
+    var photosCount: Int?
     let speedtestsCount: Int?
     let raw: [String: JSONValue]?
     let core: AntennaCoreDetails?
@@ -334,7 +334,7 @@ struct AntennaDetails: Decodable {
     let nearbySpeedtests: [NearbySpeedtest]
     /// Règle A (public-map-tiles v1.1) : heures des speedtests voisins tronquées à l'heure.
     let nearbySpeedtestsHourPrecision: Bool
-    let photos: [AntennaPhotoSummary]
+    var photos: [AntennaPhotoSummary]
     /// OFFICIAL-NEARBY r1 §3 : faits officiels d'une position suisse (OFCOM) ou bruxelloise ;
     /// absent ailleurs, Flandre comprise.
     let officialDetails: OfficialSiteDetails?
@@ -1113,6 +1113,21 @@ struct AntennaPhotoSummary: Decodable, Equatable, Identifiable {
         socialPostId = c.decodeFlexibleString(forKey: .socialPostId)
         commentCount = try? c.decodeIfPresent(Int.self, forKey: .commentCount)
         repostsCount = try? c.decodeIfPresent(Int.self, forKey: .repostsCount)
+    }
+
+    /// La photo que le membre vient d'envoyer, d'après la réponse de `POST /api/photos`.
+    init(uploaded photo: Photo) {
+        id = photo.id
+        imageUrl = photo.imageUrl
+        thumbnailUrl = photo.thumbnailUrl
+        description = photo.description
+        uploadedAt = (photo.uploadedAt ?? photo.createdAt).map { ISO8601DateFormatter().string(from: $0) }
+        likes = 0
+        userName = nil
+        userReaction = nil
+        socialPostId = photo.socialPostId
+        commentCount = 0
+        repostsCount = 0
     }
 }
 

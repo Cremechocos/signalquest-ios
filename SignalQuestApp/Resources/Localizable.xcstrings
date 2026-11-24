@@ -81093,23 +81093,6 @@
         }
       }
     },
-    "Photo envoyée — merci ! Elle apparaîtra après validation." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Photo sent — thank you! It will appear after review."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Photo envoyée — merci ! Elle apparaîtra après validation."
-          }
-        }
-      }
-    },
     "Photo indisponible" : {
       "localizations" : {
         "en" : {
@@ -125112,6 +125095,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les conversations pas encore passées au nouveau chiffrement ne reçoivent que du texte."
+          }
+        }
+      }
+    },
+    "Photo publiée — merci !" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo published. Thank you!"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo publiée — merci !"
           }
         }
       }

@@ -83,9 +83,11 @@ final class AntennaDetailViewModel: ObservableObject {
         }
     }
 
-    /// Envoie une photo sur le site via `PhotoService`, puis recharge la fiche
-    /// (la photo peut être en attente de modération côté serveur). Les zones
-    /// floutées sont cuites avant l'encodage ; l'EXIF vient de l'original.
+    /// Envoie une photo sur le site via `PhotoService`, puis recharge la fiche.
+    /// Le serveur la publie tout de suite (masquée si elle est signalée), mais sert
+    /// la fiche depuis un cache de 5 min que l'envoi ne vide pas : la photo s'ajoute
+    /// donc ici, en tête, comme sur Android. Les zones floutées sont cuites avant
+    /// l'encodage ; l'EXIF vient de l'original.
     func uploadPhoto(
         raw: Data,
         edits: PhotoEdits,
@@ -106,7 +108,7 @@ final class AntennaDetailViewModel: ObservableObject {
                 photoUploadMessage = "Image illisible."
                 return
             }
-            _ = try await photos.uploadPhoto(
+            let uploaded = try await photos.uploadPhoto(
                 data: prepared.jpeg,
                 siteId: siteId,
                 market: market.uppercased(),
@@ -116,12 +118,23 @@ final class AntennaDetailViewModel: ObservableObject {
                 exifMetadata: prepared.exifJSON
             )
             Haptics.success()
-            photoUploadMessage = "Photo envoyée — merci ! Elle apparaîtra après validation."
+            photoUploadMessage = "Photo publiée — merci !"
             await load(id: siteId, market: market, operatorName: operatorName, anfrCode: anfrCode)
+            details = Self.prependingUploaded(uploaded, to: details)
+            if let detailsOperator, let details { operatorDetails[detailsOperator] = details }
         } catch {
             Haptics.error()
             photoUploadMessage = error.userFacingMessage
         }
+    }
+
+    /// La photo envoyée en tête de la fiche, sauf si la fiche relue la porte déjà.
+    nonisolated static func prependingUploaded(_ photo: Photo, to details: AntennaDetails?) -> AntennaDetails? {
+        guard var details, !details.photos.contains(where: { $0.id == photo.id }) else { return details }
+        details.photos.insert(AntennaPhotoSummary(uploaded: photo), at: 0)
+        // Le compteur de l'onglet vient aussi du cache : il suit la photo ajoutée.
+        details.photosCount = details.photosCount.map { $0 + 1 }
+        return details
     }
 
 }
