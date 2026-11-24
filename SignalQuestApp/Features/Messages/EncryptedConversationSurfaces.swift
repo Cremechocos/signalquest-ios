@@ -191,16 +191,17 @@ enum ShareDestinationPolicy {
         return nil
     }
 
-    /// Une conversation reçoit le partage si l'envoi y est possible. Dans une
-    /// conversation chiffrée, seul le texte l'est : une photo ou un fichier
-    /// partirait par la route des pièces jointes, jamais chiffrée.
+    /// Une conversation reçoit le partage si l'envoi y est possible. En v2, les
+    /// pièces partent chiffrées par le composer (blobs, `sendStaged`). Une
+    /// conversation chiffrée encore v1 ne prend que le texte : une photo ou un
+    /// fichier y partirait par la route des pièces jointes, jamais chiffrée.
     static func conversationAccepts(
         _ manifest: ShareInbox.Manifest,
         toEncrypted: Bool,
         route: EncryptedConversationSurfaces.ForwardRoute
     ) -> Bool {
         guard route != .unavailable else { return false }
-        return !toEncrypted || manifest.items.isEmpty
+        return !toEncrypted || manifest.items.isEmpty || route == .v2
     }
 }
 

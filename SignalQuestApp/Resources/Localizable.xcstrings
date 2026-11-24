@@ -26780,22 +26780,6 @@
         }
       }
     },
-    "Les conversations chiffrées ne reçoivent que du texte." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Encrypted conversations only receive text."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les conversations chiffrées ne reçoivent que du texte."
-          }
-        }
-      }
-    },
     "Les conversations chiffrées ne sont pas incluses : leurs messages ne se lisent que sur ton téléphone." : {
       "localizations" : {
         "en" : {
@@ -125112,6 +125096,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Système intérieur ou distribué : les azimuts ne sont pas une direction."
+          }
+        }
+      }
+    },
+    "Les conversations pas encore passées au nouveau chiffrement ne reçoivent que du texte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conversations that haven’t moved to the new encryption yet only receive text."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les conversations pas encore passées au nouveau chiffrement ne reçoivent que du texte."
           }
         }
       }

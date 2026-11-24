@@ -3498,9 +3498,12 @@ struct ReceivedShareSheet: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, SQSpace.xl)
             } else if targets.isEmpty && archivedTargets.isEmpty {
+                // Écartées parce que chiffrées en v1 : on dit pourquoi, plutôt qu'un vide.
                 EmptyStateView(
                     title: String(localized: "Aucune conversation"),
-                    message: String(localized: "Aucune conversation ne peut recevoir ce partage."),
+                    message: hiddenEncryptedCount > 0
+                        ? String(localized: "Les conversations pas encore passées au nouveau chiffrement ne reçoivent que du texte.")
+                        : String(localized: "Aucune conversation ne peut recevoir ce partage."),
                     systemImage: "bubble.left.and.bubble.right"
                 )
             } else {
@@ -3535,7 +3538,7 @@ struct ReceivedShareSheet: View {
                     .accessibilityIdentifier("share.archived")
                 }
                 if hiddenEncryptedCount > 0 {
-                    Text("Les conversations chiffrées ne reçoivent que du texte.")
+                    Text("Les conversations pas encore passées au nouveau chiffrement ne reçoivent que du texte.")
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
                         .padding(.horizontal, SQSpace.xs)

@@ -838,7 +838,7 @@ final class ModelDecodeTests: XCTestCase {
         XCTAssertEqual(ShareDestinationPolicy.feedBlocker(for: shareManifest([.image, .image])), .severalImages)
     }
 
-    func testEncryptedConversationsOnlyAcceptText() {
+    func testOnlyV1EncryptedConversationsAreLimitedToText() {
         let text = shareManifest(text: "salut", url: "https://example.com")
         let photo = shareManifest(text: "légende", [.image])
         let file = shareManifest([.file])
@@ -846,11 +846,13 @@ final class ModelDecodeTests: XCTestCase {
         for manifest in [text, photo, file] {
             XCTAssertTrue(ShareDestinationPolicy.conversationAccepts(manifest, toEncrypted: false, route: .plain))
         }
-        // Chiffrée (v1 ou v2) : le texte seulement.
-        for route in [EncryptedConversationSurfaces.ForwardRoute.legacyEncrypted, .v2] {
-            XCTAssertTrue(ShareDestinationPolicy.conversationAccepts(text, toEncrypted: true, route: route))
-            XCTAssertFalse(ShareDestinationPolicy.conversationAccepts(photo, toEncrypted: true, route: route))
-            XCTAssertFalse(ShareDestinationPolicy.conversationAccepts(file, toEncrypted: true, route: route))
+        // Chiffrée encore v1 : le texte seulement (les pièces partiraient en clair).
+        XCTAssertTrue(ShareDestinationPolicy.conversationAccepts(text, toEncrypted: true, route: .legacyEncrypted))
+        XCTAssertFalse(ShareDestinationPolicy.conversationAccepts(photo, toEncrypted: true, route: .legacyEncrypted))
+        XCTAssertFalse(ShareDestinationPolicy.conversationAccepts(file, toEncrypted: true, route: .legacyEncrypted))
+        // Chiffrée v2 : tout passe, les pièces partent chiffrées par le composer.
+        for manifest in [text, photo, file] {
+            XCTAssertTrue(ShareDestinationPolicy.conversationAccepts(manifest, toEncrypted: true, route: .v2))
         }
         // Chiffrée v2 fermée dans cette version : rien n'y part.
         XCTAssertFalse(ShareDestinationPolicy.conversationAccepts(text, toEncrypted: true, route: .unavailable))
