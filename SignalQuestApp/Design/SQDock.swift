@@ -231,7 +231,13 @@ private struct SQDockRootPresence: UIViewRepresentable {
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
-            onChange(ObjectIdentifier(self), window != nil)
+            // UIKit appelle ceci pendant une mise à jour SwiftUI (changement d'onglet,
+            // push) : publier là sur le routeur déclenchait « Publishing changes from
+            // within view updates ». Le signal part au tour suivant, dans l'ordre.
+            let id = ObjectIdentifier(self)
+            let visible = window != nil
+            let onChange = onChange
+            Task { @MainActor in onChange(id, visible) }
         }
     }
 }
