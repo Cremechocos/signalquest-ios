@@ -42864,47 +42864,6 @@
         }
       }
     },
-    "%lld points · %lld session" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld points · %lld session"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld points · %lld sessions"
-                }
-              }
-            }
-          }
-        },
-        "fr" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld points · %lld session"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld points · %lld sessions"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "%lld points · progression %lld %%" : {
       "localizations" : {
         "en" : {
@@ -43222,46 +43181,6 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld tests"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "%lld test · moy. DL %lld Mbps · ping min %lld ms" : {
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld test · avg DL %lld Mb/s · min ping %lld ms"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld tests · avg DL %lld Mb/s · min ping %lld ms"
-                }
-              }
-            }
-          }
-        },
-        "fr" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld test · moy. DL %lld Mb/s · ping min %lld ms"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld tests · moy. DL %lld Mb/s · ping min %lld ms"
                 }
               }
             }
