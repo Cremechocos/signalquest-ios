@@ -616,7 +616,7 @@ struct SessionDetailView: View {
                     HStack(spacing: 5) {
                         Circle().fill(Self.operatorColor(op.colorHex)).frame(width: 8, height: 8)
                             .accessibilityHidden(true)
-                        Text(op.label).font(SQFont.body(13, .semibold, relativeTo: .caption))
+                        Text(verbatim: SessionRow.fullLabel(op)).font(SQFont.body(13, .semibold, relativeTo: .caption))
                         if let count = op.count {
                             Text("\(count) points")
                                 .font(SQFont.body(12, relativeTo: .caption2))

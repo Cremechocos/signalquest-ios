@@ -287,6 +287,16 @@ final class SessionRowTests: XCTestCase {
                        "Opérateur local")
     }
 
+    /// Le nom complet de l'app, jamais la clé brute du serveur (« BOUYGUES ») ; un opérateur
+    /// inconnu garde l'étiquette servie.
+    func testOperatorFullLabelIsTheAppName() {
+        XCTAssertEqual(SessionRow.fullLabel(SessionOperator(key: "BOUYGUES", label: "BOUYGUES", colorHex: nil, count: nil)),
+                       "Bouygues Telecom")
+        XCTAssertEqual(SessionRow.fullLabel(SessionOperator(key: "ORANGE", label: "ORANGE", colorHex: nil, count: nil)), "Orange")
+        XCTAssertEqual(SessionRow.fullLabel(SessionOperator(key: "XYZ", label: "Opérateur local", colorHex: nil, count: nil)),
+                       "Opérateur local")
+    }
+
     /// VoiceOver lit la ligne dans l'ordre : jour et heure, distance et durée, type, opérateurs
     /// en entier, qualité. Ni points ni dBm, comme à l'écran.
     func testAccessibilityTextReadsTheRow() throws {

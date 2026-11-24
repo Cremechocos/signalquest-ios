@@ -609,6 +609,12 @@ struct SessionRow: View {
         SQBrand.operatorShortName(op.key) ?? SQBrand.operatorShortName(op.label) ?? op.label
     }
 
+    /// « Bouygues Telecom », le nom complet de l'app : le serveur sert parfois la clé
+    /// brute en étiquette (« BOUYGUES », « ORANGE »), qui s'affichait telle quelle.
+    nonisolated static func fullLabel(_ op: SessionOperator) -> String {
+        SQBrand.operatorName(op.key) ?? SQBrand.operatorName(op.label) ?? op.label
+    }
+
     /// Une seule phrase pour VoiceOver, dans l'ordre de la ligne.
     nonisolated static func accessibilityText(_ session: CoverageSession) -> String {
         var parts: [String] = []
@@ -618,7 +624,7 @@ struct SessionRow: View {
         parts.append(headline(session))
         if let detail = detailLine(session) { parts.append(detail) }
         if session.isDriveTest { parts.append(String(localized: "Drive Test")) }
-        if !session.operators.isEmpty { parts.append(session.operators.map(\.label).joined(separator: ", ")) }
+        if !session.operators.isEmpty { parts.append(session.operators.map(fullLabel).joined(separator: ", ")) }
         switch quality(of: session) {
         case .signal(let level): parts.append(String(localized: "Signal \(level.label.lowercased())"))
         case .throughput(let mbps): parts.append(String(localized: "\(SQUnits.throughput(mbps: mbps)) en moyenne"))
@@ -740,7 +746,7 @@ struct SessionRow: View {
                 Circle()
                     .fill(SessionDetailView.operatorColor(op.colorHex))
                     .frame(width: 8, height: 8)
-                Text(verbatim: short ? Self.shortLabel(op) : op.label)
+                Text(verbatim: short ? Self.shortLabel(op) : Self.fullLabel(op))
             }
             .fixedSize()
         }
