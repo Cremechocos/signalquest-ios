@@ -55,12 +55,15 @@ struct SocialFeedAuthor: Codable, Identifiable, Equatable {
     /// celui dérivé de l'abonnement actif, que le serveur recalcule à chaque
     /// lecture plutôt que de le stocker.
     let badges: [SocialUserBadge]
+    /// `author.spotlight` (D13) : bandeau, encre et badge animé dans le fil ; `nil` pour un
+    /// auteur qui n'est pas Premium actif.
+    var spotlight: ProfileSpotlight? = nil
 
     var displayName: String {
         MemberIdentity.displayName(name, handle: handle)
     }
 
-    enum CodingKeys: String, CodingKey { case id, name, handle, avatarUrl, isFriend, isFollowing, liveRadio, badges }
+    enum CodingKeys: String, CodingKey { case id, name, handle, avatarUrl, isFriend, isFollowing, liveRadio, badges, spotlight }
 
     init(
         id: String,
@@ -70,7 +73,8 @@ struct SocialFeedAuthor: Codable, Identifiable, Equatable {
         isFriend: Bool?,
         isFollowing: Bool?,
         liveRadio: SocialAuthorLiveRadio?,
-        badges: [SocialUserBadge] = []
+        badges: [SocialUserBadge] = [],
+        spotlight: ProfileSpotlight? = nil
     ) {
         self.id = id
         self.name = name
@@ -80,6 +84,7 @@ struct SocialFeedAuthor: Codable, Identifiable, Equatable {
         self.isFollowing = isFollowing
         self.liveRadio = liveRadio
         self.badges = badges
+        self.spotlight = spotlight
     }
 
     init(from decoder: Decoder) throws {
@@ -92,6 +97,7 @@ struct SocialFeedAuthor: Codable, Identifiable, Equatable {
         isFollowing = try c.decodeIfPresent(Bool.self, forKey: .isFollowing)
         liveRadio = try c.decodeIfPresent(SocialAuthorLiveRadio.self, forKey: .liveRadio)
         badges = c.decodeLossyArray([SocialUserBadge].self, forKey: .badges)
+        spotlight = try? c.decodeIfPresent(ProfileSpotlight.self, forKey: .spotlight)
     }
 }
 
@@ -936,6 +942,8 @@ struct SocialUserProfile: Codable, Equatable {
     var postNotifications: PostNotificationLevel?
     /// Photos récentes ; vide d'un serveur plus ancien.
     var recentPhotos: [SocialProfilePhoto] = []
+    /// Profil mis en valeur (D13) : bannière et couleur ; `nil` hors Premium actif.
+    var spotlight: ProfileSpotlight?
 
     var displayName: String {
         MemberIdentity.displayName(name, handle: handle)
@@ -951,7 +959,7 @@ struct SocialUserProfile: Codable, Equatable {
     enum CodingKeys: String, CodingKey {
         case id, name, handle, bio, avatarUrl, createdAt, isSelf, isFriend
         case isFollowing, followersCount, followingCount, canMessage, stats
-        case accountBadges, networks, privacy, statsHidden, postNotifications, recentPhotos
+        case accountBadges, networks, privacy, statsHidden, postNotifications, recentPhotos, spotlight
     }
 
     init(
@@ -973,7 +981,8 @@ struct SocialUserProfile: Codable, Equatable {
         privacy: SocialUserProfilePrivacy? = nil,
         statsHidden: Bool = false,
         postNotifications: PostNotificationLevel? = nil,
-        recentPhotos: [SocialProfilePhoto] = []
+        recentPhotos: [SocialProfilePhoto] = [],
+        spotlight: ProfileSpotlight? = nil
     ) {
         self.id = id
         self.name = name
@@ -994,6 +1003,7 @@ struct SocialUserProfile: Codable, Equatable {
         self.statsHidden = statsHidden
         self.postNotifications = postNotifications
         self.recentPhotos = recentPhotos
+        self.spotlight = spotlight
     }
 
     init(from decoder: Decoder) throws {
@@ -1018,8 +1028,85 @@ struct SocialUserProfile: Codable, Equatable {
         postNotifications = (try? c.decodeIfPresent(String.self, forKey: .postNotifications)).flatMap { $0 }
             .map(PostNotificationLevel.init(served:))
         recentPhotos = c.decodeLossyArray([SocialProfilePhoto].self, forKey: .recentPhotos)
+        spotlight = try? c.decodeIfPresent(ProfileSpotlight.self, forKey: .spotlight)
     }
 }
+
+// MARK: - Profil mis en valeur (D13)
+
+/// Profil mis en valeur d'un membre Premium (contrat Abonnements §3, `profile.spotlight`, D13) :
+/// `spotlight` du profil public et `author.spotlight` des publications, `nil` hors Premium actif.
+/// Le serveur a déjà résolu la bannière (photo retirée, « Mes mesures » sous le seuil) : l'app
+/// n'en refait rien. Dégradations, comme Android, sans rien inventer : une couleur inconnue prend
+/// l'encre neutre, une série corrompue ou trop courte, un genre inconnu ou une photo sans adresse
+/// donnent « aucune bannière » ; plus de 24 valeurs, les 24 dernières.
+struct ProfileSpotlight: Codable, Hashable, Sendable {
+    enum Accent: String, CaseIterable, Sendable {
+        case gold, slate, plum, fir, brick, ink
+    }
+
+    enum Banner: Hashable, Sendable {
+        /// 5 à 24 valeurs dans [0, 1], ordre chronologique : l'allure des débits, sans lieu ni date.
+        case measures([Double])
+        case photo(URL)
+        case empty
+    }
+
+    let accent: Accent
+    let banner: Banner
+
+    static let seriesMinimum = 5
+    static let seriesMaximum = 24
+
+    init(accent: Accent, banner: Banner) {
+        self.accent = accent
+        self.banner = banner
+    }
+
+    private enum CodingKeys: String, CodingKey { case accent, banner }
+    private enum BannerKeys: String, CodingKey { case kind, series, photoUrl }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        accent = (try? c.decode(String.self, forKey: .accent)).flatMap(Accent.init(rawValue:)) ?? .ink
+        guard let b = try? c.nestedContainer(keyedBy: BannerKeys.self, forKey: .banner) else {
+            banner = .empty
+            return
+        }
+        switch try? b.decode(String.self, forKey: .kind) {
+        case "measures":
+            banner = Self.series(try? b.decode([Double].self, forKey: .series)).map(Banner.measures) ?? .empty
+        case "photo":
+            banner = b.decodeLossyURL(forKey: .photoUrl).map(Banner.photo) ?? .empty
+        default:
+            banner = .empty
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(accent.rawValue, forKey: .accent)
+        var b = c.nestedContainer(keyedBy: BannerKeys.self, forKey: .banner)
+        switch banner {
+        case .measures(let series):
+            try b.encode("measures", forKey: .kind)
+            try b.encode(series, forKey: .series)
+        case .photo(let url):
+            try b.encode("photo", forKey: .kind)
+            try b.encode(url.absoluteString, forKey: .photoUrl)
+        case .empty:
+            try b.encode("none", forKey: .kind)
+        }
+    }
+
+    /// Une série hors bornes n'est jamais « réparée » : elle ne dessine rien.
+    static func series(_ raw: [Double]?) -> [Double]? {
+        guard let raw, raw.count >= seriesMinimum,
+              raw.allSatisfy({ $0.isFinite && (0...1).contains($0) }) else { return nil }
+        return Array(raw.suffix(seriesMaximum))
+    }
+}
+
 
 /// Niveau de la cloche d'un profil suivi (SOCIAL-BELL-1, choix d'Alexandre du 24/11).
 enum PostNotificationLevel: String, Codable, CaseIterable, Sendable {

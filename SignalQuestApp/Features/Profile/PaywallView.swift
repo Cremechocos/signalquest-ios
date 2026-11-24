@@ -792,7 +792,7 @@ struct PaywallView: View {
     /// contrat v1, le serveur sert la liste (`benefits.premium`, B9, D20) et
     /// l'app n'en affiche que les clés qu'elle connaît : `radio_log.unlimited`
     /// est ignoré (un iPhone ne fait que lire le journal, Q7), `reports.logo`
-    /// aussi (Android seul, D15), `profile.spotlight` attend sa maquette (D13).
+    /// aussi (Android seul, D15). `profile.spotlight` (D13, d'après Android) ne s'affiche que servi.
     /// `recap.monthly` (Bilan mensuel, maquette validée le 16/11) ne s'affiche que
     /// servi : jamais dans le repli sans liste. Sans la liste (ancienne route), seul
     /// l'existant s'affiche. App Review souscrit pour vérifier : un avantage
@@ -808,6 +808,7 @@ struct PaywallView: View {
         if let served = store.serverState.snapshot?.benefits?.premium {
             let servedOnly: [(key: String, text: String)] = [
                 ("recap.monthly", String(localized: "Ton bilan chaque mois, à lire et à partager.")),
+                ("profile.spotlight", String(localized: "Une bannière tirée de tes mesures ou de tes photos, et une couleur sur ton profil et dans le fil.")),
             ]
             shown = (known + servedOnly).filter { served.contains($0.key) }.map(\.text)
         } else {

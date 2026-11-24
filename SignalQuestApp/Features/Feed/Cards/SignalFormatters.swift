@@ -279,12 +279,41 @@ struct CardHeader: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.feedCardMenu) private var menu
     @Environment(\.feedCardShowsAuthor) private var showsAuthor
+    @Environment(\.feedCardSpotlightPostId) private var spotlightPostId
+
+    /// Marge intérieure commune aux cartes du fil (`.padding(SQSpace.lg)`) : le bandeau la
+    /// traverse pour toucher les bords de la carte.
+    private static let cardPadding = SQSpace.lg
+    private static let bannerHeight: CGFloat = 36
+
+    /// Mise en valeur de l'auteur, dans le fil seulement.
+    private var spotlight: ProfileSpotlight? {
+        spotlightPostId == nil || !showsAuthor ? nil : author.spotlight
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.xs) {
+            if let spotlight, spotlight.banner != .empty { spotlightBanner(spotlight) }
             if isPinned { pinnedTag }
             headerRow
         }
+    }
+
+    /// Bandeau de 36 pt en haut de la carte, au-dessus de l'en-tête : il ne touche ni le texte
+    /// ni les résultats. Coins hauts de la carte ; le bas est coupé net.
+    private func spotlightBanner(_ spotlight: ProfileSpotlight) -> some View {
+        let radius = SQRadius.xl
+        // Le masque, plus haut que le bandeau, arrondit les coins hauts et laisse le bas droit ;
+        // la courbe reste dessinée dans les 36 pt.
+        return SQSpotlightBanner(spotlight: spotlight)
+            .frame(height: Self.bannerHeight)
+            .mask(alignment: .top) {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .frame(height: Self.bannerHeight + radius)
+            }
+            .padding(.horizontal, -Self.cardPadding)
+            .padding(.top, -Self.cardPadding)
+            .padding(.bottom, SQSpace.sm)
     }
 
     private var pinnedTag: some View {
@@ -400,6 +429,13 @@ struct CardHeader: View {
     private var authorBlock: some View {
         HStack(alignment: .top, spacing: SQSpace.md) {
             SQAvatar(url: author.avatarUrl, name: author.displayName)
+                .overlay {
+                    // Premium mis en valeur : l'anneau de SON encre, dessiné hors du cadre pour
+                    // ne rien décaler.
+                    if let spotlight {
+                        SQAvatarShape(inset: -4).strokeBorder(spotlight.accent.ink, lineWidth: 2.5)
+                    }
+                }
             VStack(alignment: .leading, spacing: SQSpace.xs + 1) {
                 HStack(spacing: 5) {
                     Text(author.displayName)
@@ -408,7 +444,8 @@ struct CardHeader: View {
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                     // Badges accolés au nom, comme sur le web et Android.
-                    SQUserBadges(badges: author.badges)
+                    SQUserBadges(badges: author.badges,
+                                 premiumArcAnimationKey: spotlight == nil ? nil : spotlightPostId)
                 }
                 metadata
                 .font(SQType.caption)
@@ -801,6 +838,10 @@ private struct FeedCardShowsAuthorKey: EnvironmentKey {
     static var defaultValue: Bool { true }
 }
 
+private struct FeedCardSpotlightPostIdKey: EnvironmentKey {
+    static var defaultValue: String? { nil }
+}
+
 private struct FeedCardMenuKey: EnvironmentKey {
     static var defaultValue: AnyView? { nil }
 }
@@ -826,6 +867,14 @@ extension EnvironmentValues {
     var feedCardShowsAuthor: Bool {
         get { self[FeedCardShowsAuthorKey.self] }
         set { self[FeedCardShowsAuthorKey.self] = newValue }
+    }
+
+    /// Identifiant de la publication quand la carte est dans le fil : seul le fil montre la
+    /// mise en valeur d'un auteur Premium (bandeau, anneau d'encre, arc du badge tracé une fois
+    /// par publication), comme Android. Ailleurs (détail, profil, recherche) la carte reste nue.
+    var feedCardSpotlightPostId: String? {
+        get { self[FeedCardSpotlightPostIdKey.self] }
+        set { self[FeedCardSpotlightPostIdKey.self] = newValue }
     }
 
     /// Filtre le fil sur un hashtag touché dans une carte. Sans action, les

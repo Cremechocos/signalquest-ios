@@ -449,6 +449,120 @@ final class FeedComposerTests: XCTestCase {
         XCTAssertEqual(hidden.stats?.photos, 4)
     }
 
+    /// D13 : `spotlight` du profil et `author.spotlight` du fil, décodés comme Android, sans rien
+    /// inventer : couleur inconnue → encre neutre ; série trop courte, hors bornes ou non
+    /// numérique, genre inconnu, photo sans adresse → pas de bannière ; plus de 24 valeurs →
+    /// les 24 dernières ; `null` → pas de mise en valeur.
+    func testSpotlightDecodesLikeAndroidWithoutRepairingAnything() throws {
+        func spotlight(_ json: String) throws -> ProfileSpotlight? {
+            let profile = #"{"id":"u1","name":"Léa","isSelf":false,"spotlight":\#(json)}"#
+            return try JSONDecoder.signalQuest.decode(SocialUserProfile.self, from: Data(profile.utf8)).spotlight
+        }
+        let five = "[0.1,0.5,1,0.25,0]"
+        XCTAssertEqual(try spotlight(#"{"accent":"plum","banner":{"kind":"measures","series":\#(five)}}"#),
+                       ProfileSpotlight(accent: .plum, banner: .measures([0.1, 0.5, 1, 0.25, 0])))
+        XCTAssertEqual(try spotlight(#"{"accent":"neon","banner":{"kind":"none"}}"#),
+                       ProfileSpotlight(accent: .ink, banner: .empty))
+        XCTAssertEqual(try spotlight(#"{"accent":"fir","banner":{"kind":"measures","series":[0.1,0.5,1,0.25]}}"#)?.banner, .empty)
+        XCTAssertEqual(try spotlight(#"{"accent":"fir","banner":{"kind":"measures","series":[0.1,0.5,1.2,0.25,0]}}"#)?.banner, .empty)
+        XCTAssertEqual(try spotlight(#"{"accent":"fir","banner":{"kind":"measures","series":[0.1,"0.5",1,0.25,0]}}"#)?.banner, .empty)
+        let thirty = (0..<30).map { Double($0) / 30 }
+        let long = "[" + thirty.map { String($0) }.joined(separator: ",") + "]"
+        XCTAssertEqual(try spotlight(#"{"accent":"gold","banner":{"kind":"measures","series":\#(long)}}"#)?.banner,
+                       .measures(Array(thirty.suffix(24))))
+        XCTAssertEqual(try spotlight(#"{"accent":"brick","banner":{"kind":"photo","photoUrl":"https://cdn.example.test/b.jpg"}}"#)?.banner,
+                       .photo(URL(string: "https://cdn.example.test/b.jpg")!))
+        XCTAssertEqual(try spotlight(#"{"accent":"brick","banner":{"kind":"photo","photoUrl":""}}"#)?.banner, .empty)
+        XCTAssertEqual(try spotlight(#"{"accent":"slate","banner":{"kind":"hologram"}}"#)?.banner, .empty)
+        XCTAssertNil(try spotlight("null"))
+        XCTAssertNil(try spotlight(#""gold""#))
+
+        // Dans le fil : l'auteur porte la sienne ; un auteur gratuit n'en a pas.
+        let author = try JSONDecoder.signalQuest.decode(SocialFeedAuthor.self, from: Data(
+            #"{"id":"a1","name":"Inès","spotlight":{"accent":"gold","banner":{"kind":"none"}}}"#.utf8))
+        XCTAssertEqual(author.spotlight, ProfileSpotlight(accent: .gold, banner: .empty))
+        let free = try JSONDecoder.signalQuest.decode(SocialFeedAuthor.self, from: Data(#"{"id":"a2","name":"Tom"}"#.utf8))
+        XCTAssertNil(free.spotlight)
+
+        // Le fil se garde en cache : la mise en valeur fait l'aller-retour.
+        let again = try JSONDecoder.signalQuest.decode(SocialFeedAuthor.self, from: JSONEncoder().encode(author))
+        XCTAssertEqual(again.spotlight, author.spotlight)
+    }
+
+    /// La courbe passe par chaque point sans dépasser verticalement entre deux valeurs.
+    func testSpotlightCurveNeverOvershootsBetweenTwoValues() {
+        let points = SQSpotlightCurve.points([0, 1, 0.2, 0.9, 0.9, 0], in: CGSize(width: 300, height: 100), padX: 12, padY: 10)
+        XCTAssertEqual(points.first, CGPoint(x: 12, y: 90))
+        XCTAssertEqual(points[1], CGPoint(x: 12 + 276.0 / 5, y: 10))
+        let segments = SQSpotlightCurve.segments(points)
+        XCTAssertEqual(segments.count, points.count - 1)
+        for (i, segment) in segments.enumerated() {
+            let lo = min(points[i].y, points[i + 1].y)
+            let hi = max(points[i].y, points[i + 1].y)
+            XCTAssertTrue((lo...hi).contains(segment.c1.y), "c1 du segment \(i)")
+            XCTAssertTrue((lo...hi).contains(segment.c2.y), "c2 du segment \(i)")
+            XCTAssertEqual(segment.end, points[i + 1])
+        }
+        XCTAssertTrue(SQSpotlightCurve.points([0.5], in: CGSize(width: 300, height: 100), padX: 12, padY: 10).isEmpty)
+    }
+
+    /// Réglages : on n'enregistre qu'un vrai changement, jamais une bannière photo sans photo ;
+    /// chaque refus du serveur a son message ; sous le seuil, l'aperçu n'invente pas de courbe.
+    func testSpotlightSettingsSaveOnlyRealChangesAndNameEachRefusal() async throws {
+        let served = try JSONDecoder.signalQuest.decode(ProfileSpotlightSettings.self, from: Data(
+            #"{"banner":{"kind":"measures","photoId":null},"accent":"gold","measures":{"count":7,"threshold":5},"kept":false}"#.utf8))
+        XCTAssertEqual(served, ProfileSpotlightSettings(kind: .measures, photoId: nil, accent: .gold,
+                                                        measuresCount: 7, threshold: 5, kept: false))
+        XCTAssertFalse(served.belowThreshold)
+        let none = try JSONDecoder.signalQuest.decode(ProfileSpotlightSettings.self, from: Data(
+            #"{"banner":{"kind":"none","photoId":"p9"},"accent":"plum","measures":{"count":2,"threshold":5},"kept":true}"#.utf8))
+        XCTAssertEqual(none.kind, .noBanner)
+        XCTAssertNil(none.photoId)
+        XCTAssertTrue(none.belowThreshold)
+        XCTAssertTrue(none.kept)
+
+        let service = SpotlightServiceFixture(settings: served)
+        let model = ProfileSpotlightSettingsModel(service: service) {
+            ProfileSpotlight(accent: .gold, banner: .measures([0.2, 0.4, 0.6, 0.8, 1]))
+        }
+        await model.load()
+        XCTAssertFalse(model.canSave)
+        XCTAssertEqual(model.previewBanner, .measures([0.2, 0.4, 0.6, 0.8, 1]))
+
+        model.select(.photo)
+        XCTAssertFalse(model.canSave, "une bannière photo sans photo ne s'enregistre pas")
+        XCTAssertEqual(model.previewBanner, .empty)
+        model.choose(ProfileSpotlightPhoto(id: "p1", thumbnailUrl: nil, bannerUrl: URL(string: "https://cdn.example.test/p1.jpg")))
+        XCTAssertTrue(model.canSave)
+        XCTAssertEqual(model.previewBanner, .photo(URL(string: "https://cdn.example.test/p1.jpg")!))
+
+        model.select(ProfileSpotlight.Accent.fir)
+        await model.save()
+        XCTAssertEqual(service.saved?.kind, .photo)
+        XCTAssertEqual(service.saved?.photoId, "p1")
+        XCTAssertEqual(service.saved?.accent, .fir)
+        XCTAssertEqual(model.outcome, .saved)
+        XCTAssertFalse(model.canSave, "enregistré : plus rien à enregistrer")
+
+        func refusal(_ code: String, status: Int) -> ProfileSpotlightSettingsModel.Outcome {
+            ProfileSpotlightSettingsModel.outcome(for: APIError.http(status: status, code: code, message: "",
+                                                                     requestId: nil, retryAfter: nil))
+        }
+        XCTAssertEqual(refusal("PREMIUM_REQUIRED", status: 403), .premiumRequired)
+        XCTAssertEqual(refusal("INVALID_ACCENT", status: 422), .invalidAccent)
+        XCTAssertEqual(refusal("PHOTO_NOT_ELIGIBLE", status: 422), .photoNotEligible)
+        XCTAssertEqual(refusal("INTERNAL_ERROR", status: 500), .failed)
+
+        // Sous le seuil, « Mes mesures » ne dessine rien dans l'aperçu.
+        let below = SpotlightServiceFixture(settings: none)
+        let quiet = ProfileSpotlightSettingsModel(service: below) {
+            ProfileSpotlight(accent: .plum, banner: .measures([0.2, 0.4, 0.6, 0.8, 1]))
+        }
+        await quiet.load()
+        quiet.select(.measures)
+        XCTAssertEqual(quiet.previewBanner, .empty)
+    }
+
     func testFollowListShowsHiddenAndPrivateStatesInsteadOfAnError() async {
         let fixture = ComposerFeedFixture()
         let model = FollowListViewModel(
@@ -650,4 +764,26 @@ private final class ComposerFeedFixture: SocialFeedServicing, @unchecked Sendabl
     func mySpeedtests(page: Int, limit: Int) async throws -> (tests: [SocialShareableSpeedtest], hasMore: Bool) { throw ComposerFixtureError.unused }
     func networkPulse(latitude: Double, longitude: Double, radiusMeters: Int?) async throws -> NetworkPulse { throw ComposerFixtureError.unused }
     func nearbyRecentSpeedtests(latitude: Double, longitude: Double, radiusMeters: Int, limit: Int) async throws -> [AndroidSpeedtestMarker] { throw ComposerFixtureError.unused }
+}
+
+/// Réglages de la mise en valeur sans réseau : rend ce qu'on lui a donné et garde le dernier envoi.
+private final class SpotlightServiceFixture: ProfileSpotlightServicing, @unchecked Sendable {
+    var settingsValue: ProfileSpotlightSettings
+    var saved: (kind: ProfileSpotlightSettings.Kind, photoId: String?, accent: ProfileSpotlight.Accent)?
+
+    init(settings: ProfileSpotlightSettings) { settingsValue = settings }
+
+    func settings() async throws -> ProfileSpotlightSettings { settingsValue }
+
+    func save(kind: ProfileSpotlightSettings.Kind, photoId: String?, accent: ProfileSpotlight.Accent) async throws -> ProfileSpotlightSettings {
+        saved = (kind, photoId, accent)
+        settingsValue = ProfileSpotlightSettings(kind: kind, photoId: photoId, accent: accent,
+                                                 measuresCount: settingsValue.measuresCount,
+                                                 threshold: settingsValue.threshold, kept: false)
+        return settingsValue
+    }
+
+    func photos(cursor: String?) async throws -> ProfileSpotlightPhotoPage {
+        ProfileSpotlightPhotoPage(photos: [], nextCursor: nil)
+    }
 }

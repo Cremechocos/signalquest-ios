@@ -117916,6 +117916,792 @@
           }
         }
       }
+    },
+    "Mise en valeur du profil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Profile highlight"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mise en valeur du profil"
+          }
+        }
+      }
+    },
+    "Bannière" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Banner"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bannière"
+          }
+        }
+      }
+    },
+    "La courbe de tes derniers débits mesurés. Aucun lieu n’y figure." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The curve of your latest measured speeds. No place appears in it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La courbe de tes derniers débits mesurés. Aucun lieu n’y figure."
+          }
+        }
+      }
+    },
+    "SQFormal|La courbe de tes derniers débits mesurés. Aucun lieu n’y figure." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La courbe de vos derniers débits mesurés. Aucun lieu n’y figure."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Une de mes photos" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One of my photos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une de mes photos"
+          }
+        }
+      }
+    },
+    "Choisie parmi tes photos déjà publiées." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chosen among your already published photos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisie parmi tes photos déjà publiées."
+          }
+        }
+      }
+    },
+    "SQFormal|Choisie parmi tes photos déjà publiées." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisie parmi vos photos déjà publiées."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Choisir" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir"
+          }
+        }
+      }
+    },
+    "Seule la couleur reste, autour de ton avatar." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only the color stays, around your avatar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seule la couleur reste, autour de ton avatar."
+          }
+        }
+      }
+    },
+    "SQFormal|Seule la couleur reste, autour de ton avatar." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seule la couleur reste, autour de votre avatar."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Couleur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Color"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couleur"
+          }
+        }
+      }
+    },
+    "Visible sur ton profil et sur tes publications dans le fil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Visible on your profile and on your posts in the feed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Visible sur ton profil et sur tes publications dans le fil."
+          }
+        }
+      }
+    },
+    "SQFormal|Visible sur ton profil et sur tes publications dans le fil." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Visible sur votre profil et sur vos publications dans le fil."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Or" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gold"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Or"
+          }
+        }
+      }
+    },
+    "Ardoise" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slate"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ardoise"
+          }
+        }
+      }
+    },
+    "Prune" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plum"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prune"
+          }
+        }
+      }
+    },
+    "Sapin" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fir"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sapin"
+          }
+        }
+      }
+    },
+    "Ta bannière et ta couleur sont gardées. Elles réapparaissent dès que Premium revient." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your banner and color are kept. They come back as soon as Premium returns."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta bannière et ta couleur sont gardées. Elles réapparaissent dès que Premium revient."
+          }
+        }
+      }
+    },
+    "SQFormal|Ta bannière et ta couleur sont gardées. Elles réapparaissent dès que Premium revient." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre bannière et votre couleur sont gardées. Elles réapparaissent dès que Premium revient."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Une bannière tirée de tes mesures ou de tes photos, et une couleur sur ton profil et dans le fil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A banner drawn from your measurements or your photos, and a color on your profile and in the feed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une bannière tirée de tes mesures ou de tes photos, et une couleur sur ton profil et dans le fil."
+          }
+        }
+      }
+    },
+    "SQFormal|Une bannière tirée de tes mesures ou de tes photos, et une couleur sur ton profil et dans le fil." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une bannière tirée de vos mesures ou de vos photos, et une couleur sur votre profil et dans le fil."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Bannière et couleur sur ton profil et dans le fil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Banner and color on your profile and in the feed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bannière et couleur sur ton profil et dans le fil."
+          }
+        }
+      }
+    },
+    "SQFormal|Bannière et couleur sur ton profil et dans le fil." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bannière et couleur sur votre profil et dans le fil."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Enregistré." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistré."
+          }
+        }
+      }
+    },
+    "La mise en valeur du profil est réservée aux membres Premium." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Profile highlight is reserved for Premium members."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La mise en valeur du profil est réservée aux membres Premium."
+          }
+        }
+      }
+    },
+    "Cette couleur n’est pas disponible. Choisis-en une autre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This color is not available. Choose another one."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette couleur n’est pas disponible. Choisis-en une autre."
+          }
+        }
+      }
+    },
+    "SQFormal|Cette couleur n’est pas disponible. Choisis-en une autre." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette couleur n’est pas disponible. Choisissez-en une autre."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Cette photo ne peut plus servir de bannière. Choisis-en une autre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This photo can no longer be used as a banner. Choose another one."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette photo ne peut plus servir de bannière. Choisis-en une autre."
+          }
+        }
+      }
+    },
+    "SQFormal|Cette photo ne peut plus servir de bannière. Choisis-en une autre." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette photo ne peut plus servir de bannière. Choisissez-en une autre."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Pas de connexion. Rien n’a été enregistré." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No connection. Nothing was saved."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas de connexion. Rien n’a été enregistré."
+          }
+        }
+      }
+    },
+    "Enregistrement impossible. Rien n’a changé : réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not save. Nothing changed. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistrement impossible. Rien n’a changé : réessaie."
+          }
+        }
+      }
+    },
+    "SQFormal|Enregistrement impossible. Rien n’a changé : réessaie." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistrement impossible. Rien n’a changé : réessayez."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Choisis une photo" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a photo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisis une photo"
+          }
+        }
+      }
+    },
+    "SQFormal|Choisis une photo" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez une photo"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Tu n’as pas encore de photo publiée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You have no published photo yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu n’as pas encore de photo publiée."
+          }
+        }
+      }
+    },
+    "SQFormal|Tu n’as pas encore de photo publiée." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous n’avez pas encore de photo publiée."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Impossible de charger les photos." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos could not be loaded."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de charger les photos."
+          }
+        }
+      }
+    },
+    "Ta bannière se dessinera après tes %lld premiers speedtests. En attendant, ton profil garde ta couleur." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Your banner will be drawn after your first speedtest. Until then, your profile keeps your color."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Your banner will be drawn after your first %lld speedtests. Until then, your profile keeps your color."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Ta bannière se dessinera après ton premier speedtest. En attendant, ton profil garde ta couleur."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Ta bannière se dessinera après tes %lld premiers speedtests. En attendant, ton profil garde ta couleur."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "SQFormal|Ta bannière se dessinera après tes %lld premiers speedtests. En attendant, ton profil garde ta couleur." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Votre bannière se dessinera après votre premier speedtest. En attendant, votre profil garde votre couleur."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Votre bannière se dessinera après vos %lld premiers speedtests. En attendant, votre profil garde votre couleur."
+                }
+              }
+            }
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "SQEnGB|Bannière et couleur sur ton profil et dans le fil." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Banner and colour on your profile and in the feed."
+          }
+        }
+      }
+    },
+    "SQEnCA|Bannière et couleur sur ton profil et dans le fil." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Banner and colour on your profile and in the feed."
+          }
+        }
+      }
+    },
+    "SQEnGB|Cette couleur n’est pas disponible. Choisis-en une autre." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This colour is not available. Choose another one."
+          }
+        }
+      }
+    },
+    "SQEnCA|Cette couleur n’est pas disponible. Choisis-en une autre." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This colour is not available. Choose another one."
+          }
+        }
+      }
+    },
+    "SQEnGB|Couleur" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colour"
+          }
+        }
+      }
+    },
+    "SQEnCA|Couleur" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colour"
+          }
+        }
+      }
+    },
+    "SQEnGB|Seule la couleur reste, autour de ton avatar." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only the colour stays, around your avatar."
+          }
+        }
+      }
+    },
+    "SQEnCA|Seule la couleur reste, autour de ton avatar." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only the colour stays, around your avatar."
+          }
+        }
+      }
+    },
+    "SQEnGB|Ta bannière et ta couleur sont gardées. Elles réapparaissent dès que Premium revient." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your banner and colour are kept. They come back as soon as Premium returns."
+          }
+        }
+      }
+    },
+    "SQEnCA|Ta bannière et ta couleur sont gardées. Elles réapparaissent dès que Premium revient." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your banner and colour are kept. They come back as soon as Premium returns."
+          }
+        }
+      }
+    },
+    "SQEnGB|Ta bannière se dessinera après tes %lld premiers speedtests. En attendant, ton profil garde ta couleur." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Your banner will be drawn after your first speedtest. Until then, your profile keeps your colour."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Your banner will be drawn after your first %lld speedtests. Until then, your profile keeps your colour."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "SQEnCA|Ta bannière se dessinera après tes %lld premiers speedtests. En attendant, ton profil garde ta couleur." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Your banner will be drawn after your first speedtest. Until then, your profile keeps your colour."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Your banner will be drawn after your first %lld speedtests. Until then, your profile keeps your colour."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "SQEnGB|Une bannière tirée de tes mesures ou de tes photos, et une couleur sur ton profil et dans le fil." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A banner drawn from your measurements or your photos, and a colour on your profile and in the feed."
+          }
+        }
+      }
+    },
+    "SQEnCA|Une bannière tirée de tes mesures ou de tes photos, et une couleur sur ton profil et dans le fil." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A banner drawn from your measurements or your photos, and a colour on your profile and in the feed."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

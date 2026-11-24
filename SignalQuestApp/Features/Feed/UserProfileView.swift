@@ -725,6 +725,13 @@ struct UserProfileView: View {
     private var header: some View {
         let profile = model.profile
         VStack(alignment: .leading, spacing: SQSpace.md) {
+            // Membre Premium mis en valeur (D13) : sa bannière en tête, décorative.
+            if let spotlight = profile?.spotlight, spotlight.banner != .empty {
+                SQSpotlightBanner(spotlight: spotlight)
+                    .frame(height: 110)
+                    .clipShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+                    .accessibilityIdentifier("profile.member.spotlightBanner")
+            }
             HStack(spacing: SQSpace.md2) {
                 avatar
                 VStack(alignment: .leading, spacing: SQSpace.xxs) {
@@ -1056,6 +1063,10 @@ struct UserProfileView: View {
         .overlay {
             if hasActiveStory {
                 SQStoryRing(lineWidth: 3)
+            } else if let spotlight = model.profile?.spotlight {
+                // L'encre du membre Premium, un seul anneau ; la story, elle, s'ouvre au toucher
+                // et garde le sien.
+                SQAvatarShape().strokeBorder(spotlight.accent.ink, lineWidth: 3)
             }
         }
     }

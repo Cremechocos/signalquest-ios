@@ -1825,6 +1825,8 @@ struct FeedView: View {
         // Même menu derrière le ⋯ de la carte, et en dernières actions VoiceOver,
         // Signaler compris (CardActionsBar) : plus de « Signaler » en tête (F-50).
         .environment(\.feedCardMenu, AnyView(postMenu(for: item)))
+        // Mise en valeur Premium de l'auteur : le fil seulement (D13).
+        .environment(\.feedCardSpotlightPostId, item.id)
         .environment(\.feedHashtagAction, { filter(byHashtag: $0) })
         .environment(\.feedOpenLink, { $0.open(with: services.router) })
         .sqFadeUp()
