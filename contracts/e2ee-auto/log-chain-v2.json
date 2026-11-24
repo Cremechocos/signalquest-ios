@@ -1004,6 +1004,112 @@
       }
     },
     {
+      "name": "REVOKE V2_REVOKE posé par le serveur",
+      "links": [
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n1\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\nACCOUNT\nf3ugMEQbYZWAbpurGTMwaLSf9aGrXnvNW2eQhaPFRRY\nOIDybZiAQBCTqQObUGOI4YP6s-oCarFsynJu9u8jKls\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n2\nSEA9refIxD5MTl3KjuA5_QI75M8548w8UGB6ThVkYdI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nT3RxHn7DO7a8mtCKBHBxRDlucZwhgkz-ytrDM_U1JDA\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n3\nGxx8anlIONjMEb8drYDRk3vbKnQYztqlqo3m5AN1SJA\nACCOUNT\nR27gP0zCGVvu3vqkFiaONkBhkGlNUIhwAiwdaQDua98\n_2LqS8SVYJfYPFE3eUu3Hi8-V8zaca57DkkzKdYFhtA\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n4\nObanguziQzE6MLa3xp2FCNhpRuTiLprzR9_P5CJ5Y_Q\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nUEOiOR-R7g7oaWdNKzi0WG29PyP22JPT_FtGS0zgxyk\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n5\n9_fmYmedVpWEvLjwaF7RmxtIfw0PNL2pxfHoAqfM2F8\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nJjew-HewseCz1gL19hMOps3MsFXLqgFEDXXAA8H_ow4\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n6\nGfRIeVGPQD7OBwJpII-kB4CVufZDRdnmHoSBlW2w0oY\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nKy4PVH0yU2KGZsHNz8lifCBA8LwsBToukOHPO1ZqIjQ\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n7\nX4Koyk1X_cOBg2B1Id6yzUZHg2mfVCY01igJX3AT8Es\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nDrJKIpN_UzUQUJHE0-fC2-pE9Gx-wFIHDZ007KA5ZlA\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n8\nZrEMi2sMCBWTyKZHQcMghkQFpgrdv_Ems-OUzocb0QY\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nsFIcYmnzSB4b66FBpDgPTsqmyszIiYSbtEv1aAyshtg\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n9\nEem_IadeS7Bi8VNe8NS9wRMju_nJm7Hlm7E1PGtPDEc\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nKOMmTzV3RWxWrNb2i3-hrBVbdCKi0w4-ENkoqnUEFi4\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n10\nZNVKRynYn5ZbSXrJBFee5wE5ERHTL1j8pg023pmkxYg\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nwYiRQOokgFdGAN_hIdcN1NSQN4D9EH-1U9RuonGl2Bs\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n11\ngfsnn7YSkn9zaQL7jgMNTw2hyVsjhWqaMeSOaYAxcPU\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\ngT7NUhwckdPwSdit4b5Gyo_zE5ZJ5jIh4r0mxNeTAzU\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n12\nwRogfAV__F6NOswuKo3-es4_7Bt3OFMuoT3s7cwvBR4\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nr24e6HESRQ8GqS7LcPnUkg6867GlyDB5b6FYDWnzr_w\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n13\nKwwQvhKeIFjBHRUk-XmMdlsJhJ1X_S2dxpwjmwv9Bro\nENTRY\n-\nx6Nfrd51LYIV61SuoQUOdC3Okw7chvj5IZ9hjkL_6aQ\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n14\ngdyGby_gnsmN6-mbk5sO4KfN-sxWlefoxcdkSmwmAms\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nYNdMGgfZI7xCEFElHFJNeL7r7tJ7IKUUNRu-lV4nfTc\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n15\nmwH2CJjopy0vBixsD8wFft-PywLk9MzTur0K25mL5KU\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nAQlW-i7ocOQifRtgBCkmeCmIZ4vz35FwL1Gu4ikkVBk\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n16\nw0x4eI1f3B8O09rNWdVGgp7UoFv_q4KE68rSNYqoQoI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nhc5R-5PY_GQYOrGpQIT1bH1VuPUBDtBqBwi-1ai0G0Y\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n17\ngGeha_-1dHONfjYQZ4j9oEJRAStErrxossfD8gImbbY\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nA51AcXS83arDsBo3Vqt3pOo948LtTckX8QvyDVGdZgg\n0"
+      ],
+      "logKeyEntries": {
+        "13": "SQ-E2EE-AUTO-LOG-ENTRY\n2\n13\n-\n-\nLOG_KEY\n-\n-\n-\n-\n-\nBAiH9ZnXqJSoqkIKdvmI9dOIRhRcjPm+3lVsuU96TEUEn3RcvKb2LRN9eTHK6M6GbsY30g3zda+GwTg3D6MiwHc=:MEQCIEzs3IhQWvHfXr69a1I6z3i2aL8AkeoTI8tfAqOXRHRiAiBtMyxGXEudqEyHklq+lhTrD7v5vpJxQqp2S1/PmJPyzg==\n1790025200000"
+      },
+      "account": {
+        "userId": "user_alice_00000000001",
+        "accountSaltB64": "oaGhoaGhoaGhoaGhoaGhoQ==",
+        "entries": [
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n2\nuser_alice_00000000001\n-\nADD\ndevice_alice_a1_000001\nios\nBJ1E/TNbxTHr+Bj3zhT7mcR+fj8LYenKUfHlipSGsFBbdUbn6TCcnnEdKP1kTzDgeQI34eQ8Bka8fPEgoYuyhf0=\nBLPm4T23SvmU0YbzgjuCmcMO8FkM/jrIM8p+bkPakYhNgYvGaeb1/3BDne2x0bGXWPpG8AXziXmf8znMHz/zBDg=\n1\nGENESIS\n1789136000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n5\nuser_alice_00000000001\nT3RxHn7DO7a8mtCKBHBxRDlucZwhgkz-ytrDM_U1JDA\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_a1_000001:BLjhhp33T4TM8vknGo4EPmPggJfCKAmfVQ3ztNN+pEryCbksoxviIun7xz6AfZCJb7d3CFI0F3GYxfZBlEFXEbY=:MEUCIQDbLf3xZMFFx+0BA+RBqAw1WvkEVdlLBuXUxk+NlTgYjwIgV87VvE5wiJe1nLVr8N7tihmdeEkv8WoeB1L+lanfnYw=\n1790000000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n6\nuser_alice_00000000001\nJjew-HewseCz1gL19hMOps3MsFXLqgFEDXXAA8H_ow4\nADD\ndevice_alice_a2_000002\nweb\nBLwANv4Y8Zy918xI5WXkWGJc78A+SMht7b/pdKw5bkMRKSMFTf1746WT+Xy2b3hgejQe7YHa9CjCF01Yp3weqEw=\nBP9WnYXmP9nTVX4nSAugUhSZzkPKLodyvvO42ItRsANb33+e+RSFzymTO2viF2koSaATD1AjQi6xkUF1BrWNnhU=\n1\n-\n1790003600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n8\nuser_alice_00000000001\nKy4PVH0yU2KGZsHNz8lifCBA8LwsBToukOHPO1ZqIjQ\nROTATE\ndevice_alice_a1_000001\n-\nBMu3NmkpxeWFaJu08ufOycZxONa32XU2sngLgDKXHUp/uVwDaT0l4G68OTVHm1DPvM7KtGOXVJ9UktsdcaP70WU=\n-\n2\nMEUCIQCR8oyxKtAHzoPgAw9LxzlZ2LlFQ5gBjpopEgT8ymcaMwIgJ+REIgnuVgjdZPM4i8Sx46QVxNRtgXcrDXcvM5z8vII=\n1790010800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n10\nuser_alice_00000000001\nsFIcYmnzSB4b66FBpDgPTsqmyszIiYSbtEv1aAyshtg\nREVOKE\ndevice_alice_a2_000002\n-\n-\n-\n-\nNOT_ME:device_alice_a1_000001:MEQCIB393Lol7hWSdPYtqC6zDyYsWuXcLyyienBd3ChyWJLLAiA9HijSxnRsDUqgDG4qz8fZKbJVQ8gER1B2HFNROyaWGQ==\n1790018000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n11\nuser_alice_00000000001\nwYiRQOokgFdGAN_hIdcN1NSQN4D9EH-1U9RuonGl2Bs\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_a1_000001:BFyoPC6RfAiXzsUfPLkVqn+5UTVdSOZF18JkjQpXEAPFLa2oetN6pJFaGAIkOXcGl3yKwlgyEWdtKzLGY+NiUMY=:MEUCIQDMYS9Gyi79ZI/+jsCxtp3lifZBFTfNxXjcGyzBXlWPjQIgL2MNz+OS2ja23a6lWvuc0Tn/CA4bblmC79eGBWCuxMs=\n1790018060000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n16\nuser_alice_00000000001\ngT7NUhwckdPwSdit4b5Gyo_zE5ZJ5jIh4r0mxNeTAzU\nADD\ndevice_alice_a3_000003\nandroid\nBJ/3CpjAtwHYghD9dCgwkFw2r4hpdlwStJjJVMkOWmxw2wigSC7Ij0dYO/VbNMHUycI9+6Y2gILxgSYQf/eFr0I=\nBJDutRnOtaHOVMluYIKu3wUNg9v7vRPoeFUKySXgnSFgMhOA0+ShIrIsetYjkqCfTQF4jTmTVuDxAKvaLh+rRsU=\n1\n-\n1790032400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n17\nuser_alice_00000000001\nhc5R-5PY_GQYOrGpQIT1bH1VuPUBDtBqBwi-1ai0G0Y\nREVOKE\ndevice_alice_a3_000003\n-\n-\n-\n-\nV2_REVOKE\n1790036000000"
+        ]
+      },
+      "expect": {
+        "ok": true,
+        "state": {
+          "rotationDueRevokeSeq": 17,
+          "devices": {
+            "device_alice_a3_000003": {
+              "status": "REVOKED",
+              "revokeReason": "V2_REVOKE",
+              "revokeSeq": 17,
+              "revokedAtMs": 1790036000000
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "REVOKE IDENTITY_RESET posé par le serveur",
+      "links": [
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n1\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\nACCOUNT\nf3ugMEQbYZWAbpurGTMwaLSf9aGrXnvNW2eQhaPFRRY\nOIDybZiAQBCTqQObUGOI4YP6s-oCarFsynJu9u8jKls\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n2\nSEA9refIxD5MTl3KjuA5_QI75M8548w8UGB6ThVkYdI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nT3RxHn7DO7a8mtCKBHBxRDlucZwhgkz-ytrDM_U1JDA\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n3\nGxx8anlIONjMEb8drYDRk3vbKnQYztqlqo3m5AN1SJA\nACCOUNT\nR27gP0zCGVvu3vqkFiaONkBhkGlNUIhwAiwdaQDua98\n_2LqS8SVYJfYPFE3eUu3Hi8-V8zaca57DkkzKdYFhtA\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n4\nObanguziQzE6MLa3xp2FCNhpRuTiLprzR9_P5CJ5Y_Q\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nUEOiOR-R7g7oaWdNKzi0WG29PyP22JPT_FtGS0zgxyk\n1",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n5\n9_fmYmedVpWEvLjwaF7RmxtIfw0PNL2pxfHoAqfM2F8\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nJjew-HewseCz1gL19hMOps3MsFXLqgFEDXXAA8H_ow4\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n6\nGfRIeVGPQD7OBwJpII-kB4CVufZDRdnmHoSBlW2w0oY\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nKy4PVH0yU2KGZsHNz8lifCBA8LwsBToukOHPO1ZqIjQ\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n7\nX4Koyk1X_cOBg2B1Id6yzUZHg2mfVCY01igJX3AT8Es\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nDrJKIpN_UzUQUJHE0-fC2-pE9Gx-wFIHDZ007KA5ZlA\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n8\nZrEMi2sMCBWTyKZHQcMghkQFpgrdv_Ems-OUzocb0QY\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nsFIcYmnzSB4b66FBpDgPTsqmyszIiYSbtEv1aAyshtg\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n9\nEem_IadeS7Bi8VNe8NS9wRMju_nJm7Hlm7E1PGtPDEc\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nKOMmTzV3RWxWrNb2i3-hrBVbdCKi0w4-ENkoqnUEFi4\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n10\nZNVKRynYn5ZbSXrJBFee5wE5ERHTL1j8pg023pmkxYg\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nwYiRQOokgFdGAN_hIdcN1NSQN4D9EH-1U9RuonGl2Bs\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n11\ngfsnn7YSkn9zaQL7jgMNTw2hyVsjhWqaMeSOaYAxcPU\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\ngT7NUhwckdPwSdit4b5Gyo_zE5ZJ5jIh4r0mxNeTAzU\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n12\nwRogfAV__F6NOswuKo3-es4_7Bt3OFMuoT3s7cwvBR4\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nr24e6HESRQ8GqS7LcPnUkg6867GlyDB5b6FYDWnzr_w\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n13\nKwwQvhKeIFjBHRUk-XmMdlsJhJ1X_S2dxpwjmwv9Bro\nENTRY\n-\nx6Nfrd51LYIV61SuoQUOdC3Okw7chvj5IZ9hjkL_6aQ\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n14\ngdyGby_gnsmN6-mbk5sO4KfN-sxWlefoxcdkSmwmAms\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nYNdMGgfZI7xCEFElHFJNeL7r7tJ7IKUUNRu-lV4nfTc\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n15\nmwH2CJjopy0vBixsD8wFft-PywLk9MzTur0K25mL5KU\nENTRY\n1FiaXY6DhVe1a7sU2cvgUxG6zmcdPTHkHw_kkeiIONU\nAQlW-i7ocOQifRtgBCkmeCmIZ4vz35FwL1Gu4ikkVBk\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n16\nw0x4eI1f3B8O09rNWdVGgp7UoFv_q4KE68rSNYqoQoI\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nhc5R-5PY_GQYOrGpQIT1bH1VuPUBDtBqBwi-1ai0G0Y\n0",
+        "SQ-E2EE-AUTO-LOG-LINK\n1\n17\ngGeha_-1dHONfjYQZ4j9oEJRAStErrxossfD8gImbbY\nENTRY\nemd44gnaRXKPnbmhzl3jvHDJ-uvlY1fs_ZFro30n5e0\nIFGKoV3IZu-xtfEqhedMk_ULHrSbVYJ4UkT9Rgww9SU\n0"
+      ],
+      "logKeyEntries": {
+        "13": "SQ-E2EE-AUTO-LOG-ENTRY\n2\n13\n-\n-\nLOG_KEY\n-\n-\n-\n-\n-\nBAiH9ZnXqJSoqkIKdvmI9dOIRhRcjPm+3lVsuU96TEUEn3RcvKb2LRN9eTHK6M6GbsY30g3zda+GwTg3D6MiwHc=:MEQCIEzs3IhQWvHfXr69a1I6z3i2aL8AkeoTI8tfAqOXRHRiAiBtMyxGXEudqEyHklq+lhTrD7v5vpJxQqp2S1/PmJPyzg==\n1790025200000"
+      },
+      "account": {
+        "userId": "user_alice_00000000001",
+        "accountSaltB64": "oaGhoaGhoaGhoaGhoaGhoQ==",
+        "entries": [
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n2\nuser_alice_00000000001\n-\nADD\ndevice_alice_a1_000001\nios\nBJ1E/TNbxTHr+Bj3zhT7mcR+fj8LYenKUfHlipSGsFBbdUbn6TCcnnEdKP1kTzDgeQI34eQ8Bka8fPEgoYuyhf0=\nBLPm4T23SvmU0YbzgjuCmcMO8FkM/jrIM8p+bkPakYhNgYvGaeb1/3BDne2x0bGXWPpG8AXziXmf8znMHz/zBDg=\n1\nGENESIS\n1789136000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n5\nuser_alice_00000000001\nT3RxHn7DO7a8mtCKBHBxRDlucZwhgkz-ytrDM_U1JDA\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_a1_000001:BLjhhp33T4TM8vknGo4EPmPggJfCKAmfVQ3ztNN+pEryCbksoxviIun7xz6AfZCJb7d3CFI0F3GYxfZBlEFXEbY=:MEUCIQDbLf3xZMFFx+0BA+RBqAw1WvkEVdlLBuXUxk+NlTgYjwIgV87VvE5wiJe1nLVr8N7tihmdeEkv8WoeB1L+lanfnYw=\n1790000000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n6\nuser_alice_00000000001\nJjew-HewseCz1gL19hMOps3MsFXLqgFEDXXAA8H_ow4\nADD\ndevice_alice_a2_000002\nweb\nBLwANv4Y8Zy918xI5WXkWGJc78A+SMht7b/pdKw5bkMRKSMFTf1746WT+Xy2b3hgejQe7YHa9CjCF01Yp3weqEw=\nBP9WnYXmP9nTVX4nSAugUhSZzkPKLodyvvO42ItRsANb33+e+RSFzymTO2viF2koSaATD1AjQi6xkUF1BrWNnhU=\n1\n-\n1790003600000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n8\nuser_alice_00000000001\nKy4PVH0yU2KGZsHNz8lifCBA8LwsBToukOHPO1ZqIjQ\nROTATE\ndevice_alice_a1_000001\n-\nBMu3NmkpxeWFaJu08ufOycZxONa32XU2sngLgDKXHUp/uVwDaT0l4G68OTVHm1DPvM7KtGOXVJ9UktsdcaP70WU=\n-\n2\nMEUCIQCR8oyxKtAHzoPgAw9LxzlZ2LlFQ5gBjpopEgT8ymcaMwIgJ+REIgnuVgjdZPM4i8Sx46QVxNRtgXcrDXcvM5z8vII=\n1790010800000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n10\nuser_alice_00000000001\nsFIcYmnzSB4b66FBpDgPTsqmyszIiYSbtEv1aAyshtg\nREVOKE\ndevice_alice_a2_000002\n-\n-\n-\n-\nNOT_ME:device_alice_a1_000001:MEQCIB393Lol7hWSdPYtqC6zDyYsWuXcLyyienBd3ChyWJLLAiA9HijSxnRsDUqgDG4qz8fZKbJVQ8gER1B2HFNROyaWGQ==\n1790018000000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n11\nuser_alice_00000000001\nwYiRQOokgFdGAN_hIdcN1NSQN4D9EH-1U9RuonGl2Bs\nHISTORY_KEY\n-\n-\n-\n-\n-\ndevice_alice_a1_000001:BFyoPC6RfAiXzsUfPLkVqn+5UTVdSOZF18JkjQpXEAPFLa2oetN6pJFaGAIkOXcGl3yKwlgyEWdtKzLGY+NiUMY=:MEUCIQDMYS9Gyi79ZI/+jsCxtp3lifZBFTfNxXjcGyzBXlWPjQIgL2MNz+OS2ja23a6lWvuc0Tn/CA4bblmC79eGBWCuxMs=\n1790018060000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n16\nuser_alice_00000000001\ngT7NUhwckdPwSdit4b5Gyo_zE5ZJ5jIh4r0mxNeTAzU\nADD\ndevice_alice_a3_000003\nandroid\nBJ/3CpjAtwHYghD9dCgwkFw2r4hpdlwStJjJVMkOWmxw2wigSC7Ij0dYO/VbNMHUycI9+6Y2gILxgSYQf/eFr0I=\nBJDutRnOtaHOVMluYIKu3wUNg9v7vRPoeFUKySXgnSFgMhOA0+ShIrIsetYjkqCfTQF4jTmTVuDxAKvaLh+rRsU=\n1\n-\n1790032400000",
+          "SQ-E2EE-AUTO-LOG-ENTRY\n2\n17\nuser_alice_00000000001\nhc5R-5PY_GQYOrGpQIT1bH1VuPUBDtBqBwi-1ai0G0Y\nREVOKE\ndevice_alice_a3_000003\n-\n-\n-\n-\nIDENTITY_RESET\n1790036000000"
+        ]
+      },
+      "expect": {
+        "ok": true,
+        "state": {
+          "rotationDueRevokeSeq": 17,
+          "devices": {
+            "device_alice_a3_000003": {
+              "status": "REVOKED",
+              "revokeReason": "IDENTITY_RESET",
+              "revokeSeq": 17,
+              "revokedAtMs": 1790036000000
+            }
+          }
+        }
+      }
+    },
+    {
       "name": "compte repris avec deux appareils GENESIS",
       "links": [
         "SQ-E2EE-AUTO-LOG-LINK\n1\n1\nAZQjoi_m4pl9nRo6F2eAvnqiSZCKLjWQSBVAznD2V7M\nACCOUNT\nNIc0S5vq_SJnELY0XzaZmcQoImCPqnPRjMu0543Uhh4\nEQlwoA3KlrIDODgbQTsknuDcwV5WIglxhnCHw0mmZyM\n1",

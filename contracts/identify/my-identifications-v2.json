@@ -252,10 +252,10 @@
         "derivedSector": 1
       },
       {
-        "label": "hors ZB, SFR base 0",
+        "label": "hors ZB, SFR base 1",
         "operator": "SFR",
         "cid": 4,
-        "stored": 1,
+        "stored": 2,
         "sectorCount": 3,
         "zbLeader": null,
         "leaderSectorCount": null,
@@ -265,7 +265,7 @@
         "expected": null,
         "status": "match",
         "basis": "line",
-        "derivedSector": 1
+        "derivedSector": 2
       },
       {
         "label": "N inconnu",
@@ -316,7 +316,7 @@
         "derivedSector": null
       },
       {
-        "label": "sans secteur stocké, hors ZB, SFR base 0 : secteur prouvé",
+        "label": "sans secteur stocké, hors ZB, SFR base 1 : secteur prouvé",
         "stored": null,
         "operator": "SFR",
         "cid": 4,
@@ -329,7 +329,7 @@
         "expected": null,
         "status": "not_applicable",
         "basis": "none",
-        "derivedSector": 1
+        "derivedSector": 2
       },
       {
         "label": "sans secteur stocké, leader non prouvé : rien",
@@ -364,7 +364,7 @@
         "derivedSector": null
       }
     ],
-    "expectedRule": "expected est non nul seulement pour status mismatch ; même numérotation que sectors (SFR base 0, autres base 1)",
+    "expectedRule": "expected est non nul seulement pour status mismatch ; même numérotation que sectors (base 1 pour tous les opérateurs, SFR compris depuis SECTOR-BASE-1)",
     "presence": "v2, lignes pci et cellid seulement, toujours présent si checks.sectorCheck = ok ; jamais sur les nœuds",
     "mismatchAction": "bouton « Corriger les secteurs » prérempli avec expected ; le membre reste libre (décision d'Alexandre)",
     "derivedSectorRule": "derivedSector : secteur que la règle PROUVE (même calcul que sectorCheck), secteur stocké ou non ; même numérotation que sectors ; ABSENT (jamais null) quand rien n'est prouvé : unknown, non applicable, multi-secteur, hors FR. Ne change pas le sens de expected. Ajout v2 additif (02/11, décision d'Alexandre). Dans cases, derivedSector null = champ absent de la réponse."
