@@ -1219,6 +1219,7 @@ struct FeedView: View {
         }
         if let id = router.openUserProfileId {
             router.openUserProfileId = nil
+            if routedProfileId != nil, await popRoutedDestination({ routedProfileId = nil }) == false { return }
             routedProfileId = id
         }
         if let id = router.openPostId {
@@ -1235,6 +1236,9 @@ struct FeedView: View {
         routedPostRevision = revision
         failedRoutedPostID = nil
         routedPostMissing = false
+        if routedPostItem != nil {
+            guard await popRoutedDestination({ routedPostItem = nil }), routedPostRevision == revision else { return }
+        }
         if AppEnvironment.usesDemoData,
            let existing = model.page?.items.first(where: { $0.id == id || $0.backendPostId == id }) {
             routedPostItem = RoutedPost(item: existing)
@@ -1258,6 +1262,16 @@ struct FeedView: View {
                 failedRoutedPostID = id
             }
         }
+    }
+
+    /// IOS-019 : une destination routée déjà affichée peut porter d'autres écrans
+    /// (profil de l'auteur, commentaires). La remplacer sur place (SOC-11)
+    /// poserait la nouvelle cible SOUS ces écrans : on revient d'abord à la
+    /// racine, le temps de l'animation de retour. `false` si la tâche est annulée.
+    private func popRoutedDestination(_ pop: () -> Void) async -> Bool {
+        pop()
+        try? await Task.sleep(for: .milliseconds(450))
+        return !Task.isCancelled
     }
 
     private func openComposerIfRequested() {
