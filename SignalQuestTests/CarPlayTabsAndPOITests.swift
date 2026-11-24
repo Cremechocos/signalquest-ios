@@ -209,4 +209,25 @@ final class CarPlayTabsAndPOITests: XCTestCase {
         }
         wait(for: [reloaded], timeout: 2)
     }
+
+    /// IOS-004 : même risque pour le délégué des onglets ; un changement d'onglet signalé hors
+    /// du fil principal ne plante pas et arrive sur le fil principal, avec le bon template.
+    func testTabSelectionFromABackgroundQueueArrivesOnTheMainThread() {
+        let selected = expectation(description: "onglet choisi")
+        let list = CPListTemplate(title: "Ici", sections: [])
+        let delegate = CarPlayTabBarDelegate()
+        delegate.onSelect = { template in
+            XCTAssertTrue(Thread.isMainThread)
+            XCTAssertTrue(template === list)
+            selected.fulfill()
+        }
+        let tabs = CPTabBarTemplate(templates: [list])
+        nonisolated(unsafe) let unsafeDelegate = delegate
+        nonisolated(unsafe) let unsafeTabs = tabs
+        nonisolated(unsafe) let unsafeList = list
+        DispatchQueue.global().async {
+            unsafeDelegate.tabBarTemplate(unsafeTabs, didSelect: unsafeList)
+        }
+        wait(for: [selected], timeout: 2)
+    }
 }

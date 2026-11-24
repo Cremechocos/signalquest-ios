@@ -20,8 +20,12 @@ enum CarPlayLocationRenderGate {
 final class CarPlayTabBarDelegate: NSObject, CPTabBarTemplateDelegate {
     var onSelect: (CPTemplate) -> Void = { _ in }
 
-    func tabBarTemplate(_ tabBarTemplate: CPTabBarTemplate, didSelect selectedTemplate: CPTemplate) {
-        onSelect(selectedTemplate)
+    /// Comme le délégué de la carte (IOS-002), CarPlay peut l'appeler depuis sa file XPC : sous
+    /// `@MainActor`, le contrôle d'isolation de Swift 6 ferait planter l'app au changement
+    /// d'onglet (IOS-004). On repasse sur le fil principal ; le template n'y est que comparé.
+    nonisolated func tabBarTemplate(_ tabBarTemplate: CPTabBarTemplate, didSelect selectedTemplate: CPTemplate) {
+        nonisolated(unsafe) let selected = selectedTemplate
+        Task { @MainActor [weak self] in self?.onSelect(selected) }
     }
 }
 
