@@ -542,7 +542,19 @@ struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
     /// Vrai si l'utilisateur peut éditer, supprimer ou épingler ce post.
     /// L'autorité reste le SERVEUR (403 sinon) : ceci ne fait que masquer des
     /// actions vouées à échouer.
-    var canManage: Bool { isMine == true }
+    ///
+    /// IOS-043 : le serveur ne sert `isMine` que sur les stories, jamais sur les
+    /// publications du fil ; sans repli, ses propres posts n'offraient ni Modifier
+    /// ni Supprimer, mais « Signaler ». Faute de `isMine`, l'auteur décide, comme Android.
+    var canManage: Bool {
+        Self.isManaged(isMine: isMine, authorId: author.id, currentUserId: LocalAccountScope.currentUserId)
+    }
+
+    static func isManaged(isMine: Bool?, authorId: String, currentUserId: String?) -> Bool {
+        if let isMine { return isMine }
+        guard let currentUserId, !currentUserId.isEmpty else { return false }
+        return authorId == currentUserId
+    }
     /// Modifier : seulement un post écrit à la main (le serveur répond 403
     /// GENERATED_POST_READ_ONLY sur un post automatique).
     var canEdit: Bool { canManage && generated != true }

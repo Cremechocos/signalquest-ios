@@ -1032,10 +1032,11 @@ struct FeedView: View {
         .sheet(isPresented: $showRecap) {
             WeeklyRecapSheet(service: services.feed, onPublished: { Task { await model.load() } })
         }
-        .confirmationDialog(
+        // Alerte centrée, « Annuler » visible : en confirmationDialog, iOS 26 la posait en
+        // bulle sur le centre du fil, pointée vers une autre publication (IOS-044).
+        .alert(
             "Supprimer cette publication ?",
-            isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } }),
-            titleVisibility: .visible
+            isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } })
         ) {
             Button("Supprimer", role: .destructive) {
                 if let item = pendingDeletion { model.deletePost(item) }

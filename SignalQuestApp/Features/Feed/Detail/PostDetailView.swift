@@ -188,10 +188,11 @@ struct PostDetailView: View {
             ComposerSheet(service: feedService, editing: post)
                 .onDisappear { Task { await reloadAfterEdit() } }
         }
-        .confirmationDialog(
+        // Alerte centrée, « Annuler » visible : en confirmationDialog, iOS 26 la posait en
+        // bulle sur le centre du fil, pointée vers une autre publication (IOS-044).
+        .alert(
             "Supprimer cette publication ?",
-            isPresented: $confirmsDeletion,
-            titleVisibility: .visible
+            isPresented: $confirmsDeletion
         ) {
             Button("Supprimer", role: .destructive) { Task { await deletePost() } }
             Button("Annuler", role: .cancel) {}

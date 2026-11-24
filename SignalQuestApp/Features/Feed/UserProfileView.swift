@@ -1117,10 +1117,11 @@ struct UserProfileView: View {
     /// Les publications, avec la confirmation avant d'en supprimer une des tiennes.
     private var postsWithDeletionDialog: some View {
         postsSection
-            .confirmationDialog(
+            // Alerte centrée, « Annuler » visible : en confirmationDialog, iOS 26 la posait en
+            // bulle sur le centre du fil, pointée vers une autre publication (IOS-044).
+            .alert(
                 "Supprimer cette publication ?",
-                isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } }),
-                titleVisibility: .visible
+                isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } })
             ) {
                 Button("Supprimer", role: .destructive) {
                     if let item = pendingDeletion { model.delete(item) }

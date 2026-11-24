@@ -202,6 +202,16 @@ final class FeedItemOwnershipTests: XCTestCase {
         XCTAssertTrue(item.isPinned)
     }
 
+    /// IOS-043 : le fil ne sert pas `isMine` sur les publications ; l'auteur décide alors,
+    /// comme Android. Un `isMine` servi garde le dernier mot.
+    func testOwnPostWithoutServedOwnershipCanBeManaged() {
+        XCTAssertTrue(UnifiedSocialFeedItem.isManaged(isMine: nil, authorId: "me", currentUserId: "me"))
+        XCTAssertFalse(UnifiedSocialFeedItem.isManaged(isMine: nil, authorId: "other", currentUserId: "me"))
+        XCTAssertFalse(UnifiedSocialFeedItem.isManaged(isMine: nil, authorId: "me", currentUserId: nil), "Invité")
+        XCTAssertFalse(UnifiedSocialFeedItem.isManaged(isMine: false, authorId: "me", currentUserId: "me"))
+        XCTAssertTrue(UnifiedSocialFeedItem.isManaged(isMine: true, authorId: "other", currentUserId: "me"))
+    }
+
     func testAPostFromSomeoneElseCannotBeManaged() throws {
         let item = try decode(payload(isMine: "false", pinnedAt: "null"))
         XCTAssertFalse(item.canManage)
