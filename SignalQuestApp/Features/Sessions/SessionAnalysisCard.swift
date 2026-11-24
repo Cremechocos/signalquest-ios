@@ -44,6 +44,19 @@ enum SessionAnalysisText {
         return String(localized: "Mesuré sur \(percent) % du trajet")
     }
 
+    /// Les quatre chiffres d'une série, libellés comme Android ; seuls ceux que le serveur sert.
+    static func figures(_ series: SessionAnalysis.Series) -> [(label: String, value: String)] {
+        func percent(_ value: Int?) -> String? {
+            value.map { (Double($0) / 100).formatted(.percent.precision(.fractionLength(0))) }
+        }
+        return [
+            (String(localized: "En 5G"), percent(series.pct5g)),
+            (String(localized: "Couvert"), percent(series.coveragePct)),
+            (String(localized: "Bon signal"), percent(series.goodSignalPct)),
+            (String(localized: "Sans service"), series.noServiceRuns.map { $0.formatted() }),
+        ].compactMap { label, value in value.map { (label, $0) } }
+    }
+
     /// « Sans relevé : 6 min 50 s sur 4,4 km », rien quand il n'y a pas de trou.
     static func noRecordLabel(_ noRecord: SessionAnalysis.NoRecord?) -> String? {
         guard let noRecord, let seconds = noRecord.totalSec, seconds > 0 else { return nil }
@@ -213,6 +226,30 @@ struct SessionAnalysisCard: View {
                         .font(SQType.caption)
                         .monospacedDigit()
                         .foregroundStyle(SQColor.labelSecondary)
+                }
+                let figures = SessionAnalysisText.figures(series)
+                if !figures.isEmpty {
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: SQSpace.sm), GridItem(.flexible(), spacing: SQSpace.sm)],
+                              alignment: .leading, spacing: SQSpace.sm) {
+                        ForEach(figures, id: \.label) { figure in
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(verbatim: figure.value)
+                                    .font(SQFont.body(15, .bold))
+                                    .monospacedDigit()
+                                    .foregroundStyle(SQColor.label)
+                                Text(verbatim: figure.label)
+                                    .font(SQType.caption)
+                                    .foregroundStyle(SQColor.labelSecondary)
+                                    .lineLimit(2)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, SQSpace.sm2)
+                            .padding(.vertical, SQSpace.sm)
+                            .background(SQColor.chip, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                        }
+                    }
+                    .padding(.top, SQSpace.xs)
+                    .accessibilityIdentifier("sessionDetail.analysis.figures")
                 }
                 if series.isUnreliable {
                     Label("Peu de mesures : à prendre avec prudence", systemImage: "exclamationmark.triangle")

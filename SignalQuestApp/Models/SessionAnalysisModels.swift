@@ -47,6 +47,13 @@ struct SessionAnalysis: Decodable, Equatable, Sendable {
         let quality: Quality?
         let verdict: Verdict?
         let spotsTotal: Int?
+        /// Parts des relevés de la série, en % entiers (IOS-037, comme Android) : en 5G, couverts,
+        /// au bon signal ; et le nombre de suites d'au moins deux relevés sans service.
+        /// Absents d'une analyse figée avant leur ajout.
+        var pct5g: Int? = nil
+        var coveragePct: Int? = nil
+        var goodSignalPct: Int? = nil
+        var noServiceRuns: Int? = nil
 
         struct Quality: Decodable, Equatable, Sendable {
             let score: Int?
@@ -64,6 +71,7 @@ struct SessionAnalysis: Decodable, Equatable, Sendable {
 
         private enum CodingKeys: String, CodingKey {
             case seriesKey, operatorKey, marketCode, operatorRank, pointCount, quality, verdict, spotsTotal
+            case pct5g, coveragePct, goodSignalPct, noServiceRuns
         }
 
         init(from decoder: Decoder) throws {
@@ -75,6 +83,13 @@ struct SessionAnalysis: Decodable, Equatable, Sendable {
             quality = try? c.decodeIfPresent(Quality.self, forKey: .quality)
             verdict = try? c.decodeIfPresent(Verdict.self, forKey: .verdict)
             spotsTotal = try? c.decodeIfPresent(Int.self, forKey: .spotsTotal)
+            func percent(_ key: CodingKeys) -> Int? {
+                ((try? c.decodeIfPresent(Int.self, forKey: key)) ?? nil).flatMap { (0...100).contains($0) ? $0 : nil }
+            }
+            pct5g = percent(.pct5g)
+            coveragePct = percent(.coveragePct)
+            goodSignalPct = percent(.goodSignalPct)
+            noServiceRuns = ((try? c.decodeIfPresent(Int.self, forKey: .noServiceRuns)) ?? nil).flatMap { $0 >= 0 ? $0 : nil }
             seriesKey = (try? c.decodeIfPresent(String.self, forKey: .seriesKey)) ?? nil
             id = seriesKey ?? [operatorKey ?? "unknown", operatorRank.map(String.init) ?? ""].joined(separator: "#")
         }

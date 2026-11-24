@@ -46,6 +46,27 @@ final class SessionAnalysisTests: XCTestCase {
         XCTAssertNotNil(SessionAnalysisText.noRecordLabel(analysis.noRecord))
     }
 
+    /// IOS-037 : les quatre chiffres d'une série, comme Android (En 5G, Couvert, Bon signal en %,
+    /// Sans service en nombre de suites) ; une analyse figée avant leur ajout n'en montre aucun,
+    /// une valeur hors bornes n'est pas affichée.
+    func testSeriesFiguresAreShownOnlyWhenServed() throws {
+        let older = try decode(readyJSON).operators[0]
+        XCTAssertTrue(SessionAnalysisText.figures(older).isEmpty)
+
+        let json = #"{"analysis":{"contractVersion":1,"formulaVersion":3,"status":"ready","operators":[{"operatorKey":"ORANGE","pointCount":120,"quality":{"level":"good","score":71},"verdict":{"holes":0,"level":"good","headlineCode":"OK"},"pct5g":42,"coveragePct":98,"goodSignalPct":71,"noServiceRuns":2},{"operatorKey":"SFR","pointCount":80,"quality":{"level":"fair","score":50},"pct5g":140,"coveragePct":-3,"goodSignalPct":55,"noServiceRuns":0}]}}"#
+        let analysis = try decode(json)
+        let orange = SessionAnalysisText.figures(analysis.operators[0])
+        let labels = [String(localized: "En 5G"), String(localized: "Couvert"),
+                      String(localized: "Bon signal"), String(localized: "Sans service")]
+        XCTAssertEqual(orange.map(\.label), labels)
+        XCTAssertEqual(orange.map { $0.value.filter(\.isNumber) }, ["42", "98", "71", "2"])
+        XCTAssertTrue(orange[0].value.contains("%"))
+        XCTAssertFalse(orange[3].value.contains("%"))
+        let sfr = SessionAnalysisText.figures(analysis.operators[1])
+        XCTAssertEqual(sfr.map(\.label), Array(labels.suffix(2)), "Pourcentages hors bornes écartés")
+        XCTAssertEqual(sfr.last?.value, "0")
+    }
+
     func testUnavailableAndLiveAnalysesAreHidden() throws {
         for (status, reason) in [("unavailable", "no_points"), ("unavailable", "too_short"), ("live", "session_active")] {
             let json = #"{"analysis":{"contractVersion":1,"formulaVersion":1,"status":"\#(status)","reason":"\#(reason)","operators":[]}}"#
