@@ -106,18 +106,27 @@ struct DefaultPostVisibilitySheet: View {
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("dpv.closeNote")
                     }
-
-                    GradientButton("Valider", style: .accent) {
-                        guard let selection else { return }
-                        Task { await save(selection, applying: showsApplyOption && applyToExistingPosts) }
-                    }
-                    .disabled(!canValidate)
-                    .overlay { if isSaving { SQSpinner() } }
-                    .accessibilityIdentifier("dpv.validate")
                 }
                 .padding(.horizontal, SQSpace.xl)
                 .padding(.vertical, SQSpace.lg)
                 .sqReadableWidth()
+            }
+            // IOS-012 : « Valider » fixé en bas, toujours visible avec sa marge. Au bout du
+            // contenu défilant, il sortait de la feuille sur iPad, plus basse.
+            .safeAreaInset(edge: .bottom) {
+                GradientButton("Valider", style: .accent) {
+                    guard let selection else { return }
+                    Task { await save(selection, applying: showsApplyOption && applyToExistingPosts) }
+                }
+                .disabled(!canValidate)
+                .overlay { if isSaving { SQSpinner() } }
+                .accessibilityIdentifier("dpv.validate")
+                .padding(.horizontal, SQSpace.xl)
+                .padding(.top, SQSpace.sm)
+                .padding(.bottom, SQSpace.sm)
+                .sqReadableWidth()
+                .frame(maxWidth: .infinity)
+                .background(SQColor.bg.ignoresSafeArea(edges: .bottom))
             }
             .background(SQColor.bg.ignoresSafeArea())
             .toolbar {
