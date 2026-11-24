@@ -117884,6 +117884,38 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "Photos récentes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recent photos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos récentes"
+          }
+        }
+      }
+    },
+    "Trajets publics" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Public trips"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trajets publics"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

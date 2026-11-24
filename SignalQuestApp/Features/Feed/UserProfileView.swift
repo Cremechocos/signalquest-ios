@@ -350,7 +350,8 @@ final class UserProfileViewModel: ObservableObject {
             followersCount: 128,
             followingCount: 87,
             canMessage: !isSelf,
-            stats: SocialUserProfileStats(points: 4210, gamificationPoints: 4210, level: 12, validations: 36, photos: 14, speedtests: 220),
+            stats: SocialUserProfileStats(points: 4210, gamificationPoints: 4210, level: 12, validations: 36, photos: 14, speedtests: 220,
+                                          publicSessions: 9),
             accountBadges: [SocialUserBadge(kind: "premium")],
             // Deux réseaux qui ne totalisent pas 100 % : la démo doit exercer la
             // piste résiduelle de la barre empilée, pas seulement le cas plein.
@@ -407,6 +408,8 @@ struct UserProfileView: View {
     @State private var friendRequestSent = false
     @State private var editingPost: UnifiedSocialFeedItem?
     @State private var pendingDeletion: UnifiedSocialFeedItem?
+    /// Photo récente ouverte en plein écran.
+    @State private var openedPhoto: SocialProfilePhoto?
 
     private enum ProfileSheet: Identifiable {
         case detail(UnifiedSocialFeedItem)
@@ -451,6 +454,10 @@ struct UserProfileView: View {
                     }
                     if let networks = model.profile?.networks, !networks.operators.isEmpty {
                         measuredNetworks(networks)
+                    }
+                    // Publiques, les photos restent quand les chiffres sont masqués (comme Android).
+                    if !model.isPrivate, !loadFailed, let photos = model.profile?.recentPhotos, !photos.isEmpty {
+                        recentPhotos(photos)
                     }
                     if model.isPrivate {
                         EmptyStateView(
@@ -516,6 +523,18 @@ struct UserProfileView: View {
         }
         .sheet(item: $editingPost) { post in
             ComposerSheet(service: services.feed, editing: post, onPublished: { Task { await model.load() } })
+        }
+        .fullScreenCover(item: $openedPhoto) { photo in
+            // Le site se déduit de la photo : le profil ne connaît que son identifiant.
+            MapPhotoViewer(
+                items: (model.profile?.recentPhotos ?? [photo]).map {
+                    MapPhotoTarget(id: $0.id, thumbnailURL: $0.thumbnailUrl)
+                },
+                initialId: photo.id,
+                service: services.photos,
+                operatorAccent: { SQBrand.operatorColor($0) },
+                operatorLabel: { SQBrand.operatorName($0) ?? $0 }
+            )
         }
         .sheet(item: $presentedSheet) { sheet in
             switch sheet {
@@ -822,13 +841,18 @@ struct UserProfileView: View {
     /// de nombre de publications : la carte garde les mesures de contribution.
     private var statsCard: some View {
         let stats = model.profile?.stats
-        let cells: [(Int?, LocalizedStringKey)] = [
+        var cells: [(Int?, LocalizedStringKey)] = [
             (stats?.displayedPoints, "Points"),
             (stats?.speedtests, "Tests"),
             (stats?.validations, "Validations"),
             (stats?.photos, "Photos")
         ]
-        return HStack(spacing: 0) {
+        // Servi seulement quand les chiffres sont visibles (IOS-037, comme Android et le Web).
+        if let trips = stats?.publicSessions {
+            cells.append((trips, "Trajets publics"))
+        }
+        // Alignées en haut : un libellé sur deux lignes ne décale pas les nombres.
+        return HStack(alignment: .top, spacing: 0) {
             ForEach(Array(cells.enumerated()), id: \.offset) { index, cell in
                 if index > 0 {
                     Rectangle().fill(SQColor.separator).frame(width: 1).padding(.vertical, SQSpace.xs)
@@ -841,7 +865,8 @@ struct UserProfileView: View {
                     Text(cell.1)
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(1)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
                         .minimumScaleFactor(0.8)
                 }
                 .frame(maxWidth: .infinity)
@@ -852,6 +877,43 @@ struct UserProfileView: View {
         .padding(.horizontal, SQSpace.xs)
         .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
         .accessibilityIdentifier("profile.member.stats")
+    }
+
+    /// Photos récentes de la personne (6 au plus), comme Android et le Web : une grille
+    /// de trois, chaque vignette ouvre la visionneuse plein écran.
+    private func recentPhotos(_ photos: [SocialProfilePhoto]) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text("Photos récentes")
+                .sqKicker()
+                .accessibilityAddTraits(.isHeader)
+                .padding(.leading, SQSpace.xs)
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: 3),
+                spacing: SQSpace.sm
+            ) {
+                ForEach(Array(photos.enumerated()), id: \.element.id) { index, photo in
+                    let shape = RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
+                    Button { openedPhoto = photo } label: {
+                        Color.clear
+                            .aspectRatio(1, contentMode: .fit)
+                            .overlay {
+                                RemoteImage(url: photo.thumbnailUrl, maxDimension: 200, contentMode: .fill, showsFailureUI: true) {
+                                    Rectangle().fill(SQColor.fill).sqShimmer()
+                                }
+                            }
+                            .clipShape(shape)
+                            .contentShape(shape)
+                    }
+                    .buttonStyle(.plain)
+                    // Le libellé est porté par le bouton : il reste lu si la vignette ne charge pas.
+                    .accessibilityLabel(Text("Photo \(index + 1) sur \(photos.count)"))
+                    .accessibilityHint(Text("Ouvre la photo en plein écran"))
+                }
+            }
+            .padding(SQSpace.md)
+            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        }
+        .accessibilityIdentifier("profile.member.photos")
     }
 
     /// Sous 1 000, le nombre entier passe par une variation plurielle du catalogue

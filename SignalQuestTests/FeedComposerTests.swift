@@ -418,6 +418,37 @@ final class FeedComposerTests: XCTestCase {
         XCTAssertTrue(try profile(#","isSelf":false,"statsHidden":"oui""#).showsStats)
     }
 
+    /// IOS-037 : trajets publics et photos récentes, comme Android et le Web. Le serveur met
+    /// `publicSessions` à null quand les chiffres sont masqués ; une photo mal formée tombe
+    /// seule, sans emporter les autres ni le profil.
+    func testProfileDecodesPublicTripsAndRecentPhotos() throws {
+        func profile(_ extra: String) throws -> SocialUserProfile {
+            let json = #"{"id":"u1","name":"Léa","isSelf":false\#(extra)}"#
+            return try JSONDecoder.signalQuest.decode(SocialUserProfile.self, from: Data(json.utf8))
+        }
+        let older = try profile(#","stats":{"photos":4}"#)
+        XCTAssertNil(older.stats?.publicSessions)
+        XCTAssertEqual(older.recentPhotos, [])
+
+        let served = try profile(#"""
+        ,"stats":{"photos":4,"publicSessions":7},
+        "recentPhotos":[
+          {"id":"p1","thumbnailUrl":"https://cdn.example.test/p1.jpg","siteId":"site_1"},
+          {"thumbnailUrl":"https://cdn.example.test/sans-id.jpg"},
+          {"id":"p2","thumbnailUrl":null,"siteId":null}
+        ]
+        """#)
+        XCTAssertEqual(served.stats?.publicSessions, 7)
+        XCTAssertEqual(served.recentPhotos.map(\.id), ["p1", "p2"])
+        XCTAssertEqual(served.recentPhotos.first?.thumbnailUrl?.absoluteString, "https://cdn.example.test/p1.jpg")
+        XCTAssertEqual(served.recentPhotos.first?.siteId, "site_1")
+        XCTAssertNil(served.recentPhotos.last?.thumbnailUrl)
+
+        let hidden = try profile(#","statsHidden":true,"stats":{"photos":4,"publicSessions":null}"#)
+        XCTAssertNil(hidden.stats?.publicSessions)
+        XCTAssertEqual(hidden.stats?.photos, 4)
+    }
+
     func testFollowListShowsHiddenAndPrivateStatesInsteadOfAnError() async {
         let fixture = ComposerFeedFixture()
         let model = FollowListViewModel(

@@ -865,6 +865,9 @@ struct SocialUserProfileStats: Codable, Equatable {
     /// Niveau des missions, seul niveau affiché partout depuis le 29/09 (son propre
     /// profil, Android, Web) ; `level` est l'ancien niveau stocké.
     var missionsLevel: Int? = nil
+    /// Trajets que la personne a rendus publics (IOS-037, comme Android et le Web) ;
+    /// `nil` quand elle masque ses chiffres, ou d'un serveur plus ancien : la case n'apparaît pas.
+    var publicSessions: Int? = nil
 
     /// IOS-023 : les points affichés sont ceux de la gamification, comme son propre
     /// profil (/api/user/stats), les classements et Android ; `points` (ancien
@@ -873,6 +876,30 @@ struct SocialUserProfileStats: Codable, Equatable {
 
     /// IOS-031 : même principe pour le niveau ; `level` ne sert que de repli.
     var displayedLevel: Int? { missionsLevel ?? level }
+}
+
+/// Photo récente d'un profil (6 au plus). Le serveur ne sert que des photos approuvées et
+/// visibles, la règle de GET /api/photos/[id] : une vignette n'ouvre jamais une photo introuvable.
+/// Publiques, elles restent quand le membre masque ses chiffres.
+struct SocialProfilePhoto: Codable, Equatable, Identifiable {
+    let id: String
+    let thumbnailUrl: URL?
+    let siteId: String?
+
+    init(id: String, thumbnailUrl: URL?, siteId: String? = nil) {
+        self.id = id
+        self.thumbnailUrl = thumbnailUrl
+        self.siteId = siteId
+    }
+
+    enum CodingKeys: String, CodingKey { case id, thumbnailUrl, siteId }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        thumbnailUrl = c.decodeLossyURL(forKey: .thumbnailUrl)
+        siteId = c.decodeFlexibleString(forKey: .siteId)
+    }
 }
 
 /// Profil public renvoyé par GET /api/users/[id]/profile.
@@ -907,6 +934,8 @@ struct SocialUserProfile: Codable, Equatable {
     /// Cloche du profil (SOCIAL-BELL-1). `nil` : champ absent, fonctionnalité non servie,
     /// la cloche reste masquée et aucun appel n'est fait.
     var postNotifications: PostNotificationLevel?
+    /// Photos récentes ; vide d'un serveur plus ancien.
+    var recentPhotos: [SocialProfilePhoto] = []
 
     var displayName: String {
         MemberIdentity.displayName(name, handle: handle)
@@ -922,7 +951,7 @@ struct SocialUserProfile: Codable, Equatable {
     enum CodingKeys: String, CodingKey {
         case id, name, handle, bio, avatarUrl, createdAt, isSelf, isFriend
         case isFollowing, followersCount, followingCount, canMessage, stats
-        case accountBadges, networks, privacy, statsHidden, postNotifications
+        case accountBadges, networks, privacy, statsHidden, postNotifications, recentPhotos
     }
 
     init(
@@ -943,7 +972,8 @@ struct SocialUserProfile: Codable, Equatable {
         networks: SocialProfileNetworks? = nil,
         privacy: SocialUserProfilePrivacy? = nil,
         statsHidden: Bool = false,
-        postNotifications: PostNotificationLevel? = nil
+        postNotifications: PostNotificationLevel? = nil,
+        recentPhotos: [SocialProfilePhoto] = []
     ) {
         self.id = id
         self.name = name
@@ -963,6 +993,7 @@ struct SocialUserProfile: Codable, Equatable {
         self.privacy = privacy
         self.statsHidden = statsHidden
         self.postNotifications = postNotifications
+        self.recentPhotos = recentPhotos
     }
 
     init(from decoder: Decoder) throws {
@@ -986,6 +1017,7 @@ struct SocialUserProfile: Codable, Equatable {
         statsHidden = (try? c.decodeIfPresent(Bool.self, forKey: .statsHidden)) ?? false
         postNotifications = (try? c.decodeIfPresent(String.self, forKey: .postNotifications)).flatMap { $0 }
             .map(PostNotificationLevel.init(served:))
+        recentPhotos = c.decodeLossyArray([SocialProfilePhoto].self, forKey: .recentPhotos)
     }
 }
 
