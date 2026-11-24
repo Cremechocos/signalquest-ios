@@ -996,23 +996,28 @@ struct SignalQuestHomeView: View {
             }
             router.selectedTab = .map
         } label: {
-            HStack(spacing: SQSpace.md) {
-                Group {
-                    if let upgrade {
-                        TechBadge(text: upgrade, color: TechAccent.color(for: upgrade))
-                    } else {
-                        Text("Prévu")
-                            .font(SQType.chip)
-                            .foregroundStyle(SQColor.chipInk)
-                            .padding(.horizontal, SQSpace.sm2)
-                            .padding(.vertical, SQSpace.xs2)
-                            .sqSurface(SQColor.chip, in: Capsule(style: .continuous))
-                    }
+            let badge = Group {
+                if let upgrade {
+                    TechBadge(text: upgrade, color: TechAccent.color(for: upgrade))
+                } else {
+                    Text("Prévu")
+                        .font(SQType.chip)
+                        .foregroundStyle(SQColor.chipInk)
+                        .padding(.horizontal, SQSpace.sm2)
+                        .padding(.vertical, SQSpace.xs2)
+                        .sqSurface(SQColor.chip, in: Capsule(style: .continuous))
                 }
-                .fixedSize()
-                // Même colonne pour « 5G » et « Prévu » : les titres restent alignés.
-                .frame(minWidth: 58, alignment: .leading)
+            }
+            .fixedSize()
+            HStack(spacing: SQSpace.md) {
+                // En grandes tailles de texte, la pastille passe au-dessus du titre :
+                // en colonne, elle laissait au texte une largeur qui coupait les mots.
+                if !dynamicTypeSize.isAccessibilitySize {
+                    // Même colonne pour « 5G » et « Prévu » : les titres restent alignés.
+                    badge.frame(minWidth: 58, alignment: .leading)
+                }
                 VStack(alignment: .leading, spacing: 2) {
+                    if dynamicTypeSize.isAccessibilitySize { badge }
                     Text(verbatim: title)
                         .font(SQType.callout(.bold))
                         .foregroundStyle(SQColor.label)

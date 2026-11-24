@@ -634,6 +634,9 @@ struct MessagesView: View {
                 splitDetail
             }
             .navigationSplitViewStyle(.balanced)
+            // Les colonnes commencent sous la barre d'onglets flottante : sans ce fond,
+            // la bande derrière elle restait blanche au lieu du crème de l'app.
+            .signalQuestBackground()
             // Poussée dans la pile du Feed : la barre de cette pile reste masquée,
             // le retour rond de la liste suffit.
             .toolbar(.hidden, for: .navigationBar)
@@ -1352,48 +1355,69 @@ struct MessagesView: View {
                     if showingShelved { showingShelved = false } else if showingRequests { showingRequests = false } else { dismiss() }
                 }
                 Spacer(minLength: SQSpace.sm)
-                if !showingShelved && !showingRequests {
-                    listMenu
-                    Button {
-                        Haptics.light()
-                        showNewConversation = true
-                    } label: {
-                        Image(systemName: "square.and.pencil")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(SQColor.onInk)
-                            .frame(width: 44, height: 44)
-                            .background(SQColor.label, in: Circle())
-                            .contentShape(Circle())
-                    }
-                    .buttonStyle(SQPressButtonStyle())
-                    .accessibilityLabel("Nouvelle conversation")
-                    .accessibilityIdentifier("messages.new")
+                if !usesSplitLayout { headerActions }
+            }
+            // iPad : la barre d'onglets flotte en haut, au centre, et la colonne de la liste
+            // ne s'écarte pas d'elle ; sur la rangée du retour, ces deux boutons passaient
+            // dessous (tour A3 du 24/11). Ils rejoignent la rangée du titre, sous la barre.
+            HStack(alignment: .top, spacing: SQSpace.sm) {
+                headerTitle
+                if usesSplitLayout {
+                    Spacer(minLength: SQSpace.sm)
+                    headerActions
                 }
             }
-            VStack(alignment: .leading, spacing: SQSpace.xs) {
-                Text(showingRequests ? "Demandes de message" : (showingShelved ? "Archivées" : "Messages"))
-                    .font(SQFont.display(30, .bold, relativeTo: .largeTitle))
-                    .foregroundStyle(SQColor.label)
-                    .sqHeader()
-                let unread = model.conversations.filter(isUnread).count
-                if showingRequests {
-                    Text("Ces personnes ne sont pas dans tes amis. Tant que tu n’acceptes pas, elles ne savent pas que tu as lu leur message.")
-                        .font(SQType.callout)
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("messages.requests.note")
-                } else if showingShelved {
-                    Text("Une conversation archivée revient dans ta liste au prochain message, sauf si elle est en sourdine.")
-                        .font(SQType.callout)
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("messages.shelved.note")
-                } else if unread > 0 {
-                    Text("\(unread) conversations non lues")
-                        .font(SQType.callout)
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .accessibilityIdentifier("messages.unreadCount")
+        }
+    }
+
+    /// Menu de la liste et « Nouvelle conversation », hors archivées et demandes.
+    @ViewBuilder
+    private var headerActions: some View {
+        if !showingShelved && !showingRequests {
+            HStack(spacing: SQSpace.sm) {
+                listMenu
+                Button {
+                    Haptics.light()
+                    showNewConversation = true
+                } label: {
+                    Image(systemName: "square.and.pencil")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(SQColor.onInk)
+                        .frame(width: 44, height: 44)
+                        .background(SQColor.label, in: Circle())
+                        .contentShape(Circle())
                 }
+                .buttonStyle(SQPressButtonStyle())
+                .accessibilityLabel("Nouvelle conversation")
+                .accessibilityIdentifier("messages.new")
+            }
+        }
+    }
+
+    private var headerTitle: some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs) {
+            Text(showingRequests ? "Demandes de message" : (showingShelved ? "Archivées" : "Messages"))
+                .font(SQFont.display(30, .bold, relativeTo: .largeTitle))
+                .foregroundStyle(SQColor.label)
+                .sqHeader()
+            let unread = model.conversations.filter(isUnread).count
+            if showingRequests {
+                Text("Ces personnes ne sont pas dans tes amis. Tant que tu n’acceptes pas, elles ne savent pas que tu as lu leur message.")
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("messages.requests.note")
+            } else if showingShelved {
+                Text("Une conversation archivée revient dans ta liste au prochain message, sauf si elle est en sourdine.")
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("messages.shelved.note")
+            } else if unread > 0 {
+                Text("\(unread) conversations non lues")
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .accessibilityIdentifier("messages.unreadCount")
             }
         }
     }
