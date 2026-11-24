@@ -156,6 +156,12 @@ struct SpeedtestDetailContent: View {
                     .accessibilityLabel(Text("Adresse"))
                     .accessibilityValue(Text(verbatim: address))
                     .accessibilityIdentifier("speedtest.detail.address")
+                // Choix d'Alexandre du 24/11 : l'auteur voit son adresse et son Wi-Fi jusque dans le
+                // fil, et doit savoir d'un coup d'œil que personne d'autre ne les voit.
+                Label("Visible de toi seul", systemImage: "lock.fill")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .accessibilityIdentifier("speedtest.detail.ownerOnly")
             }
             if visibilityStatus != nil || deviceModel != nil {
                 let pills = Group {
@@ -214,10 +220,15 @@ struct SpeedtestDetailContent: View {
 
     /// Ligne « Réseau », avec le même nom d'opérateur que le sur-titre.
     private var networkLine: String {
-        let line = result.networkShareDisplayName
-        guard let raw = result.networkOperatorName?.trimmedNonEmptyDetail,
-              let label = operatorLabel, label != raw else { return line }
-        return line.replacingOccurrences(of: raw, with: label)
+        Self.networkLine(result.networkShareDisplayName, served: result.networkOperatorName?.trimmedNonEmptyDetail,
+                         label: operatorLabel)
+    }
+
+    /// Le nom du réseau, en tête de ligne, prend le nom du sur-titre ; seule sa PREMIÈRE
+    /// occurrence change. Tout remplacer donnait « SIM Bouygues Telecom Telecom » (24/11).
+    nonisolated static func networkLine(_ line: String, served raw: String?, label: String?) -> String {
+        guard let raw, let label, label != raw, let range = line.range(of: raw) else { return line }
+        return line.replacingCharacters(in: range, with: label)
     }
 
     // MARK: Débits mesurés — jauge et trois valeurs
@@ -564,7 +575,7 @@ struct SpeedtestDetailContent: View {
             dotRow("Réseau", networkLine)
             // Nom du Wi-Fi : le sien seulement, le serveur ne le rend à personne d'autre.
             if result.connectionType == .wifi, let ssid = result.wifiSSID?.trimmedNonEmptyDetail {
-                dotRow("Réseau Wi-Fi", ssid, localized: false)
+                dotRow("Réseau Wi-Fi", ssid, ownerOnly: true)
             }
             if let plmn = result.observedPlmn?.trimmedNonEmptyDetail {
                 dotRow("MCC-MNC", Self.plmn(plmn))
@@ -599,7 +610,8 @@ struct SpeedtestDetailContent: View {
                 dotRow("Moteur", engine)
             }
             if let version = result.methodologyVersion {
-                dotRow("Méthodologie", String(version))
+                // « Méthodologie 7 » ne disait rien (séance iPhone du 24/11) : libellé et « v7 » d'Android.
+                dotRow("Version de la méthode", "v\(version)")
             }
             if result.durationSeconds > 0 {
                 dotRow("Durée du test", String(localized: "\(Int(result.durationSeconds.rounded())) s"))
@@ -744,8 +756,15 @@ struct SpeedtestDetailContent: View {
     /// Ligne clé · · · valeur, comme le « Diagnostic radio » du web. Les très
     /// grands textes empilent la clé et la valeur plutôt que de les tronquer.
     private func dotRow(_ label: String, _ value: String, trailing: String? = nil, dot: Color? = nil,
-                        localized: Bool = true) -> some View {
+                        localized: Bool = true, ownerOnly: Bool = false) -> some View {
         let valueText = HStack(alignment: .firstTextBaseline, spacing: 4) {
+            // Donnée que le serveur ne rend qu'à l'auteur : le cadenas le dit, VoiceOver aussi.
+            if ownerOnly {
+                Image(systemName: "lock.fill")
+                    .font(SQType.micro)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .accessibilityLabel(Text("Visible de toi seul"))
+            }
             if let dot {
                 Circle()
                     .fill(dot)

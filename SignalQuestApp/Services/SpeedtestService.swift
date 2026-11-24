@@ -1325,6 +1325,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             uploadServerPort: ulAverageMbps == nil ? nil : Int(port)
         )
         measurements.pingLoss = pingOutcome.loss
+        measurements.streamCount = parallelStreams
         return await finalizeRun(
             measurements,
             startedAt: startedAt,
@@ -1458,6 +1459,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         /// Perte de la série de pings au repos (IOS-037) ; `nil` quand la latence vient des
         /// connexions du download, où aucun écho n'est envoyé ni perdu.
         var pingLoss: SpeedtestPingLoss? = nil
+        /// Connexions parallèles RÉELLEMENT ouvertes pour le download (iPerf3 en ouvre au moins
+        /// 4, Cloudflare et LibreSpeed au moins 2), et non le réglage demandé.
+        var streamCount: Int? = nil
     }
 
     /// Contexte de résultat (lieu, SSID, opérateur) — résolu en tâche
@@ -1585,6 +1589,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         )
         result.packetLossPct = m.pingLoss?.percent
         result.pingSampleCount = m.pingLoss?.samples
+        result.streamCount = m.streamCount
 
         do {
             try await appendHistory(result)
@@ -1887,6 +1892,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             uploadServerPort: ulAverageMbps == nil ? nil : Int(CloudflareSpeedtestConfig.httpsPort)
         )
         measurements.pingLoss = cloudflarePings.loss
+        measurements.streamCount = dlStreams
         return await finalizeRun(
             measurements,
             startedAt: startedAt,
@@ -2249,6 +2255,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             uploadServerPort: ulAverageMbps == nil ? nil : Int(LibreSpeedConfig.httpsPort)
         )
         measurements.pingLoss = pingResult.loss
+        measurements.streamCount = dlStreams
         return await finalizeRun(
             measurements, startedAt: startedAt, pathStatus: pathStatus,
             location: location, context: contextTask, progress: progress

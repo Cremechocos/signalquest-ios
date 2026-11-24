@@ -107,6 +107,44 @@ final class AccountSpeedtestDetailTests: XCTestCase {
 
     /// IOS-037 lot 2 : la fiche relit ce que le serveur sert en plus (test Android compris), le nom du
     /// Wi-Fi seulement pour son propriétaire ; l'envoi iOS porte la même note, à grandeur égale.
+    /// Séance iPhone du 24/11 : la fiche d'un test tout juste mesuré n'avait pas ses connexions
+    /// parallèles, et l'envoi transmettait le réglage (2 ou 3) quand iPerf3 en ouvre au moins 4.
+    func testSubmittedStreamCountIsTheOneTheEngineOpened() throws {
+        var measured = SpeedtestRunResult(label: "local", downloadMbps: 80, downloadAverageMbps: 80, downloadMaxMbps: 90,
+                                          durationSeconds: 24.6, connectionType: .cellular, cellularTechnology: .fourG,
+                                          createdAt: Date(timeIntervalSince1970: 1_795_190_000))
+        XCTAssertEqual(SpeedtestSubmission.iosPayload(from: measured, streams: 2, deviceModel: "iPhone").testDuration, 25,
+                       "arrondie comme la fiche locale, que la colonne entière du serveur ne tronque plus à 24")
+        measured.streamCount = 4
+        XCTAssertEqual(SpeedtestSubmission.iosPayload(from: measured, streams: 2, deviceModel: "iPhone").streams, 4,
+                       "le nombre réellement ouvert, pas le réglage")
+        let stored = try JSONDecoder().decode(SpeedtestRunResult.self, from: JSONEncoder().encode(measured))
+        XCTAssertEqual(stored.streamCount, 4, "l'historique local le garde pour la fiche")
+        measured.streamCount = nil
+        XCTAssertEqual(SpeedtestSubmission.iosPayload(from: measured, streams: 2, deviceModel: "iPhone").streams, 2,
+                       "un ancien résultat garde le réglage")
+    }
+
+    /// Même séance : « Bouygues Telecom · SIM Bouygues Telecom Telecom 5G SA ». Le réseau servi
+    /// (« Bouygues ») et la SIM (« Bouygues Telecom ») sont le même opérateur, et tout « Bouygues »
+    /// de la ligne prenait le nom complet.
+    func testNetworkLineNamesTheOperatorOnce() {
+        func cellular(network: String, sim: String) -> SpeedtestRunResult {
+            SpeedtestRunResult(label: "local", downloadMbps: 80, downloadAverageMbps: 80, downloadMaxMbps: 90,
+                               durationSeconds: 10, connectionType: .cellular, cellularTechnology: .fiveGSA,
+                               networkOperatorName: network, carrierName: sim, createdAt: Date(timeIntervalSince1970: 1_795_190_000))
+        }
+        let same = cellular(network: "Bouygues", sim: "Bouygues Telecom")
+        XCTAssertEqual(same.networkShareDisplayName, "Bouygues 5G SA")
+        XCTAssertEqual(SpeedtestDetailContent.networkLine(same.networkShareDisplayName, served: "Bouygues", label: "Bouygues Telecom"),
+                       "Bouygues Telecom 5G SA")
+        XCTAssertEqual(cellular(network: "Free", sim: "Free Mobile").networkShareDisplayName, "Free 5G SA")
+        XCTAssertEqual(cellular(network: "SFR", sim: "RED by SFR").networkShareDisplayName, "SFR · SIM RED by SFR 5G SA",
+                       "une autre marque reste une autre SIM")
+        XCTAssertEqual(SpeedtestDetailContent.networkLine("Bouygues · SIM Bouygues Telecom 5G SA", served: "Bouygues", label: "Bouygues Telecom"),
+                       "Bouygues Telecom · SIM Bouygues Telecom 5G SA", "seul le nom du réseau change")
+    }
+
     func testServedSpeedtestExtrasAndTheSubmittedLoadedLatencyGrade() throws {
         let served = try detail("""
         {"id":"cksp2","timestamp":"2026-11-24T10:00:00.000Z","averageSpeed":300,"connectionType":"wifi","connectionKind":"wifi",

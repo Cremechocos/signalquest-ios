@@ -71178,23 +71178,6 @@
         }
       }
     },
-    "Méthodologie" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Methodology"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Méthodologie"
-          }
-        }
-      }
-    },
     "Métrique" : {
       "localizations" : {
         "en" : {
@@ -117638,6 +117621,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "≥ %lld ms"
+          }
+        }
+      }
+    },
+    "Version de la méthode" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Methodology version"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version de la méthode"
           }
         }
       }

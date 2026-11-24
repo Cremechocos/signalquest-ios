@@ -830,7 +830,7 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
                 .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
                 .reduce(into: [String]()) { labels, value in
-                    if !labels.contains(where: { $0.caseInsensitiveCompare(value) == .orderedSame }) {
+                    if !labels.contains(where: { Self.namesSameOperator($0, value) }) {
                         labels.append(value)
                     }
                 }
@@ -844,6 +844,16 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
         case .wired, .other:
             return networkDisplayName
         }
+    }
+
+    /// Deux noms du même opérateur : identiques, ou nom long et nom court d'un opérateur connu
+    /// (« Bouygues » servi, « Bouygues Telecom » de la SIM ; séance iPhone du 24/11). Une
+    /// marque distincte (« RED by SFR ») reste une autre SIM.
+    static func namesSameOperator(_ a: String, _ b: String) -> Bool {
+        if a.caseInsensitiveCompare(b) == .orderedSame { return true }
+        guard let full = SQBrand.operatorName(a), full == SQBrand.operatorName(b) else { return false }
+        let names = [full, SQBrand.operatorShortName(a)].compactMap { $0 }
+        return [a, b].allSatisfy { value in names.contains { $0.caseInsensitiveCompare(value) == .orderedSame } }
     }
 
     var speedtestConnectionType: String {
@@ -1142,8 +1152,11 @@ struct SpeedtestSubmission: Encodable, Equatable {
             jitterDl: result.jitterDlMs,
             pingUl: result.pingUlMs,
             jitterUl: result.jitterUlMs,
-            testDuration: result.durationSeconds,
-            streams: streams,
+            // La colonne serveur est entière et tronque (24,6 s → 24) ; la fiche locale arrondit (25) :
+            // envoyée arrondie, la durée est la même des deux côtés (séance iPhone du 24/11).
+            testDuration: result.durationSeconds.rounded(),
+            // Les connexions réellement ouvertes ; le réglage seulement pour un ancien résultat.
+            streams: result.streamCount ?? streams,
             connectionType: result.speedtestConnectionType,
             networkType: result.connectionType.rawValue,
             coordinates: shareExactLocation ? result.coordinate : minimizedCoordinates(result.coordinate),
