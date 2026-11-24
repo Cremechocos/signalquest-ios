@@ -1,4 +1,5 @@
 import CryptoKit
+import os
 import Foundation
 
 protocol SocialFeedServicing: Sendable {
@@ -374,7 +375,28 @@ final class SocialFeedService: SocialFeedServicing {
     /// jours plus tard surprendrait l'auteur, qui l'a peut-être abandonné (SOC-02).
     static let pendingPostLifetime: TimeInterval = 7 * 24 * 3600
 
+    /// Une seule reprise à la fois. Au lancement, l'app et le fil la demandent en même
+    /// temps : deux reprises envoyaient la même publication deux fois, et celle qui
+    /// perdait (refusée) la retirait de la file, même si l'autre échouait ensuite.
+    private let pendingRetry = OSAllocatedUnfairLock<Task<Void, Never>?>(initialState: nil)
+
     func retryPendingPosts() async {
+        let task: Task<Void, Never> = pendingRetry.withLock { running in
+            if let running { return running }
+            let next = Task { [weak self] in
+                guard let self else { return }
+                await self.drainPendingPosts()
+            }
+            running = next
+            return next
+        }
+        await task.value
+        pendingRetry.withLock { running in
+            if running == task { running = nil }
+        }
+    }
+
+    private func drainPendingPosts() async {
         guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent else { return }
         guard let records = try? await postOutbox.pending(session: session) else { return }
         for record in records {

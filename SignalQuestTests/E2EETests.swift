@@ -1,6 +1,7 @@
 import CryptoKit
 import ImageIO
 import Security
+import os
 import XCTest
 @testable import SignalQuest
 
@@ -4651,6 +4652,53 @@ final class SocialPostOutboxTests: XCTestCase {
         online = true
         await service.retryPendingPosts()
         XCTAssertEqual(postedRequestIds, [staged.first?.clientRequestId ?? "?"])
+        let afterReplay = try await outbox.pending(session: session)
+        XCTAssertTrue(afterReplay.isEmpty)
+    }
+
+    /// Au lancement, l'app et le fil demandent la reprise en même temps : la
+    /// publication en file ne part qu'une fois (audit A4, 24/11).
+    func testConcurrentRetriesSendAQueuedPostOnce() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("social-retry-\(UUID().uuidString)", isDirectory: true)
+        defer {
+            MockURLProtocol.requestHandler = nil
+            LocalAccountScope.deactivate()
+            try? FileManager.default.removeItem(at: root)
+        }
+        LocalAccountScope.activate(userId: "social-retry-\(UUID().uuidString)")
+        let session = try XCTUnwrap(LocalAccountScope.sessionSnapshot())
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("synthetic-social-token")
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let api = APIClient(config: .test, credentials: credentials,
+                            session: URLSession(configuration: configuration))
+        let outbox = SocialPostOutboxStore(baseDirectory: root)
+        let service = SocialFeedService(api: api, postOutbox: outbox)
+        let online = OSAllocatedUnfairLock(initialState: false)
+        let posted = OSAllocatedUnfairLock<[String]>(initialState: [])
+        MockURLProtocol.requestHandler = { request in
+            guard online.withLock({ $0 }) else { throw URLError(.notConnectedToInternet) }
+            let body = (try? JSONSerialization.jsonObject(with: Self.requestBody(request)) as? [String: Any]) ?? [:]
+            let requestId = body["clientRequestId"] as? String ?? ""
+            posted.withLock { $0.append(requestId) }
+            Thread.sleep(forTimeInterval: 0.3)
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 201,
+                                           httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"post":null,"requestId":"post-request"}"#.utf8))
+        }
+        _ = try? await service.publishPost(text: "Envoyé hors ligne", visibility: "friends",
+                                           imageData: nil, imageMimeType: "image/jpeg",
+                                           targetType: nil, targetId: nil, extraMetadata: nil, poll: nil)
+        let staged = try await outbox.pending(session: session)
+        XCTAssertEqual(staged.count, 1)
+
+        online.withLock { $0 = true }
+        async let first: Void = service.retryPendingPosts()
+        async let second: Void = service.retryPendingPosts()
+        _ = await (first, second)
+        XCTAssertEqual(posted.withLock { $0 }, [staged.first?.clientRequestId ?? "?"], "une seule reprise envoie la publication")
         let afterReplay = try await outbox.pending(session: session)
         XCTAssertTrue(afterReplay.isEmpty)
     }
