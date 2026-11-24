@@ -69,6 +69,28 @@ final class NotificationPrimingTests: XCTestCase {
         XCTAssertFalse(presented)
     }
 
+    /// Audit perf D1 (résidu, IOS-026) : le même jeton FCM ne part qu'une fois par heure
+    /// pour une même empreinte ; une autre langue, un autre compte, un échec ou une
+    /// déconnexion relancent.
+    func testFCMRegistrationIsSentOncePerFingerprintAndHour() {
+        let suffix = UUID().uuidString
+        let fr = PushNotificationService.registrationFingerprint(
+            owner: "owner-a-\(suffix)", token: "token", deviceID: "device", environment: "production",
+            locale: "fr", timeZone: "Europe/Paris")
+        let en = PushNotificationService.registrationFingerprint(
+            owner: "owner-a-\(suffix)", token: "token", deviceID: "device", environment: "production",
+            locale: "en", timeZone: "Europe/Paris")
+        let start = Date()
+        XCTAssertTrue(PushNotificationService.reserveRegistration(fr, now: start))
+        XCTAssertFalse(PushNotificationService.reserveRegistration(fr, now: start.addingTimeInterval(1)), "Doublon du lancement")
+        XCTAssertTrue(PushNotificationService.reserveRegistration(en, now: start.addingTimeInterval(2)), "Autre langue : envoi")
+        XCTAssertTrue(PushNotificationService.reserveRegistration(fr, now: start.addingTimeInterval(3_601)), "Une heure après : envoi")
+        PushNotificationService.releaseRegistration(fr)
+        XCTAssertTrue(PushNotificationService.reserveRegistration(fr, now: start.addingTimeInterval(3_602)), "Après un échec : envoi")
+        PushNotificationService.resetRegistrations()
+        XCTAssertTrue(PushNotificationService.reserveRegistration(fr, now: start.addingTimeInterval(3_603)), "Après une déconnexion : envoi")
+    }
+
     /// IOS-015 : l'accord des notifications allume « Messages privés », et lui seul.
     func testGrantTurnsOnPrivateMessagesOnly() throws {
         let body = try JSONEncoder().encode(PushNotificationService.messagePushAfterGrant)

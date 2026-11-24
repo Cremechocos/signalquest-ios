@@ -691,6 +691,21 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
                 logger.info("FCM token kept locally until an authenticated account is active")
                 return
             }
+            // Résidu de l'audit perf (D1) : au lancement, le rappel de Firebase et la
+            // relecture du jeton arrivent ensemble, d'où deux POST identiques. Une même
+            // empreinte n'est renvoyée qu'une fois par heure ; tout envoi qui n'aboutit
+            // pas libère la place.
+            let fingerprint = Self.registrationFingerprint(
+                owner: expectedOwnerScopeId, token: token, deviceID: deviceID,
+                environment: api.config.environment.rawValue,
+                locale: AccountLocaleSync.appLocale, timeZone: TimeZone.current.identifier
+            )
+            guard Self.reserveRegistration(fingerprint) else {
+                logger.info("FCM token already registered for this session")
+                return
+            }
+            var registered = false
+            defer { if !registered { Self.releaseRegistration(fingerprint) } }
             do {
                 await retryPendingRevocations()
                 let response: DevicePushRegistrationResponse = try await api.requestJSON(
@@ -730,11 +745,41 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
                     await retryPendingRevocations()
                     return
                 }
+                registered = true
                 logger.info("FCM token registered with backend")
             } catch {
                 logger.error("Token registration failed: \(error.localizedDescription, privacy: .public)")
             }
         }
+    }
+
+    /// Empreinte d'un envoi du jeton FCM : compte, jeton, appareil, environnement,
+    /// langue et fuseau. Un changement de l'un d'eux repart toujours.
+    static func registrationFingerprint(
+        owner: String, token: String, deviceID: String, environment: String, locale: String, timeZone: String
+    ) -> String {
+        [owner, token, deviceID, environment, locale, timeZone].joined(separator: "|")
+    }
+
+    private static let registrationGate = OSAllocatedUnfairLock<[String: Date]>(initialState: [:])
+    static let registrationWindow: TimeInterval = 3_600
+
+    /// `false` si la même empreinte est partie (ou part) depuis moins d'une heure.
+    static func reserveRegistration(_ fingerprint: String, now: Date = Date()) -> Bool {
+        registrationGate.withLock { sent in
+            if let at = sent[fingerprint], now.timeIntervalSince(at) < registrationWindow { return false }
+            sent[fingerprint] = now
+            return true
+        }
+    }
+
+    static func releaseRegistration(_ fingerprint: String) {
+        registrationGate.withLock { $0[fingerprint] = nil }
+    }
+
+    /// Déconnexion : le prochain compte, ou le même, renvoie son jeton aussitôt.
+    static func resetRegistrations() {
+        registrationGate.withLock { $0.removeAll() }
     }
 
     func didFailToRegister(error: Error) {
@@ -750,6 +795,7 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
         // échouer la garde de `AuthSessionViewModel.logout()` avant même
         // `AuthService.logout()`, laissant le compte visuellement connecté.
         E2EEV2NotificationContextEvents.revoke()
+        Self.resetRegistrations()
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
         E2EEV2NotificationScope.clearPostedNotifications()
         let inMemoryToken = lastToken.withLock { value -> String? in
