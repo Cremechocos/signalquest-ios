@@ -435,7 +435,11 @@ struct PlannedSitesResponse: Decodable, Equatable {
     private enum CodingKeys: String, CodingKey { case sites }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        sites = try c.decode([PlannedSiteLive].self, forKey: .sites)
+        // IOS-018 : clé exigée, puis élément par élément : un site mal formé ne vide plus la couche.
+        guard c.contains(.sites) else {
+            throw DecodingError.keyNotFound(CodingKeys.sites, .init(codingPath: c.codingPath, debugDescription: "sites"))
+        }
+        sites = c.decodeLossyArray([PlannedSiteLive].self, forKey: .sites)
         availability = try MapFeedAvailability(from: decoder)
     }
 }
@@ -558,7 +562,11 @@ struct OutageSitesResponse: Decodable, Equatable {
     private enum CodingKeys: String, CodingKey { case sites }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        sites = try c.decode([OutageSiteLive].self, forKey: .sites)
+        // IOS-018 : clé exigée, puis élément par élément : un site mal formé ne vide plus la couche.
+        guard c.contains(.sites) else {
+            throw DecodingError.keyNotFound(CodingKeys.sites, .init(codingPath: c.codingPath, debugDescription: "sites"))
+        }
+        sites = c.decodeLossyArray([OutageSiteLive].self, forKey: .sites)
         availability = try MapFeedAvailability(from: decoder)
     }
 }

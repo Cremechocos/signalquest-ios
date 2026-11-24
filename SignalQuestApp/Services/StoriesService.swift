@@ -37,9 +37,10 @@ struct StoriesListResponse: Decodable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        stories = (try? c.decode([SocialStory].self, forKey: .stories))
-            ?? (try? c.decode([SocialStory].self, forKey: .items))
-            ?? []
+        // IOS-018 : élément par élément ; une story malformée ne vide plus toute la barre.
+        stories = c.contains(.stories)
+            ? c.decodeLossyArray([SocialStory].self, forKey: .stories)
+            : c.decodeLossyArray([SocialStory].self, forKey: .items)
     }
 }
 

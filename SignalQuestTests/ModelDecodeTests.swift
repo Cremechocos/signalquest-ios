@@ -9,6 +9,26 @@ final class ModelDecodeTests: XCTestCase {
         XCTAssertEqual(page.stories.count, 1)
     }
 
+    /// IOS-018 : une seule entrée mal formée ne vide plus une liste entière ; une
+    /// clé principale absente reste une erreur (une boîte vide à tort serait pire).
+    func testOneMalformedEntryNoLongerEmptiesAWholeList() throws {
+        let decoder = JSONDecoder.signalQuest
+        let inbox = try decoder.decode(ConversationsResponse.self, from: Data("""
+        {"conversations":[{"id":"c1","isGroup":false,"participants":[]},{"id":"c2","isGroup":false,"e2eeEnabled":"oui","participants":[]}]}
+        """.utf8))
+        XCTAssertEqual(inbox.conversations.map(\.id), ["c1"])
+        XCTAssertThrowsError(try decoder.decode(ConversationsResponse.self, from: Data(#"{"items":[]}"#.utf8)))
+
+        let stories = try decoder.decode(StoriesListResponse.self, from: Data("""
+        {"stories":[{"id":"s1","author":{"id":"u1","name":"Camille","handle":"camille","avatarUrl":null},"text":"Story","mediaUrl":null,"thumbnailUrl":null,"mediaKind":"text","background":null,"metadata":null,"visibility":"public","status":"active","durationSeconds":5,"createdAt":"2026-05-11T10:00:00.000Z","expiresAt":null,"viewedByMe":false,"isMine":false},{"id":"s2","author":null}]}
+        """.utf8))
+        XCTAssertEqual(stories.stories.map(\.id), ["s1"])
+
+        let page = try decoder.decode(AppNotificationPage.self, from: Data(#"{"notifications":[],"nextCursor":42,"unreadCount":"3"}"#.utf8))
+        XCTAssertEqual(page.nextCursor, "42")
+        XCTAssertEqual(page.unreadCount, 3)
+    }
+
     private struct DateBox: Decodable { let d: Date }
 
     /// DEC-DATE-EPOCH-01 : le décodeur tolère une date en epoch numérique

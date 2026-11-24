@@ -246,8 +246,10 @@ struct AppNotificationPage: Decodable {
         } else {
             notifications = []
         }
-        nextCursor = try c.decodeIfPresent(String.self, forKey: .nextCursor)
-        unreadCount = try c.decodeIfPresent(Int.self, forKey: .unreadCount)
+        // IOS-018 : un curseur ou un compteur mal typé ne fait plus échouer toute la page.
+        nextCursor = c.decodeFlexibleString(forKey: .nextCursor)
+        unreadCount = (try? c.decodeIfPresent(Int.self, forKey: .unreadCount))
+            ?? c.decodeFlexibleString(forKey: .unreadCount).flatMap { Int($0) }
     }
 }
 

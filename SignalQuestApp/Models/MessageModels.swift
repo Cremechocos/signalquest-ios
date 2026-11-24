@@ -21,7 +21,14 @@ struct ConversationsResponse: Decodable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        conversations = try c.decode([MessageConversation].self, forKey: .conversations)
+        // IOS-018 : clé exigée (sans elle, une erreur vaut mieux qu'une boîte vide à
+        // tort), puis élément par élément : une conversation mal formée ne vide plus la liste.
+        guard c.contains(.conversations) else {
+            throw DecodingError.keyNotFound(
+                CodingKeys.conversations, .init(codingPath: c.codingPath, debugDescription: "conversations")
+            )
+        }
+        conversations = c.decodeLossyArray([MessageConversation].self, forKey: .conversations)
         hasMore = try? c.decodeIfPresent(Bool.self, forKey: .hasMore)
         nextCursor = try? c.decodeIfPresent(String.self, forKey: .nextCursor)
         pinLimit = (try? c.decodeIfPresent(Int.self, forKey: .pinLimit))

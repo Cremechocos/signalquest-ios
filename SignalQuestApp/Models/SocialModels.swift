@@ -22,7 +22,8 @@ extension SocialFeedPage {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         items = c.decodeLossyElementArray([UnifiedSocialFeedItem].self, forKey: .items)
-        nextCursor = try c.decodeIfPresent(String.self, forKey: .nextCursor)
+        // IOS-018 : un curseur numérique ne fait plus échouer toute la page.
+        nextCursor = c.decodeFlexibleString(forKey: .nextCursor)
         stories = c.decodeLossyElementArray([SocialStory].self, forKey: .stories)
         trendingHashtags = c.decodeLossyElementArray([TrendingHashtag].self, forKey: .trendingHashtags)
         suggestedUsers = c.decodeLossyElementArray([SocialFeedAuthor].self, forKey: .suggestedUsers)
