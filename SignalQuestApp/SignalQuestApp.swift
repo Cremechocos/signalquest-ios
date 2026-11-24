@@ -312,9 +312,13 @@ struct AppRootView: View {
                     }()
                     Task { await AccountLocaleSync.sync(api: services.api, force: signedIn) }
                     Task {
-                        await services.livePresence.refreshSharingSettings()
+                        if LaunchRefreshGate.shouldRun("presence-settings") {
+                            await services.livePresence.refreshSharingSettings()
+                        }
                         if case .authenticated(let user) = newState {
-                            await services.liveShare.bootstrap(currentUserId: user.id)
+                            if LaunchRefreshGate.shouldRun("live-share") {
+                                await services.liveShare.bootstrap(currentUserId: user.id)
+                            }
                             await services.speedtest.retryPendingSaves()
                         }
                     }

@@ -871,7 +871,9 @@ final class AppServices: ObservableObject {
                 // Le namespace du compte est actif : les files ne peuvent plus être
                 // rejouées avec l'identité d'un autre utilisateur.
                 await speedtest.retryPendingSaves()
-                await liveShare.bootstrap(currentUserId: user.id)
+                if LaunchRefreshGate.shouldRun("live-share") {
+                    await liveShare.bootstrap(currentUserId: user.id)
+                }
             }
         }
         bootstrapTask = task
