@@ -1275,7 +1275,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         }
 
         // 5. Assemblage partagé (commun aux moteurs iPerf3 et Cloudflare).
-        let measurements = EngineMeasurements(
+        var measurements = EngineMeasurements(
             serverName: serverName,
             // L'id de catalogue, pas une chaîne dérivée de l'hôte : c'est lui qui
             // part en base et il doit être comparable à celui d'Android. La forme
@@ -1324,6 +1324,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             uploadServerHost: ulAverageMbps == nil ? nil : iperfServer.hostname,
             uploadServerPort: ulAverageMbps == nil ? nil : Int(port)
         )
+        measurements.pingLoss = pingOutcome.loss
         return await finalizeRun(
             measurements,
             startedAt: startedAt,
@@ -1454,6 +1455,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         var pingServerPort: Int? = nil
         var uploadServerHost: String? = nil
         var uploadServerPort: Int? = nil
+        /// Perte de la série de pings au repos (IOS-037) ; `nil` quand la latence vient des
+        /// connexions du download, où aucun écho n'est envoyé ni perdu.
+        var pingLoss: SpeedtestPingLoss? = nil
     }
 
     /// Contexte de résultat (lieu, SSID, opérateur) — résolu en tâche
@@ -1506,7 +1510,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         }
         let trace = SpeedtestTraceScope.current?.snapshot(retainingUpload: m.uploadAverageMbps != nil)
 
-        let result = SpeedtestRunResult(
+        var result = SpeedtestRunResult(
             id: SpeedtestTraceScope.current?.runId ?? UUID(),
             label: "iOS speedtest",
             downloadMbps: m.downloadAverageMbps,
@@ -1579,6 +1583,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             uploadServerPort: m.uploadServerPort,
             servedBrand: operatorContext.brandWithoutNetwork
         )
+        result.packetLossPct = m.pingLoss?.percent
+        result.pingSampleCount = m.pingLoss?.samples
 
         do {
             try await appendHistory(result)
@@ -1687,7 +1693,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         // 1. Ping HTTPS (TTFB sur __down?bytes=0). Facultatif : un réseau qui
         // bloque ces sondes garde son débit, sans latence (jamais 0 ms) ni
         // latence sous charge, comme Android.
-        let idleLatency = IdleLatencySummary(await measureCloudflarePings(serverName: serverName, progress: progress))
+        let cloudflarePings = await measureCloudflarePings(serverName: serverName, progress: progress)
+        let idleLatency = IdleLatencySummary(cloudflarePings.values)
         let pingValue = idleLatency.averageMs
         let pingMedianValue = idleLatency.medianMs
         let pingMinValue = idleLatency.minMs
@@ -1840,7 +1847,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             )
         }
 
-        let measurements = EngineMeasurements(
+        var measurements = EngineMeasurements(
             serverName: serverName,
             downloadServerId: "cloudflare_\(colo ?? "edge")",
             downloadServerCode: colo ?? "edge",
@@ -1879,6 +1886,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             uploadServerHost: ulAverageMbps == nil ? nil : CloudflareSpeedtestConfig.host,
             uploadServerPort: ulAverageMbps == nil ? nil : Int(CloudflareSpeedtestConfig.httpsPort)
         )
+        measurements.pingLoss = cloudflarePings.loss
         return await finalizeRun(
             measurements,
             startedAt: startedAt,
@@ -1911,14 +1919,14 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     private func measureCloudflarePings(
         serverName: String,
         progress: SpeedtestProgressHandler?
-    ) async -> [Double] {
+    ) async -> PingAttemptResult {
         await measureTcpPings(
             host: CloudflareSpeedtestConfig.host,
             port: CloudflareSpeedtestConfig.httpsPort,
             serverName: serverName,
             progress: progress,
             minimumValidSamples: 2
-        ).values
+        )
     }
 
 
@@ -2201,7 +2209,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             )
         }
 
-        let measurements = EngineMeasurements(
+        var measurements = EngineMeasurements(
             serverName: serverName,
             downloadServerId: "librespeed_\(server.countryCode.lowercased())",
             downloadServerCode: server.hostname,
@@ -2240,6 +2248,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             uploadServerHost: ulAverageMbps == nil ? nil : server.hostname,
             uploadServerPort: ulAverageMbps == nil ? nil : Int(LibreSpeedConfig.httpsPort)
         )
+        measurements.pingLoss = pingResult.loss
         return await finalizeRun(
             measurements, startedAt: startedAt, pathStatus: pathStatus,
             location: location, context: contextTask, progress: progress
@@ -3075,11 +3084,19 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     private struct PingOutcome: Sendable {
         let values: [Double]
         let protocolName: String
+        var loss: SpeedtestPingLoss? = nil
     }
 
     private struct PingAttemptResult: Sendable {
         let values: [Double]
         let attemptsUsed: Int
+
+        /// Sonde TCP : la première tentative chauffe le chemin et n'est pas comptée, les suivantes
+        /// (rattrapage compris) sont des échos envoyés ; un échec de série ne dit rien de la perte.
+        var loss: SpeedtestPingLoss? {
+            guard !values.isEmpty else { return nil }
+            return speedtestPacketLoss(sent: attemptsUsed - SpeedtestEngineConfig.pingWarmupCount, received: values.count)
+        }
     }
 
     /// Latence à vide d'un POP iPerf3. ICMP d'abord : c'est le seul vrai RTT.
@@ -3151,7 +3168,11 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             serverName: serverName,
             progress: progress
         )
-        return PingOutcome(values: Array(values), protocolName: "ICMP")
+        // Écho 0 = chauffe ; une série qui aboutit a envoyé tous ses échos (l'abandon ne
+        // survient que si rien n'est revenu au début).
+        let measuredReplies = samples.filter { $0.sequence != 0 }.count
+        return PingOutcome(values: Array(values), protocolName: "ICMP",
+                           loss: speedtestPacketLoss(sent: target, received: measuredReplies))
     }
 
     /// Latence ICMP d'un candidat Auto : la seule sonde qui ne touche pas au démon
@@ -5469,6 +5490,19 @@ func speedtestUploadStreamLadder(requested: Int, hardMax: Int, fallback: Int, la
 /// séparément les laisserait diverger, et la divergence serait invisible en test
 /// tout en étant parfaitement visible à l'écran — la latence affichée changerait
 /// au moment où le résultat remplace le direct.
+/// Perte d'une série de pings (IOS-037, comme Android) : échos sans réponse sur échos envoyés,
+/// chauffe exclue, à une décimale ; `nil` sans écho envoyé (perte inconnue, pas 0 %).
+struct SpeedtestPingLoss: Sendable, Equatable {
+    let percent: Double
+    let samples: Int
+}
+
+func speedtestPacketLoss(sent: Int, received: Int) -> SpeedtestPingLoss? {
+    guard sent > 0 else { return nil }
+    let lost = sent - min(max(0, received), sent)
+    return SpeedtestPingLoss(percent: (Double(lost) / Double(sent) * 1_000).rounded() / 10, samples: sent)
+}
+
 func speedtestIcmpMeasuredValues(_ samples: [ICMPPinger.Sample]) -> [Double] {
     samples.dropFirst().map(\.rttMs).filter { $0 > 0 }
 }

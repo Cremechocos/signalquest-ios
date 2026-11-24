@@ -105,6 +105,62 @@ final class AccountSpeedtestDetailTests: XCTestCase {
         try JSONDecoder.signalQuest.decode(SpeedtestDetail.self, from: Data(json.utf8))
     }
 
+    /// IOS-037 lot 2 : la fiche relit ce que le serveur sert en plus (test Android compris), le nom du
+    /// Wi-Fi seulement pour son propriétaire ; l'envoi iOS porte la même note, à grandeur égale.
+    func testServedSpeedtestExtrasAndTheSubmittedLoadedLatencyGrade() throws {
+        let served = try detail("""
+        {"id":"cksp2","timestamp":"2026-11-24T10:00:00.000Z","averageSpeed":300,"connectionType":"wifi","connectionKind":"wifi",
+         "uploadServerName":"Paris BBR","wifiSsid":"Maison-5G","radioTechChangedDuringTest":true,
+         "bufferbloatGrade":"B","bufferbloatDeltaMs":21,"packetLossPct":12.5,"pingSampleCount":8}
+        """)
+        let owner = SpeedtestAccountHistory.runResult(from: served)
+        XCTAssertEqual(owner.uploadServerName, "Paris BBR")
+        XCTAssertEqual(owner.wifiSSID, "Maison-5G")
+        XCTAssertEqual(owner.networkChangedDuringTest, true)
+        XCTAssertEqual(owner.servedBufferbloatGrade, "B")
+        XCTAssertEqual(owner.packetLossPct, 12.5)
+        XCTAssertEqual(owner.pingSampleCount, 8)
+        XCTAssertEqual(SpeedtestDetailContent.packetLossText(12.5, pings: 8), "12,5 % sur 8 pings")
+        XCTAssertNil(SpeedtestAccountHistory.runResult(from: served, includesPrivateDetails: false).wifiSSID)
+        let bogus = try detail(#"{"id":"x","bufferbloatGrade":"Z","packetLossPct":140}"#)
+        XCTAssertNil(bogus.bufferbloatGrade)
+        XCTAssertNil(bogus.packetLossPct)
+
+        // Envoi : moyenne en charge du pire sens (57) contre moyenne au repos (24) → 33 ms, C.
+        var local = SpeedtestRunResult(label: "t", downloadMbps: 300, downloadAverageMbps: 300, downloadMaxMbps: 310,
+                                       pingMs: 24, pingMinMs: 14, pingDlMs: 42, pingUlMs: 57,
+                                       durationSeconds: 20, connectionType: .wifi, wifiSSID: " Maison-5G ",
+                                       serverName: "Paris BBR", downloadServerName: "Paris BBR",
+                                       downloadServerHost: "paris.bbr.test", pingServerHost: "paris.bbr.test",
+                                       uploadServerHost: "paris.bbr.test")
+        local.packetLossPct = 0
+        local.pingSampleCount = 7
+        var payload = SpeedtestSubmission.iosPayload(from: local, streams: 16, deviceModel: "test")
+        XCTAssertEqual(payload.bufferbloatGrade, "C")
+        XCTAssertEqual(payload.bufferbloatDeltaMs, 33)
+        XCTAssertEqual(payload.pingMeasuredOnTestServer, true)
+        XCTAssertEqual(payload.uploadServerName, "Paris BBR")
+        XCTAssertEqual(payload.wifiSsid, "Maison-5G")
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(payload)) as? [String: Any])
+        XCTAssertEqual((json["wifi"] as? [String: Any])?["ssid"] as? String, "Maison-5G")
+        XCTAssertEqual(json["packetLossPct"] as? Double, 0)
+        XCTAssertEqual(json["pingSampleCount"] as? Int, 7)
+        // Latence visée ailleurs que sur le serveur du test : pas de note ; jamais de nom de Wi-Fi en cellulaire.
+        let elsewhere = SpeedtestRunResult(label: "t", downloadMbps: 300, downloadAverageMbps: 300, downloadMaxMbps: 310,
+                                           pingMs: 24, pingDlMs: 42, durationSeconds: 20, connectionType: .cellular,
+                                           wifiSSID: "Maison-5G", downloadServerHost: "paris.bbr.test", pingServerHost: "1.1.1.1")
+        payload = SpeedtestSubmission.iosPayload(from: elsewhere, streams: 16, deviceModel: "test")
+        XCTAssertNil(payload.bufferbloatGrade)
+        XCTAssertEqual(payload.pingMeasuredOnTestServer, false)
+        XCTAssertNil(payload.wifiSsid)
+
+        // Perte de paquets, comme Android : échos sans réponse sur échos envoyés, chauffe exclue.
+        XCTAssertEqual(speedtestPacketLoss(sent: 7, received: 7), SpeedtestPingLoss(percent: 0, samples: 7))
+        XCTAssertEqual(speedtestPacketLoss(sent: 7, received: 6), SpeedtestPingLoss(percent: 14.3, samples: 7))
+        XCTAssertEqual(speedtestPacketLoss(sent: 7, received: 9)?.percent, 0, "jamais de perte négative")
+        XCTAssertNil(speedtestPacketLoss(sent: 0, received: 0), "rien envoyé : perte inconnue, pas 0 %")
+    }
+
     func testServerDetailBecomesTheSameCardAsALocalTest() throws {
         let result = SpeedtestAccountHistory.runResult(from: try detail("""
         {"id":"cksp1","timestamp":"2026-10-20T10:00:00.000Z","downloadSpeed":410,"averageSpeed":312.4,

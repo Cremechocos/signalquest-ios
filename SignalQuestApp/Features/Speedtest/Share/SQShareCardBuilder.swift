@@ -320,28 +320,20 @@ enum SQShareCardBuilder {
         return value
     }
 
-    /// Hausse de latence sous charge et sa note — même dérivation que le serveur
-    /// (`deriveBufferbloat`) et même barème que le client Android (seuils
-    /// Cloudflare : A ≤ 5, B ≤ 30, C ≤ 60, D ≤ 200 ms, F au-delà). La référence
-    /// au repos est la latence affichée en grand, pour que les deux nombres se
-    /// lisent ensemble. Sans preuve qu'elle a visé le serveur du test, pas de ligne :
-    /// l'écart entre deux machines différentes ne dit rien de la charge.
+    /// Hausse de latence sous charge et sa note : le calcul commun `SpeedtestLoadedLatencyGrade`
+    /// (choix d'Alexandre du 24/11 : comme Android, moyenne en charge contre moyenne au repos ;
+    /// la carte comparait au minimum affiché en grand, d'où une lettre plus sévère qu'ailleurs).
+    /// Sans preuve que la latence a visé le serveur du test, pas de note.
     static func loadedLatency(for result: SpeedtestRunResult) -> (deltaMs: Int, grade: SQShareCardModel.Grade)? {
-        guard let pingHost = result.pingServerHost?.shareTrimmed,
-              result.downloadServerHost.map({ $0.caseInsensitiveCompare(pingHost) == .orderedSame }) ?? true,
-              let idle = displayedLatency(for: result).value else { return nil }
-        let loaded = [result.pingDlMs, result.pingUlMs].compactMap { $0 }.filter { $0.isFinite && $0 > 0 }
-        guard let worst = loaded.max() else { return nil }
-        let delta = Int(Swift.max(0, worst - idle).rounded())
+        guard let computed = SpeedtestLoadedLatencyGrade.of(result) else { return nil }
         // Texte en teinte -700, fond en teinte vive translucide (spécification v10).
-        let (letter, color, background): (String, UInt32, UIColor) = switch delta {
-        case ...5: ("A", 0x187B38, UIColor(hex: 0x1B8A3F, alpha: 0.12))
-        case ...30: ("B", 0x477818, UIColor(hex: 0x7DB834, alpha: 0.16))
-        case ...60: ("C", 0x8C6313, UIColor(hex: 0xD08F1D, alpha: 0.16))
-        case ...200: ("D", 0xAC4F17, UIColor(hex: 0xE66A1F, alpha: 0.14))
-        default: ("F", 0xAC4F17, UIColor(hex: 0xE66A1F, alpha: 0.14))
+        let (color, background): (UInt32, UIColor) = switch computed.letter {
+        case "A": (0x187B38, UIColor(hex: 0x1B8A3F, alpha: 0.12))
+        case "B": (0x477818, UIColor(hex: 0x7DB834, alpha: 0.16))
+        case "C": (0x8C6313, UIColor(hex: 0xD08F1D, alpha: 0.16))
+        default: (0xAC4F17, UIColor(hex: 0xE66A1F, alpha: 0.14))
         }
-        return (delta, .init(letter: letter, color: UIColor(hex: color), background: background))
+        return (computed.deltaMs, .init(letter: computed.letter, color: UIColor(hex: color), background: background))
     }
 
     private static func deviceCityText(

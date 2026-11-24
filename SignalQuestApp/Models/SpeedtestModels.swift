@@ -631,6 +631,14 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
     let pingServerPort: Int?
     let uploadServerHost: String?
     let uploadServerPort: Int?
+    /// IOS-037 : lus sur la fiche d'un test relu (Android ou iOS) ; `nil` sur un résultat local
+    /// ou un serveur antérieur. Optionnels : l'historique déjà en cache se relit sans eux.
+    var uploadServerName: String? = nil
+    var networkChangedDuringTest: Bool? = nil
+    var servedBufferbloatGrade: String? = nil
+    var servedBufferbloatDeltaMs: Double? = nil
+    var packetLossPct: Double? = nil
+    var pingSampleCount: Int? = nil
     // « >= 6 » et jamais « == 6 » : la v7 ne change que la gigue.
     var primaryPingMs: Double? { (methodologyVersion ?? 0) >= 6 ? pingMinMs : pingMs }
 
@@ -1026,6 +1034,15 @@ struct SpeedtestSubmission: Encodable, Equatable {
     var pingServerPort: Int? = nil
     var uploadServerHost: String? = nil
     var uploadServerPort: Int? = nil
+    /// IOS-037 : nom du Wi-Fi, que le serveur ne rend qu'au propriétaire du test (vérifié le 24/11,
+    /// choix d'Alexandre : envoyé à cette condition) ; jamais en cellulaire.
+    var wifiSsid: String? = nil
+    var uploadServerName: String? = nil
+    var bufferbloatGrade: String? = nil
+    var bufferbloatDeltaMs: Double? = nil
+    var pingMeasuredOnTestServer: Bool? = nil
+    var packetLossPct: Double? = nil
+    var pingSampleCount: Int? = nil
 
     /// Version de la méthodologie de mesure, commune aux deux plateformes.
     ///
@@ -1055,7 +1072,10 @@ struct SpeedtestSubmission: Encodable, Equatable {
         case clientSubmissionId, downloadSpeed, averageSpeed, maxSpeed, uploadSpeed, uploadAvg, uploadMax, downloadAvg, downloadP90, downloadP95, downloadPeakMbps, downloadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, testDuration, streams, connectionType, networkType, coordinates, city, address, mobileOperator, mcc, mnc, observedPlmn, simPlmn, isRoaming, networkIdentitySource, radioEvidence, marketCode, operatorKey, carrierName, mvnoKey, mvnoName, device, deviceType, deviceModel, isVisibleOnMap, shareExactLocation, guestDeleteToken, sessionId, runOrigin, automationId, server, downloadServerName, downloadServerId, downloadServerCode, downloadServerHost, downloadServerPort, methodologyVersion, measuredAt, engine, engineFallbackReason, requestedServerId
         case rsrp, rsrq, snr, cellId, pci, tac, enb, gnb, earfcn, nrarfcn, timingAdvance, timingAdvanceSourceTechnology, timingAdvanceSourceCellId, radioSnapshots
         case pingDl, jitterDl, pingUl, jitterUl
+        case wifi, uploadServerName, bufferbloatGrade, bufferbloatDeltaMs, pingMeasuredOnTestServer, packetLossPct, pingSampleCount
     }
+
+    private enum WifiKeys: String, CodingKey { case ssid }
 
     /// Réduit la précision des coordonnées avant tout envoi au backend, pour
     /// respecter la minimisation (RGPD art. 5.1.c). Même grille que la couverture
@@ -1166,6 +1186,18 @@ struct SpeedtestSubmission: Encodable, Equatable {
         payload.measurementTrace = result.measurementTrace
         payload.methodologyVersion = result.methodologyVersion ?? 5
         payload.measuredAt = Self.measuredAtString(result.measurementEndedAt)
+        if result.connectionType == .wifi,
+           let ssid = result.wifiSSID?.trimmingCharacters(in: .whitespacesAndNewlines), !ssid.isEmpty {
+            payload.wifiSsid = String(ssid.prefix(100))
+        }
+        payload.uploadServerName = result.uploadServerName ?? SpeedtestLoadedLatencyGrade.sameServerName(result)
+        if let grade = SpeedtestLoadedLatencyGrade.of(result) {
+            payload.bufferbloatGrade = grade.letter
+            payload.bufferbloatDeltaMs = Double(grade.deltaMs)
+        }
+        payload.pingMeasuredOnTestServer = SpeedtestLoadedLatencyGrade.measuredOnTestServer(result)
+        payload.packetLossPct = result.packetLossPct
+        payload.pingSampleCount = result.pingSampleCount
         return payload
     }
 
@@ -1265,6 +1297,61 @@ struct SpeedtestSubmission: Encodable, Equatable {
         try c.encode(radioEvidence?.timingAdvanceSourceTechnology, forKey: .timingAdvanceSourceTechnology)
         try c.encode(radioEvidence?.timingAdvanceSourceCellId, forKey: .timingAdvanceSourceCellId)
         try c.encodeNil(forKey: .radioSnapshots)
+        if let wifiSsid {
+            var wifi = c.nestedContainer(keyedBy: WifiKeys.self, forKey: .wifi)
+            try wifi.encode(wifiSsid, forKey: .ssid)
+        }
+        try c.encodeIfPresent(uploadServerName, forKey: .uploadServerName)
+        try c.encodeIfPresent(bufferbloatGrade, forKey: .bufferbloatGrade)
+        try c.encodeIfPresent(bufferbloatDeltaMs, forKey: .bufferbloatDeltaMs)
+        try c.encodeIfPresent(pingMeasuredOnTestServer, forKey: .pingMeasuredOnTestServer)
+        try c.encodeIfPresent(packetLossPct, forKey: .packetLossPct)
+        try c.encodeIfPresent(pingSampleCount, forKey: .pingSampleCount)
+    }
+}
+
+/// Hausse de latence en charge et sa note (IOS-037 ; choix d'Alexandre du 24/11 : comme Android,
+/// à grandeur égale). Moyenne en charge du pire sens contre moyenne au repos (iOS ne mesure pas de
+/// médiane en charge), barème du serveur et d'Android : A ≤ 5, B ≤ 30, C ≤ 60, D ≤ 200 ms, F au-delà.
+/// Seulement si la latence a visé le serveur du test : entre deux machines, l'écart ne dit rien de
+/// la charge. La même lettre sert l'envoi, la fiche, l'écran de résultat et l'image de partage.
+enum SpeedtestLoadedLatencyGrade {
+    static func of(_ result: SpeedtestRunResult) -> (deltaMs: Int, letter: String)? {
+        guard measuredOnTestServer(result) == true,
+              let idle = result.pingMs, idle.isFinite, idle > 0 else { return nil }
+        let loaded = [result.pingDlMs, result.pingUlMs].compactMap { $0 }.filter { $0.isFinite && $0 > 0 }
+        guard let worst = loaded.max() else { return nil }
+        let delta = Int(max(0, worst - idle).rounded())
+        return (delta, letter(deltaMs: delta))
+    }
+
+    static func letter(deltaMs: Int) -> String {
+        switch deltaMs {
+        case ...5: "A"
+        case ...30: "B"
+        case ...60: "C"
+        case ...200: "D"
+        default: "F"
+        }
+    }
+
+    /// La latence a-t-elle visé le serveur de réception ? `nil` sans hôte de latence connu.
+    static func measuredOnTestServer(_ result: SpeedtestRunResult) -> Bool? {
+        guard let ping = result.pingServerHost?.trimmingCharacters(in: .whitespacesAndNewlines), !ping.isEmpty else { return nil }
+        guard let download = result.downloadServerHost?.trimmingCharacters(in: .whitespacesAndNewlines), !download.isEmpty else {
+            return true
+        }
+        return download.caseInsensitiveCompare(ping) == .orderedSame
+    }
+
+    /// Nom du serveur d'envoi quand l'envoi part vers le serveur de réception (même hôte).
+    static func sameServerName(_ result: SpeedtestRunResult) -> String? {
+        guard let upload = result.uploadServerHost?.trimmingCharacters(in: .whitespacesAndNewlines), !upload.isEmpty,
+              let download = result.downloadServerHost?.trimmingCharacters(in: .whitespacesAndNewlines),
+              upload.caseInsensitiveCompare(download) == .orderedSame,
+              let name = (result.downloadServerName ?? result.serverName)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !name.isEmpty else { return nil }
+        return name
     }
 }
 
@@ -1390,8 +1477,19 @@ struct SpeedtestDetail: Decodable, Identifiable, Equatable {
     /// d'un serveur antérieur ; `[]` en Wi-Fi ou sans relevé. Un test iOS n'en a
     /// jamais : iOS ne lit pas les bandes radio.
     let carriers: [SpeedtestServingCarrier]?
+    /// IOS-037 : servis par la fiche (le nom du Wi-Fi au seul propriétaire).
+    let uploadServerName: String?
+    let wifiSsid: String?
+    let transportChangedDuringTest: Bool?
+    let radioTechChangedDuringTest: Bool?
+    let bufferbloatGrade: String?
+    let bufferbloatDeltaMs: Double?
+    let packetLossPct: Double?
+    let pingSampleCount: Int?
 
     enum CodingKeys: String, CodingKey {
+        case uploadServerName, wifiSsid, transportChangedDuringTest, radioTechChangedDuringTest
+        case bufferbloatGrade, bufferbloatDeltaMs, packetLossPct, pingSampleCount
         case city, engine, downloadServerHost, downloadServerPort, carriers
         case measurementTrace, methodologyVersion, pingServerHost, pingServerPort, uploadServerHost, uploadServerPort, uploadMeasurementSource
         case id, timestamp, measuredAt, createdAt, downloadSpeed, maxSpeed, averageSpeed, downloadAvg, downloadP90, downloadP95, downloadMax, downloadPeakMbps, testDuration, streams, uploadSpeed, uploadAvg, uploadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, server, downloadServerId, downloadServerName, connectionType, connectionKind, networkType, mobileOperator, operatorDisplay, mcc, mnc, latitude, longitude, address, locationBlurred, deviceType, deviceModel, isPublic, isVisibleOnMap, shareExactLocation, isOwner, rsrp, rsrq, snr, timingAdvance
@@ -1469,6 +1567,16 @@ struct SpeedtestDetail: Decodable, Identifiable, Equatable {
         downloadServerPort = try? c.decodeIfPresent(Int.self, forKey: .downloadServerPort)
         // Tolérant : une forme inattendue ne fait pas échouer tout le détail.
         carriers = (try? c.decodeIfPresent([SpeedtestServingCarrier].self, forKey: .carriers)) ?? nil
+        uploadServerName = c.decodeFlexibleString(forKey: .uploadServerName)
+        wifiSsid = c.decodeFlexibleString(forKey: .wifiSsid)
+        transportChangedDuringTest = try? c.decodeIfPresent(Bool.self, forKey: .transportChangedDuringTest)
+        radioTechChangedDuringTest = try? c.decodeIfPresent(Bool.self, forKey: .radioTechChangedDuringTest)
+        bufferbloatGrade = c.decodeFlexibleString(forKey: .bufferbloatGrade)
+            .flatMap { ["A", "B", "C", "D", "F"].contains($0) ? $0 : nil }
+        bufferbloatDeltaMs = try? c.decodeIfPresent(Double.self, forKey: .bufferbloatDeltaMs)
+        packetLossPct = (try? c.decodeIfPresent(Double.self, forKey: .packetLossPct))
+            .flatMap { $0 }.flatMap { $0.isFinite && (0...100).contains($0) ? $0 : nil }
+        pingSampleCount = try? c.decodeIfPresent(Int.self, forKey: .pingSampleCount)
     }
 }
 

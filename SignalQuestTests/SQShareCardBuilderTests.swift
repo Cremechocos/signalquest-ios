@@ -162,7 +162,8 @@ final class SQShareCardBuilderTests: XCTestCase {
     }
 
     /// Sous charge, un sens par ligne : latence · gigue (règle du 20/10). La note
-    /// se pose sur le pire sens : 57 − 14 = 43 ms → C, en envoi ici.
+    /// se pose sur le pire sens, à grandeur égale comme Android (choix du 24/11) :
+    /// moyenne en charge 57 contre moyenne au repos 24, 33 ms → C, en envoi ici.
     func testUnderLoadRowsShowEachDirectionAndGradeTheWorst() {
         let rows = model(result()).rows
         XCTAssertEqual(rows.map(\.label), ["Sous charge", "Sous charge", "Gigue au repos", "Serveur"])
@@ -188,7 +189,8 @@ final class SQShareCardBuilderTests: XCTestCase {
 
     func testLoadedLatencyGradeThresholds() {
         func grade(_ loaded: Double) -> String? {
-            SQShareCardBuilder.loadedLatency(for: result(pingMin: 20, loadedPings: true, pingDl: loaded, pingUl: nil))?.grade.letter
+            // À grandeur égale (choix du 24/11, comme Android) : la moyenne au repos sert de référence.
+            SQShareCardBuilder.loadedLatency(for: result(pingMin: 14, pingAverage: 20, loadedPings: true, pingDl: loaded, pingUl: nil))?.grade.letter
         }
         XCTAssertEqual(grade(25), "A")
         XCTAssertEqual(grade(50), "B")

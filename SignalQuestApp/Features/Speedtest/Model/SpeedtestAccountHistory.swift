@@ -47,7 +47,7 @@ extension SpeedtestAccountHistory {
         let coordinate = includesPrivateDetails ? detail.latitude.flatMap { lat in
             detail.longitude.map { Coordinates(latitude: lat, longitude: $0) }
         } : nil
-        return SpeedtestRunResult(
+        var result = SpeedtestRunResult(
             id: UUID(uuidString: detail.id) ?? UUID(),
             label: detail.id,
             downloadMbps: download,
@@ -77,6 +77,8 @@ extension SpeedtestAccountHistory {
             networkOperatorName: operatorName(of: detail),
             networkOperatorMcc: detail.mcc,
             networkOperatorMnc: detail.mnc,
+            // Le serveur ne le rend qu'au propriétaire ; jamais montré à un autre lecteur.
+            wifiSSID: includesPrivateDetails ? detail.wifiSsid : nil,
             city: includesPrivateDetails ? detail.city : nil,
             address: includesPrivateDetails ? detail.address : nil,
             coordinate: coordinate,
@@ -97,6 +99,15 @@ extension SpeedtestAccountHistory {
             uploadServerPort: detail.uploadServerPort,
             servedBrand: detail.operatorDisplay?.brand?.trimmingCharacters(in: .whitespacesAndNewlines)
         )
+        // IOS-037 : ce que la fiche servie sait en plus (test Android compris).
+        result.uploadServerName = detail.uploadServerName
+        result.networkChangedDuringTest = (detail.transportChangedDuringTest == true || detail.radioTechChangedDuringTest == true)
+            ? true : nil
+        result.servedBufferbloatGrade = detail.bufferbloatGrade
+        result.servedBufferbloatDeltaMs = detail.bufferbloatDeltaMs
+        result.packetLossPct = detail.packetLossPct
+        result.pingSampleCount = detail.pingSampleCount
+        return result
     }
 
     /// Le réseau d'un test relu, seulement s'il désigne un opérateur reconnu

@@ -440,7 +440,23 @@ struct SpeedtestDetailContent: View {
     /// Une ligne par valeur mesurée ; un ancien test sans latence n'a pas de carte.
     private var hasLatency: Bool {
         [result.primaryPingMs, result.jitterMs, result.pingDlMs, result.pingUlMs, result.pingMs]
-            .contains { Self.measured($0) != nil }
+            .contains { Self.measured($0) != nil } || result.packetLossPct != nil
+    }
+
+    /// Hausse en charge et sa note (IOS-037) : celle que le serveur sert (test Android compris),
+    /// sinon le calcul commun à grandeur égale, comme Android.
+    private var loadedGrade: (deltaMs: Int, letter: String)? {
+        if let letter = result.servedBufferbloatGrade, let delta = result.servedBufferbloatDeltaMs, delta.isFinite {
+            return (Int(delta.rounded()), letter)
+        }
+        return SpeedtestLoadedLatencyGrade.of(result)
+    }
+
+    /// « 0 % sur 7 pings », comme la fiche Android ; sans nombre de pings, le pourcentage seul.
+    nonisolated static func packetLossText(_ percent: Double, pings: Int?) -> String {
+        let value = percent.formatted(.number.precision(.fractionLength(0...1)))
+        guard let pings, pings > 0 else { return "\(value) %" }
+        return String(localized: "\(value) % sur \(pings) pings")
     }
 
     private var latencyCard: some View {
@@ -460,6 +476,12 @@ struct SpeedtestDetailContent: View {
                 }
                 if let loaded = Self.measured(result.pingUlMs) {
                     dotRow("En envoi", Self.msLabel(loaded), trailing: gigue(result.jitterUlMs))
+                }
+                if let grade = loadedGrade {
+                    dotRow("Hausse en charge", String(localized: "+\(grade.deltaMs) ms · note \(grade.letter)"))
+                }
+                if let loss = result.packetLossPct {
+                    dotRow("Perte de paquets", Self.packetLossText(loss, pings: result.pingSampleCount))
                 }
                 if let average = Self.measured(result.pingMs) {
                     dotRow("Latence moyenne", Self.msLabel(average))
@@ -531,7 +553,19 @@ struct SpeedtestDetailContent: View {
 
     private var measureRows: some View {
         VStack(alignment: .leading, spacing: SQSpace.xxs) {
+            if result.networkChangedDuringTest == true {
+                // Comme la fiche Android : le test reste, mais il a changé de réseau en cours de route.
+                Label("Le réseau a changé pendant ce test.", systemImage: "exclamationmark.triangle")
+                    .font(SQType.subhead(.semibold))
+                    .foregroundStyle(SQColor.label)
+                    .padding(.bottom, SQSpace.xs)
+                    .accessibilityIdentifier("speedtest.detail.networkChanged")
+            }
             dotRow("Réseau", networkLine)
+            // Nom du Wi-Fi : le sien seulement, le serveur ne le rend à personne d'autre.
+            if result.connectionType == .wifi, let ssid = result.wifiSSID?.trimmedNonEmptyDetail {
+                dotRow("Réseau Wi-Fi", ssid, localized: false)
+            }
             if let plmn = result.observedPlmn?.trimmedNonEmptyDetail {
                 dotRow("MCC-MNC", Self.plmn(plmn))
             }
@@ -551,7 +585,12 @@ struct SpeedtestDetailContent: View {
                 dotRow("Serveur de réception", endpoint(host, result.downloadServerPort))
             }
             if let host = result.uploadServerHost {
-                dotRow("Serveur d’envoi", endpoint(host, result.uploadServerPort))
+                // Nommé comme sur Android quand on le connaît (servi, ou même hôte que la réception).
+                if let name = (result.uploadServerName ?? SpeedtestLoadedLatencyGrade.sameServerName(result))?.trimmedNonEmptyDetail {
+                    dotRow("Serveur d’envoi", name, trailing: endpoint(host, result.uploadServerPort))
+                } else {
+                    dotRow("Serveur d’envoi", endpoint(host, result.uploadServerPort))
+                }
             }
             if let host = result.pingServerHost {
                 dotRow("Serveur de latence", endpoint(host, result.pingServerPort))
@@ -561,6 +600,9 @@ struct SpeedtestDetailContent: View {
             }
             if let version = result.methodologyVersion {
                 dotRow("Méthodologie", String(version))
+            }
+            if result.durationSeconds > 0 {
+                dotRow("Durée du test", String(localized: "\(Int(result.durationSeconds.rounded())) s"))
             }
             if let source = Self.resultByteSource(result.measurementTrace?.phases.first(where: { $0.phase == "upload" }), fallback: result.uploadMeasurementSource) {
                 dotRow("Comptage de l’envoi", Self.byteSourceLabel(source))
