@@ -62,7 +62,78 @@ final class FeedViewModel: ObservableObject {
 
     /// Onglet actif. Changer d'onglet change le couple filtre/classement envoyé
     /// au serveur — c'est le seul état qui pilote `loadFeed`.
-    @Published var tab: FeedTab = .forYou { didSet { if oldValue != tab { invalidateQuery() } } }
+    @Published var tab: FeedTab = .forYou { didSet { if oldValue != tab { invalidateQuery(); rememberTab() } } }
+
+    /// Rayon de « Autour » servi par la dernière page reçue ; nil tant qu'aucune n'est arrivée.
+    @Published private(set) var nearRadiusKm: Int?
+    /// Mes abonnements, lus pour l'état vide de « Suivis » : « Tu ne suis encore personne »
+    /// et « Rien de neuf » ne disent pas la même chose. nil tant qu'inconnu.
+    @Published private(set) var followingCount: Int?
+    private var followingCountOwner: String?
+    /// Profils suivis depuis l'état vide, en un toucher, et ceux dont la réponse est attendue.
+    @Published private(set) var followedSuggestionIds: Set<String> = []
+    @Published private(set) var followBusyIds: Set<String> = []
+    private var didRestoreTab = false
+
+    /// Dernier onglet ouvert, par compte, sur cet appareil (plan Fil Communauté, C1).
+    nonisolated static func lastTabKey(ownerScopeId: String) -> String {
+        "FeedView.lastTab.\(LocalAccountScope.storageNamespace(for: ownerScopeId))"
+    }
+
+    /// Relit le dernier onglet, une seule fois, au premier affichage du fil. Jamais
+    /// « Enregistrés », qui s'ouvre depuis le menu ⋯. Vrai si l'onglet a changé.
+    func restoreLastTab(defaults: UserDefaults = .standard) -> Bool {
+        guard !didRestoreTab else { return false }
+        didRestoreTab = true
+        let key = Self.lastTabKey(ownerScopeId: LocalAccountScope.currentOwnerScopeId)
+        guard let raw = defaults.string(forKey: key), let saved = FeedTab(rawValue: raw),
+              saved != .saved, saved != tab else { return false }
+        tab = saved
+        return true
+    }
+
+    /// N'écrit que ce qui change : une écriture inutile à chaque toucher ne sert à rien.
+    private func rememberTab(defaults: UserDefaults = .standard) {
+        guard tab != .saved else { return }
+        let key = Self.lastTabKey(ownerScopeId: LocalAccountScope.currentOwnerScopeId)
+        if defaults.string(forKey: key) != tab.rawValue { defaults.set(tab.rawValue, forKey: key) }
+    }
+
+    /// Mes abonnements, pour l'état vide de « Suivis ». Relu à chaque compte.
+    func loadFollowingCount(userId: String) async {
+        let owner = LocalAccountScope.currentOwnerScopeId
+        guard followingCountOwner != owner || followingCount == nil else { return }
+        if AppEnvironment.usesDemoData { followingCount = 0; followingCountOwner = owner; return }
+        guard let profile = try? await service.userProfile(userId: userId),
+              owner == LocalAccountScope.currentOwnerScopeId else { return }
+        followingCount = profile.followingCount
+        followingCountOwner = owner
+    }
+
+    /// Suivre un profil suggéré en un toucher, depuis l'état vide. La route serveur est
+    /// une bascule : un profil déjà suivi n'est jamais renvoyé, il serait désabonné.
+    func followSuggestion(_ author: SocialFeedAuthor) {
+        guard author.isFollowing != true, !followBusyIds.contains(author.id),
+              !followedSuggestionIds.contains(author.id) else { return }
+        Haptics.medium()
+        followedSuggestionIds.insert(author.id)
+        if AppEnvironment.usesDemoData { return }
+        followBusyIds.insert(author.id)
+        Task {
+            defer { followBusyIds.remove(author.id) }
+            do {
+                let result = try await service.toggleFollow(userId: author.id)
+                if !result.following { followedSuggestionIds.remove(author.id) }
+                if let count = result.followingCount { followingCount = count }
+                // « Suivis » se remplit aussitôt avec les publications du profil suivi.
+                if result.following, tab == .following { await load() }
+            } catch {
+                followedSuggestionIds.remove(author.id)
+                if !error.isCancellation { actionError = error.userFacingMessage }
+                Haptics.error()
+            }
+        }
+    }
 
     /// Où en est la position de l'onglet « Autour ».
     enum NearbyPosition: Equatable {
@@ -284,8 +355,9 @@ final class FeedViewModel: ObservableObject {
             let loaded = try await service.loadFeed(cursor: nil, hashtag: context.hashtag, tab: context.tab,
                                                     near: context.near)
             guard context == query, request == loadRevision, !Task.isCancelled else { return }
+            if let radius = loaded.nearRadiusKm, radius > 0 { nearRadiusKm = Int(radius.rounded()) }
             page = SocialFeedPage(
-                items: loaded.items.map { item in
+                items: loaded.items.filter { deferredDeletions[$0.id] == nil }.map { item in
                     guard let receipt = detailReceipts[item.id],
                           receipt.revision > receiptRevisionAtStart else { return item }
                     return item.adoptingInteractions(from: receipt.item)
@@ -356,7 +428,7 @@ final class FeedViewModel: ObservableObject {
                                                            near: context.near)
                 guard context == query, loading == loadRevision, !Task.isCancelled, let current = page else { return }
                 var seen = Set(current.items.map(\.id))
-                let appended = next.items.filter { seen.insert($0.id).inserted }
+                let appended = next.items.filter { deferredDeletions[$0.id] == nil && seen.insert($0.id).inserted }
                 page = SocialFeedPage(items: current.items + appended, nextCursor: next.nextCursor,
                     stories: current.stories, trendingHashtags: current.trendingHashtags,
                     suggestedUsers: current.suggestedUsers, requestId: next.requestId ?? current.requestId)
@@ -482,30 +554,69 @@ final class FeedViewModel: ObservableObject {
         }
     }
 
-    /// Suppression définitive. Retrait optimiste puis remise en place en cas
-    /// d'échec — un post qui disparaît sans confirmation serveur ferait croire
-    /// à une suppression réussie.
-    func deletePost(_ item: UnifiedSocialFeedItem) {
-        guard let page else { return }
+    /// Suppressions en attente : la publication a quitté le fil tout de suite, le serveur
+    /// ne la reçoit qu'au bout du délai d'annulation (plan Fil Communauté, C5, comme
+    /// Android). Un rechargement pendant ce délai ne la fait pas revenir.
+    private struct DeferredDeletion {
+        let item: UnifiedSocialFeedItem
+        let index: Int
+        let query: UUID
+        let task: Task<Void, Never>
+        var sending = false
+    }
+    private var deferredDeletions: [String: DeferredDeletion] = [:]
+    /// Durée du bandeau « Annuler » (`showUndo`) : la suppression part à son terme.
+    nonisolated static let deletionUndoDelay: Duration = .seconds(5)
+
+    /// Retire la publication et programme sa suppression. Elle revient à sa place si
+    /// l'auteur annule, ou si le serveur refuse.
+    func deletePost(_ item: UnifiedSocialFeedItem, after delay: Duration = FeedViewModel.deletionUndoDelay) {
+        guard let page, deferredDeletions[item.id] == nil else { return }
         let index = page.items.firstIndex { $0.id == item.id } ?? 0
         removeItem(item.id)
-        Task {
-            do { try await service.deletePost(postId: item.id) }
-            catch {
-                // Réinsère la seule publication retirée, à sa place : le reste du
-                // fil a pu changer entre-temps (réaction, rechargement).
-                if let current = self.page, !current.items.contains(where: { $0.id == item.id }) {
-                    var items = current.items
-                    items.insert(item, at: min(index, items.count))
-                    self.page = SocialFeedPage(
-                        items: items, nextCursor: current.nextCursor, stories: current.stories,
-                        trendingHashtags: current.trendingHashtags, suggestedUsers: current.suggestedUsers,
-                        requestId: current.requestId
-                    )
-                }
-                if !error.isCancellation { actionError = error.userFacingMessage }
-            }
+        let task = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled else { return }
+            await self?.sendDeletion(item.id)
         }
+        deferredDeletions[item.id] = DeferredDeletion(item: item, index: index, query: queryRevision, task: task)
+    }
+
+    /// « Annuler » : rien n'est parti, la publication reprend sa place. Trop tard une
+    /// fois la demande envoyée.
+    func undoDeletion(_ id: String) {
+        guard let pending = deferredDeletions[id], !pending.sending else { return }
+        deferredDeletions[id] = nil
+        pending.task.cancel()
+        // Onglet changé entre-temps : le prochain chargement la rendra, elle n'est pas supprimée.
+        if pending.query == queryRevision { reinsert(pending.item, at: pending.index) }
+    }
+
+    private func sendDeletion(_ id: String) async {
+        guard deferredDeletions[id] != nil else { return }
+        deferredDeletions[id]?.sending = true
+        guard let pending = deferredDeletions[id] else { return }
+        do {
+            try await service.deletePost(postId: pending.item.id)
+            deferredDeletions[id] = nil
+        } catch {
+            deferredDeletions[id] = nil
+            if pending.query == queryRevision { reinsert(pending.item, at: pending.index) }
+            if !error.isCancellation { actionError = error.userFacingMessage }
+        }
+    }
+
+    /// Réinsère la seule publication retirée, à sa place : le reste du fil a pu
+    /// changer entre-temps (réaction, rechargement).
+    private func reinsert(_ item: UnifiedSocialFeedItem, at index: Int) {
+        guard let current = page, !current.items.contains(where: { $0.id == item.id }) else { return }
+        var items = current.items
+        items.insert(item, at: min(index, items.count))
+        page = SocialFeedPage(
+            items: items, nextCursor: current.nextCursor, stories: current.stories,
+            trendingHashtags: current.trendingHashtags, suggestedUsers: current.suggestedUsers,
+            requestId: current.requestId
+        )
     }
 
     /// Vote sur un sondage. Bascule si l'option était déjà choisie.
@@ -715,7 +826,6 @@ struct FeedView: View {
     /// Post en attente de confirmation de suppression. La suppression est
     /// IRRÉVERSIBLE côté serveur : elle ne peut pas partir en deux taps depuis
     /// un menu contextuel.
-    @State private var pendingDeletion: UnifiedSocialFeedItem?
     @State private var showRecap = false
     /// Post en cours d'édition — ouvre le composer en mode édition.
     @State private var editingPost: UnifiedSocialFeedItem?
@@ -891,21 +1001,9 @@ struct FeedView: View {
                     } else if (model.page?.items.isEmpty ?? true), !model.isLoading, model.errorMessage == nil {
                         // État vide explicite : sans lui, un nouveau compte (onglet par
                         // défaut) voit un écran quasi nu, l'app paraît cassée (INT-01).
-                        // Message propre à l'onglet ou au hashtag : « Ton fil est
-                        // encore vide » était faux sur « Amis » ou « Enregistrés » (SOC-38).
-                        EmptyStateView(
-                            title: model.tab == .forYou && model.selectedHashtag == nil
-                                ? "Ton fil est encore vide"
-                                : String(localized: "Rien ici pour l’instant"),
-                            message: model.selectedHashtag.map {
-                                String(localized: "Aucune publication avec #\($0) pour l’instant.")
-                            } ?? model.tab.emptyMessage,
-                            systemImage: "sparkles"
-                        )
-                        .padding(.top, SQSpace.xxl)
-                        if model.tab == .forYou, model.selectedHashtag == nil {
-                            emptyFeedNextSteps
-                        }
+                        // Titres et gestes communs au Web et à Android (plan Fil
+                        // Communauté du 24/11, C4).
+                        emptyFeedState
                     }
                     if model.tab.rendersAsGallery {
                         photoGallery(model.page?.items ?? [])
@@ -982,10 +1080,13 @@ struct FeedView: View {
         .signalQuestBackground()
         .task {
             isFeedVisible = true
+            // Le dernier onglet ouvert, relu avant le premier chargement : changer d'onglet
+            // marque le fil « en chargement » sans rien demander, d'où `restored`.
+            let restored = model.page == nil && model.restoreLastTab()
             model.startStream(services.sse)
             // Au lancement à froid, le passage à l'état actif arrive pendant ce
             // premier chargement : sans `isLoading`, le fil partait deux fois (F-44).
-            if model.page == nil, !model.isLoading { await model.load() }
+            if model.page == nil, restored || !model.isLoading { await model.load() }
             guard !Task.isCancelled, isFeedVisible else { return }
             await model.loadPulse()
             await consumeFeedRoutesIfNeeded()
@@ -1029,22 +1130,23 @@ struct FeedView: View {
                 onDeleted: { model.removeItem($0) }
             )
         }
+        // Publication supprimée, ouverte depuis une notification : un état, pas une
+        // erreur (plan Fil Communauté, C6).
+        .navigationDestination(isPresented: $routedPostMissing) {
+            DeletedPostView()
+        }
         .alert("Publication", isPresented: Binding(
-            get: { failedRoutedPostID != nil || routedPostMissing },
-            set: { if !$0 { failedRoutedPostID = nil; routedPostMissing = false } }
+            get: { failedRoutedPostID != nil },
+            set: { if !$0 { failedRoutedPostID = nil } }
         )) {
             if let retryID = failedRoutedPostID {
                 Button("Réessayer") {
                     Task { await openRoutedPost(retryID) }
                 }
             }
-            Button("Fermer", role: .cancel) { failedRoutedPostID = nil; routedPostMissing = false }
+            Button("Fermer", role: .cancel) { failedRoutedPostID = nil }
         } message: {
-            if routedPostMissing {
-                Text("Publication introuvable ou supprimée.")
-            } else {
-                Text("Une erreur est survenue. Réessaie.")
-            }
+            Text("Une erreur est survenue. Réessaie.")
         }
         // Échec d'une action : bandeau passager, ou message dans la fiche
         // ouverte, qui masquerait le bandeau (SOC-14).
@@ -1096,20 +1198,6 @@ struct FeedView: View {
         }
         .sheet(isPresented: $showRecap) {
             WeeklyRecapSheet(service: services.feed, onPublished: { Task { await model.load() } })
-        }
-        // Alerte centrée, « Annuler » visible : en confirmationDialog, iOS 26 la posait en
-        // bulle sur le centre du fil, pointée vers une autre publication (IOS-044).
-        .alert(
-            "Supprimer cette publication ?",
-            isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } })
-        ) {
-            Button("Supprimer", role: .destructive) {
-                if let item = pendingDeletion { model.deletePost(item) }
-                pendingDeletion = nil
-            }
-            Button("Annuler", role: .cancel) { pendingDeletion = nil }
-        } message: {
-            Text("Cette action est irréversible.")
         }
         .sheet(item: $presentedSheet, onDismiss: {
             // Une erreur survenue pendant que la feuille était ouverte n'a pas pu
@@ -1250,6 +1338,19 @@ struct FeedView: View {
         }
     }
 
+    // MARK: Suppression annulable
+
+    private func deleteWithUndo(_ item: UnifiedSocialFeedItem) {
+        Haptics.light()
+        model.deletePost(item)
+        inAppNotifications.showUndo(
+            body: String(localized: "Publication supprimée"),
+            actionLabel: String(localized: "Annuler")
+        ) {
+            model.undoDeletion(item.id)
+        }
+    }
+
     // MARK: Annulation d'un partage
 
     private func presentShareUndo(messageId: String, conversation: MessageConversation) {
@@ -1301,7 +1402,9 @@ struct FeedView: View {
         let revision = UUID()
         routedPostRevision = revision
         failedRoutedPostID = nil
-        routedPostMissing = false
+        if routedPostMissing {
+            guard await popRoutedDestination({ routedPostMissing = false }), routedPostRevision == revision else { return }
+        }
         if routedPostItem != nil {
             guard await popRoutedDestination({ routedPostItem = nil }), routedPostRevision == revision else { return }
         }
@@ -1633,10 +1736,73 @@ struct FeedView: View {
         .accessibilityIdentifier("community.header.action.\(identifier)")
     }
 
+    /// État vide de l'onglet ouvert, ou du hashtag choisi.
+    @ViewBuilder
+    private var emptyFeedState: some View {
+        if let tag = model.selectedHashtag {
+            EmptyStateView(title: String(localized: "Rien ici pour l’instant"),
+                           message: String(localized: "Aucune publication avec #\(tag) pour l’instant."),
+                           systemImage: "number")
+                .padding(.top, SQSpace.xxl)
+        } else {
+            switch model.tab {
+            case .forYou:
+                EmptyStateView(title: model.tab.emptyTitle, message: model.tab.emptyMessage, systemImage: "sparkles")
+                    .padding(.top, SQSpace.xxl)
+                emptyFeedNextSteps(followable: false)
+            case .following:
+                followingEmptyState
+            case .nearby:
+                // Le rayon vient de la réponse du serveur ; 30 km tant qu'il ne l'a pas dit.
+                let radius = model.nearRadiusKm ?? 30
+                EmptyStateView(title: String(localized: "Rien de publié à moins de \(radius) km"),
+                               message: String(localized: "Sois le premier à partager une mesure ici."),
+                               systemImage: "location")
+                    .padding(.top, SQSpace.xxl)
+                GradientButton("Publier", systemImage: "square.and.pencil") {
+                    composerRequest = ComposerRequest(start: nil)
+                }
+                .accessibilityIdentifier("feed.empty.publish")
+            case .photos:
+                EmptyStateView(title: model.tab.emptyTitle, message: model.tab.emptyMessage, systemImage: "photo.on.rectangle.angled")
+                    .padding(.top, SQSpace.xxl)
+            case .saved:
+                EmptyStateView(title: model.tab.emptyTitle, message: model.tab.emptyMessage, systemImage: "bookmark")
+                    .padding(.top, SQSpace.xxl)
+            }
+        }
+    }
+
+    /// « Suivis » vide : personne de suivi, ou rien de neuf chez les profils suivis. Tant
+    /// que le nombre d'abonnements n'est pas connu, le texte neutre de l'onglet.
+    @ViewBuilder
+    private var followingEmptyState: some View {
+        Group {
+            switch model.followingCount {
+            case .some(0):
+                EmptyStateView(title: FeedTab.following.emptyTitle, message: FeedTab.following.emptyMessage,
+                               systemImage: "person.2")
+            case .some:
+                EmptyStateView(title: String(localized: "Rien de neuf chez les profils que tu suis"),
+                               message: String(localized: "Leurs prochaines publications arriveront ici."),
+                               systemImage: "person.2")
+            case .none:
+                EmptyStateView(title: String(localized: "Rien ici pour l’instant"),
+                               message: FeedTab.following.emptyMessage, systemImage: "person.2")
+            }
+        }
+        .padding(.top, SQSpace.xxl)
+        .task(id: currentUser?.id) {
+            if let id = currentUser?.id { await model.loadFollowingCount(userId: id) }
+        }
+        emptyFeedNextSteps(followable: true)
+    }
+
     /// Fil vide : publier se fait déjà depuis la ligne « Quoi de neuf ? » au-dessus.
     /// Reste à trouver qui suivre : les membres que le serveur suggère, puis Explorer.
+    /// `followable` : chaque profil se suit en un toucher (état vide de « Suivis »).
     @ViewBuilder
-    private var emptyFeedNextSteps: some View {
+    private func emptyFeedNextSteps(followable: Bool) -> some View {
         let suggestions = Array((model.page?.suggestedUsers ?? []).prefix(3))
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             if !suggestions.isEmpty {
@@ -1647,6 +1813,7 @@ struct FeedView: View {
                 VStack(spacing: 0) {
                     ForEach(Array(suggestions.enumerated()), id: \.element.id) { index, author in
                         if index > 0 { Divider().padding(.leading, 58) }
+                        HStack(spacing: 0) {
                         Button {
                             Haptics.light()
                             profileAuthor = author
@@ -1666,19 +1833,24 @@ struct FeedView: View {
                                     }
                                 }
                                 Spacer(minLength: 0)
-                                Image(systemName: "chevron.right")
-                                    .font(SQType.caption)
-                                    .foregroundStyle(SQColor.labelSecondary)
-                                    .accessibilityHidden(true)
+                                if !followable {
+                                    Image(systemName: "chevron.right")
+                                        .font(SQType.caption)
+                                        .foregroundStyle(SQColor.labelSecondary)
+                                        .accessibilityHidden(true)
+                                }
                             }
                             .frame(minHeight: 44)
-                            .padding(.horizontal, SQSpace.md)
+                            .padding(.leading, SQSpace.md)
+                            .padding(.trailing, followable ? SQSpace.sm : SQSpace.md)
                             .padding(.vertical, SQSpace.xs2)
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(SQElision.apply(String(localized: "Voir le profil de \(author.displayName)"), name: author.displayName))
                         .accessibilityIdentifier("feed.empty.suggestion")
+                        if followable { suggestionFollowButton(author) }
+                        }
                     }
                 }
                 .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
@@ -1689,6 +1861,28 @@ struct FeedView: View {
             }
             .accessibilityIdentifier("feed.empty.explore")
         }
+    }
+
+    /// « Suivre » en un toucher, « Suivi » une fois fait : même pastille qu'Explorer.
+    private func suggestionFollowButton(_ author: SocialFeedAuthor) -> some View {
+        let followed = model.followedSuggestionIds.contains(author.id) || author.isFollowing == true
+        return Button { model.followSuggestion(author) } label: {
+            Text(followed ? "Suivi" : "Suivre")
+                .font(SQType.subhead(.bold))
+                .foregroundStyle(followed ? SQColor.label : SQColor.onInk)
+                .padding(.horizontal, SQSpace.md2)
+                .frame(minHeight: 32)
+                .background(followed ? SQColor.chip : SQColor.label, in: Capsule(style: .continuous))
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(followed || model.followBusyIds.contains(author.id))
+        .padding(.trailing, SQSpace.md)
+        .accessibilityLabel(followed
+            ? SQElision.apply(String(localized: "\(author.displayName), suivi"), name: author.displayName)
+            : SQElision.apply(String(localized: "Suivre \(author.displayName)"), name: author.displayName))
+        .accessibilityIdentifier("feed.empty.follow")
     }
 
     /// « Quoi de neuf ? » : la publication commence ici, en une ligne. Photo
@@ -1955,7 +2149,9 @@ struct FeedView: View {
                 Label(item.isPinned ? "Désépingler" : "Épingler",
                       systemImage: item.isPinned ? "pin.slash" : "pin")
             }
-            Button(role: .destructive) { pendingDeletion = item } label: {
+            // Pas d'alerte : la publication disparaît et « Annuler » reste 5 s (plan Fil
+            // Communauté, C5, comme Android). Le profil et le détail gardent leur confirmation.
+            Button(role: .destructive) { deleteWithUndo(item) } label: {
                 Label("Supprimer", systemImage: "trash")
             }
         }
@@ -2427,4 +2623,25 @@ extension SocialFeedPage {
 extension Notification.Name {
     /// Posté par `FriendsService.block` : `userInfo["userId"]` est le membre bloqué.
     static let sqMemberBlocked = Notification.Name("SignalQuest.MemberBlocked")
+}
+
+/// Publication ouverte depuis une notification ou un lien alors qu'elle n'existe plus, ou
+/// n'est plus visible pour ce compte : un état, pas une erreur (plan Fil Communauté, C6).
+struct DeletedPostView: View {
+    var body: some View {
+        ScrollView {
+            EmptyStateView(
+                title: String(localized: "Publication supprimée"),
+                message: String(localized: "Elle a été retirée, ou elle n’est plus visible pour toi."),
+                systemImage: "trash"
+            )
+            .padding(.top, SQSpace.xxl)
+            .padding(.horizontal, SQSpace.lg)
+            .sqReadableWidth()
+            .accessibilityIdentifier("feed.post.deleted")
+        }
+        .navigationTitle("Publication")
+        .navigationBarTitleDisplayMode(.inline)
+        .signalQuestBackground()
+    }
 }

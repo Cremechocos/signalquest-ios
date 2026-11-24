@@ -40,6 +40,21 @@ final class FeedTabsTests: XCTestCase {
         XCTAssertEqual(FeedTab.allCases.filter(\.needsPosition), [.nearby])
     }
 
+    /// Plan Fil Communauté du 24/11 (C9) : « Autour » s'ouvre en ordre chronologique,
+    /// comme le Web ; « Pour toi » et « Photos » restent classés.
+    func testNearbyIsChronologicalByDefault() {
+        XCTAssertEqual(FeedTab.nearby.ranking, "latest")
+        XCTAssertEqual(FeedTab.forYou.ranking, "foryou")
+        XCTAssertEqual(FeedTab.photos.ranking, "smart")
+    }
+
+    /// Titres d'état vide communs aux trois plateformes (C4).
+    func testEmptyTitlesFollowTheSharedPlan() {
+        XCTAssertEqual(FeedTab.forYou.emptyTitle, "Ton fil est encore vide")
+        XCTAssertEqual(FeedTab.following.emptyTitle, "Tu ne suis encore personne")
+        XCTAssertEqual(FeedTab.photos.emptyTitle, "Aucune photo pour l’instant")
+    }
+
     /// « Autour » n'envoie qu'un point arrondi au centième de degré (environ 1 km).
     func testNearbyPointIsRoundedBeforeLeavingTheDevice() {
         let point = FeedNearPoint(CLLocationCoordinate2D(latitude: 48.856_613, longitude: 2.352_222))

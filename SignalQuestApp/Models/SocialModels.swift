@@ -7,11 +7,14 @@ struct SocialFeedPage: Codable, Equatable {
     let trendingHashtags: [TrendingHashtag]
     let suggestedUsers: [SocialFeedAuthor]
     let requestId: String?
+    /// Rayon de « Autour » appliqué par le serveur (`filter=nearby` seulement) : l'état
+    /// vide l'affiche tel quel, sans le coder en dur (plan Fil Communauté, B4).
+    var nearRadiusKm: Double? = nil
 }
 
 extension SocialFeedPage {
     private enum CodingKeys: String, CodingKey {
-        case items, nextCursor, stories, trendingHashtags, suggestedUsers, requestId
+        case items, nextCursor, stories, trendingHashtags, suggestedUsers, requestId, nearRadiusKm
     }
 
     // init(from:) en EXTENSION pour préserver l'init memberwise (utilisé pour le
@@ -28,6 +31,7 @@ extension SocialFeedPage {
         trendingHashtags = c.decodeLossyElementArray([TrendingHashtag].self, forKey: .trendingHashtags)
         suggestedUsers = c.decodeLossyElementArray([SocialFeedAuthor].self, forKey: .suggestedUsers)
         requestId = try c.decodeIfPresent(String.self, forKey: .requestId)
+        nearRadiusKm = try? c.decodeIfPresent(Double.self, forKey: .nearRadiusKm)
     }
 }
 

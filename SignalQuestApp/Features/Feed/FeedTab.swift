@@ -39,11 +39,13 @@ enum FeedTab: String, CaseIterable, Identifiable, Sendable {
     ///
     /// « Pour toi » est le SEUL à demander `foryou` : c'est le classement nourri
     /// par les signaux d'engagement. « Suivis » est strictement chronologique, comme
-    /// le fil des abonnements de toute app sociale. Les autres gardent `smart`.
+    /// le fil des abonnements de toute app sociale. « Autour » aussi, par défaut (plan
+    /// Fil Communauté validé le 24/11, comme le Web) : on y cherche ce qui vient de se
+    /// passer près de soi. Les autres gardent `smart`.
     var ranking: String {
         switch self {
         case .forYou: return "foryou"
-        case .following: return "latest"
+        case .following, .nearby: return "latest"
         default: return "smart"
         }
     }
@@ -78,12 +80,24 @@ enum FeedTab: String, CaseIterable, Identifiable, Sendable {
     /// reste du fil garde ses cartes, où le texte et les métriques comptent.
     var rendersAsGallery: Bool { self == .photos }
 
+    /// Titre d'état vide propre à l'onglet, commun au Web et à Android (plan Fil
+    /// Communauté du 24/11). « Autour » a le sien, qui porte le rayon servi.
+    var emptyTitle: String {
+        switch self {
+        case .forYou: return "Ton fil est encore vide"
+        case .following: return "Tu ne suis encore personne"
+        case .nearby: return "Rien ici pour l’instant"
+        case .photos: return "Aucune photo pour l’instant"
+        case .saved: return "Rien ici pour l’instant"
+        }
+    }
+
     /// Message d'état vide propre à l'onglet — « Ton fil est encore vide » est
     /// faux et décourageant sur « Amis » quand on n'a simplement pas d'amis.
     var emptyMessage: String {
         switch self {
         case .forYou: return "Lance quelques speedtests et suis des membres : les recommandations arrivent vite."
-        case .following: return "Tu ne suis encore personne. Explore les profils pour remplir cet onglet."
+        case .following: return "Les publications des profils que tu suis arriveront ici, de la plus récente à la plus ancienne."
         case .nearby: return "Rien n’a été partagé à moins de 30 km ces derniers temps."
         case .photos: return "Aucune photo partagée pour l'instant. Ajoute-en une depuis une antenne ou une publication."
         case .saved: return "Enregistre une publication pour la retrouver ici."

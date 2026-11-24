@@ -119074,6 +119074,236 @@
           }
         }
       }
+    },
+    "Tu ne suis encore personne" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You don’t follow anyone yet"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu ne suis encore personne"
+          }
+        }
+      }
+    },
+    "SQFormal|Tu ne suis encore personne" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous ne suivez encore personne"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Les publications des profils que tu suis arriveront ici, de la plus récente à la plus ancienne." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Posts from the profiles you follow will show up here, newest first."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les publications des profils que tu suis arriveront ici, de la plus récente à la plus ancienne."
+          }
+        }
+      }
+    },
+    "SQFormal|Les publications des profils que tu suis arriveront ici, de la plus récente à la plus ancienne." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les publications des profils que vous suivez arriveront ici, de la plus récente à la plus ancienne."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Aucune photo pour l’instant" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No photos yet"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune photo pour l’instant"
+          }
+        }
+      }
+    },
+    "Rien de publié à moins de %lld km" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing posted within %lld km"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien de publié à moins de %lld km"
+          }
+        }
+      }
+    },
+    "Sois le premier à partager une mesure ici." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Be the first to share a measurement here."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sois le premier à partager une mesure ici."
+          }
+        }
+      }
+    },
+    "SQFormal|Sois le premier à partager une mesure ici." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soyez le premier à partager une mesure ici."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Rien de neuf chez les profils que tu suis" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing new from the profiles you follow"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien de neuf chez les profils que tu suis"
+          }
+        }
+      }
+    },
+    "SQFormal|Rien de neuf chez les profils que tu suis" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien de neuf chez les profils que vous suivez"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Leurs prochaines publications arriveront ici." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Their next posts will show up here."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leurs prochaines publications arriveront ici."
+          }
+        }
+      }
+    },
+    "%@, suivi" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, following"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, suivi"
+          }
+        }
+      }
+    },
+    "Publication supprimée" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Post deleted"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publication supprimée"
+          }
+        }
+      }
+    },
+    "Elle a été retirée, ou elle n’est plus visible pour toi." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It was removed, or it’s no longer visible to you."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elle a été retirée, ou elle n’est plus visible pour toi."
+          }
+        }
+      }
+    },
+    "SQFormal|Elle a été retirée, ou elle n’est plus visible pour toi." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elle a été retirée, ou elle n’est plus visible pour vous."
+          }
+        }
+      },
+      "shouldTranslate" : false
     }
   },
   "version" : "1.0"

@@ -307,6 +307,85 @@ final class FeedContextTests: XCTestCase {
         XCTAssertNil(FeedItemCard.prefetchImage(for: Self.item("sans-photo")))
     }
 
+    /// Plan Fil Communauté, C5 : la publication quitte le fil aussitôt, rien ne part avant
+    /// la fin du délai « Annuler », et un rechargement pendant ce délai ne la rend pas.
+    func testDeletionWaitsForTheUndoDelayAndUndoKeepsThePost() async throws {
+        let deletions = FeedDeletions()
+        let items = ["a", "b", "c"].map(Self.item)
+        let service = FeedContextFixture { _, _, _ in Self.page("page", items: items) }
+        service.onDelete = { await deletions.record($0) }
+        let model = FeedViewModel(service: service)
+        await model.load()
+
+        model.deletePost(items[1], after: .milliseconds(150))
+        XCTAssertEqual(model.page?.items.map(\.id), ["a", "c"])
+        model.undoDeletion("b")
+        XCTAssertEqual(model.page?.items.map(\.id), ["a", "b", "c"], "« Annuler » remet la publication à sa place")
+        try await Task.sleep(for: .milliseconds(400))
+        let afterUndo = await deletions.ids
+        XCTAssertEqual(afterUndo, [], "rien ne part après « Annuler »")
+
+        model.deletePost(items[2], after: .milliseconds(250))
+        await model.load()
+        XCTAssertEqual(model.page?.items.map(\.id), ["a", "b"], "un rechargement ne rend pas une publication en cours de suppression")
+        let beforeDelay = await deletions.ids
+        XCTAssertEqual(beforeDelay, [])
+        try await Task.sleep(for: .milliseconds(600))
+        let sent = await deletions.ids
+        XCTAssertEqual(sent, ["c"])
+        model.undoDeletion("c")
+        XCTAssertEqual(model.page?.items.map(\.id), ["a", "b"], "trop tard une fois la suppression partie")
+    }
+
+    /// Un refus du serveur, après le délai, remet la publication à sa place avec le message.
+    func testRefusedDeletionPutsThePostBack() async throws {
+        let items = ["a", "b", "c"].map(Self.item)
+        let service = FeedContextFixture { _, _, _ in Self.page("page", items: items) }
+        service.onDelete = { _ in throw APIError.http(status: 500, code: nil, message: "", requestId: nil, retryAfter: nil) }
+        let model = FeedViewModel(service: service)
+        await model.load()
+        model.deletePost(items[0], after: .milliseconds(50))
+        XCTAssertEqual(model.page?.items.map(\.id), ["b", "c"])
+        try await Task.sleep(for: .milliseconds(400))
+        XCTAssertEqual(model.page?.items.map(\.id), ["a", "b", "c"])
+        XCTAssertNotNil(model.actionError)
+    }
+
+    /// Plan Fil Communauté, C1 : le dernier onglet ouvert revient au lancement suivant,
+    /// relu une seule fois ; « Enregistrés », ouvert depuis le menu ⋯, n'est jamais retenu.
+    func testLastTabIsRememberedOnTheDevice() async {
+        let key = FeedViewModel.lastTabKey(ownerScopeId: LocalAccountScope.currentOwnerScopeId)
+        let previous = UserDefaults.standard.string(forKey: key)
+        defer { UserDefaults.standard.set(previous, forKey: key) }
+        UserDefaults.standard.removeObject(forKey: key)
+
+        let first = FeedViewModel(service: FeedContextFixture { _, _, _ in Self.page("page") })
+        XCTAssertFalse(first.restoreLastTab(), "rien de retenu : l'onglet par défaut")
+        await first.select(.photos)
+        await first.select(.saved)
+        XCTAssertEqual(UserDefaults.standard.string(forKey: key), "photos")
+
+        let next = FeedViewModel(service: FeedContextFixture { _, _, _ in Self.page("page") })
+        XCTAssertTrue(next.restoreLastTab())
+        XCTAssertEqual(next.tab, .photos)
+        await next.select(.forYou)
+        XCTAssertFalse(next.restoreLastTab(), "relu une seule fois, au premier affichage")
+        XCTAssertEqual(next.tab, .forYou)
+    }
+
+    /// Plan Fil Communauté, B4 : le rayon de « Autour » vient de la réponse, jamais d'une constante.
+    func testNearbyRadiusIsReadFromTheResponse() async throws {
+        let raw = #"{"items":[],"nextCursor":null,"nearRadiusKm":25}"#
+        let decoded = try JSONDecoder.signalQuest.decode(SocialFeedPage.self, from: Data(raw.utf8))
+        XCTAssertEqual(decoded.nearRadiusKm, 25)
+        let model = FeedViewModel(service: FeedContextFixture { _, _, _ in decoded })
+        XCTAssertNil(model.nearRadiusKm)
+        await model.load()
+        XCTAssertEqual(model.nearRadiusKm, 25)
+        let older = try JSONDecoder.signalQuest.decode(SocialFeedPage.self, from: Data(#"{"items":[]}"#.utf8))
+        XCTAssertNil(older.nearRadiusKm)
+    }
+
     nonisolated private static func queryValue(_ name: String, of request: URLRequest) -> String? {
         URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == name }?.value
     }
@@ -354,7 +433,11 @@ private final class FeedContextFixture: SocialFeedServicing, @unchecked Sendable
     func muteNotifications(postId: String) async throws -> SuccessResponse { throw FeedFixtureError.unused }
     func editPost(postId: String, text: String, visibility: String?) async throws -> UnifiedSocialFeedItem? { throw FeedFixtureError.unused }
     func setVisibility(postId: String, visibility: String) async throws -> UnifiedSocialFeedItem? { throw FeedFixtureError.unused }
-    func deletePost(postId: String) async throws { throw FeedFixtureError.unused }
+    var onDelete: (@Sendable (String) async throws -> Void)?
+    func deletePost(postId: String) async throws {
+        guard let onDelete else { throw FeedFixtureError.unused }
+        try await onDelete(postId)
+    }
     func setPinned(postId: String, pinned: Bool) async throws { throw FeedFixtureError.unused }
     func votePoll(postId: String, optionId: String?, removing: Bool) async throws -> FeedPoll? { throw FeedFixtureError.unused }
     func followedHashtags() async throws -> [FollowedHashtag] { throw FeedFixtureError.unused }
@@ -391,6 +474,11 @@ private actor FeedFixtureGate<Value: Sendable> {
     func finish(_ value: Result<Value, Error>) {
         result = value; continuation?.resume(with: value); continuation = nil
     }
+}
+
+private actor FeedDeletions {
+    private(set) var ids: [String] = []
+    func record(_ id: String) { ids.append(id) }
 }
 
 private actor FeedCallCount {
