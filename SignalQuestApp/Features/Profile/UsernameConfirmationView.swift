@@ -129,10 +129,12 @@ struct UsernameConfirmationView: View {
         }
     }
 
+    /// Le délai vient du serveur selon le palier (7 jours en Premium, 30 sinon).
     private var freeChangeNote: String {
-        current == nil
-            ? String(localized: "Tu pourras le changer ensuite, avec 30 jours d’attente entre deux changements.")
-            : String(localized: "Le changer est gratuit cette fois-ci. Ensuite, il faudra attendre 30 jours entre deux changements.")
+        let days = user.handleCooldownDayCount
+        return current == nil
+            ? String(localized: "Tu pourras le changer ensuite, avec \(days) jours d’attente entre deux changements.")
+            : String(localized: "Le changer est gratuit cette fois-ci. Ensuite, il faudra attendre \(days) jours entre deux changements.")
     }
 
     // MARK: - Nom affiché

@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Feuille de choix ou de changement du nom d'utilisateur (identité membre v1), ouverte depuis
 /// le profil et son édition : saisie sans « @ », vérifiée sur la route du profil, qui répond
-/// aussi le délai de 30 jours entre deux changements.
+/// aussi le délai entre deux changements (servi selon le palier : 7 jours en Premium, 30 sinon).
 struct ChooseHandleSheet: View {
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var session: AuthSessionViewModel
@@ -59,9 +59,10 @@ struct ChooseHandleSheet: View {
                         if let current {
                             Text("L’ancien lien \(UserHandle.profileLink(current)) mènera toujours à ton profil.")
                         }
+                        let days = user?.handleCooldownDayCount ?? 30
                         Text(user?.needsHandleConfirmation == true && current != nil
-                             ? String(localized: "Le changer est gratuit cette fois-ci. Ensuite, il faudra attendre 30 jours entre deux changements.")
-                             : String(localized: "Tu pourras le changer ensuite, avec 30 jours d’attente entre deux changements."))
+                             ? String(localized: "Le changer est gratuit cette fois-ci. Ensuite, il faudra attendre \(days) jours entre deux changements.")
+                             : String(localized: "Tu pourras le changer ensuite, avec \(days) jours d’attente entre deux changements."))
                     }
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)

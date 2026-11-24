@@ -15,6 +15,9 @@ struct AuthUser: Codable, Identifiable, Equatable, Sendable {
     /// Identité membre v1 : `nil` tant que le membre n'a ni gardé ni choisi son nom
     /// d'utilisateur depuis l'écran d'explication. Le changement est alors gratuit.
     var handleConfirmedAt: String? = nil
+    /// Délai entre deux changements de nom d'utilisateur, servi par `/api/auth/me` selon le palier
+    /// (7 jours en Premium, 30 sinon, D13). `nil` d'une réponse qui ne le porte pas.
+    var handleCooldownDays: Int? = nil
     let avatarUrl: URL?
     /// Bio de profil. Peut être absente de `/api/auth/me` ; rechargée via
     /// `/api/user/profile` pour préremplir l'édition sans l'écraser (EDITPROFILE-BUG-01).
@@ -63,11 +66,14 @@ struct AuthUser: Codable, Identifiable, Equatable, Sendable {
     var needsHandleConfirmation: Bool {
         handleConfirmedAt?.isEmpty != false || (handle ?? "").isEmpty
     }
+
+    /// Le délai à annoncer : celui du serveur, 30 jours (règle sans Premium) s'il ne le sert pas.
+    var handleCooldownDayCount: Int { handleCooldownDays ?? 30 }
 }
 
 extension AuthUser {
     private enum Keys: String, CodingKey {
-        case id, email, emailVerified, name, handle, handleChangedAt, handleConfirmedAt, avatarUrl, bio, role
+        case id, email, emailVerified, name, handle, handleChangedAt, handleConfirmedAt, handleCooldownDays, avatarUrl, bio, role
         case twoFactorEnabled, notifyMessagesPush, notifySocialPush, notifyMessagesInApp
         case callsDoNotDisturb, appleLinked, securityPrompt
     }
@@ -86,6 +92,7 @@ extension AuthUser {
         handle = optional(String.self, .handle)
         handleChangedAt = optional(String.self, .handleChangedAt)
         handleConfirmedAt = optional(String.self, .handleConfirmedAt)
+        handleCooldownDays = optional(Int.self, .handleCooldownDays).flatMap { $0 > 0 ? $0 : nil }
         avatarUrl = c.decodeLossyURL(forKey: .avatarUrl)
         bio = optional(String.self, .bio)
         role = optional(String.self, .role) ?? "user"

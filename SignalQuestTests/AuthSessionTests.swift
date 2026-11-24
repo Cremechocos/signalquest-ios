@@ -147,6 +147,21 @@ final class AuthSessionTests: XCTestCase {
         XCTAssertEqual(roundTrip, .mock)
     }
 
+    /// IOS-060 : le délai du nom d'utilisateur vient du serveur (7 jours en Premium, 30 sinon) ;
+    /// absent ou absurde, l'app annonce la règle sans Premium. Il survit au cache du compte.
+    func testHandleCooldownComesFromTheServer() throws {
+        func user(_ extra: String) throws -> AuthUser {
+            try JSONDecoder.signalQuest.decode(AuthUser.self, from: Data(#"{"id":"u-1"\#(extra)}"#.utf8))
+        }
+        let premium = try user(#","handleCooldownDays":7"#)
+        XCTAssertEqual(premium.handleCooldownDayCount, 7)
+        XCTAssertEqual(try user("").handleCooldownDayCount, 30)
+        XCTAssertEqual(try user(#","handleCooldownDays":0"#).handleCooldownDayCount, 30)
+        XCTAssertEqual(try user(#","handleCooldownDays":"7""#).handleCooldownDayCount, 30)
+        let cached = try JSONDecoder.signalQuest.decode(AuthUser.self, from: JSONEncoder.signalQuest.encode(premium))
+        XCTAssertEqual(cached.handleCooldownDayCount, 7)
+    }
+
     func testCredentialStoreTellsAnUnreadableKeychainFromAnAbsentToken() throws {
         let keychain = FlakyTokenStore()
         let credentials = CredentialStore(tokenStore: keychain)
