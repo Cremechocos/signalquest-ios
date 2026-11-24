@@ -850,6 +850,11 @@ struct SocialUserProfileStats: Codable, Equatable {
     let validations: Int?
     let photos: Int?
     let speedtests: Int?
+
+    /// IOS-023 : les points affichés sont ceux de la gamification, comme son propre
+    /// profil (/api/user/stats), les classements et Android ; `points` (ancien
+    /// compteur) ne sert plus que de repli quand le serveur ne sert pas l'autre.
+    var displayedPoints: Int? { gamificationPoints ?? points }
 }
 
 /// Profil public renvoyé par GET /api/users/[id]/profile.

@@ -324,6 +324,17 @@ final class FeedComposerTests: XCTestCase {
         XCTAssertFalse(visible.followListsHidden)
     }
 
+    /// IOS-023 : le profil public montre les points de gamification, comme son propre
+    /// profil et Android ; l'ancien compteur ne sert que de repli.
+    func testPublicProfileShowsGamificationPoints() throws {
+        func stats(_ json: String) throws -> SocialUserProfileStats {
+            try JSONDecoder.signalQuest.decode(SocialUserProfileStats.self, from: Data(json.utf8))
+        }
+        XCTAssertEqual(try stats(#"{"points":3110,"gamificationPoints":0}"#).displayedPoints, 0)
+        XCTAssertEqual(try stats(#"{"points":3110,"gamificationPoints":4878}"#).displayedPoints, 4878)
+        XCTAssertEqual(try stats(#"{"points":3110}"#).displayedPoints, 3110, "Ancien serveur : repli")
+    }
+
     /// SOCIAL-BELL-1 : champ absent = cloche masquée ; une valeur inconnue s'affiche « Désactivées ».
     func testProfileDecodesPostNotificationsAbsentServedAndUnknown() throws {
         func profile(_ extra: String) throws -> SocialUserProfile {

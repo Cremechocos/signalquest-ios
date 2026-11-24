@@ -823,7 +823,7 @@ struct UserProfileView: View {
     private var statsCard: some View {
         let stats = model.profile?.stats
         let cells: [(Int?, LocalizedStringKey)] = [
-            (stats?.points, "Points"),
+            (stats?.displayedPoints, "Points"),
             (stats?.speedtests, "Tests"),
             (stats?.validations, "Validations"),
             (stats?.photos, "Photos")
