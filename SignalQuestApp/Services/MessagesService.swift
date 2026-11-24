@@ -1,4 +1,5 @@
 import CryptoKit
+import os
 import Foundation
 
 protocol MessagesServicing: Sendable {
@@ -358,10 +359,32 @@ final class MessagesService: MessagesServicing {
     static let conversationPageSize = 100
     static let conversationMaxPages = 10
 
+    /// Lecture de la liste en cours, par session : au lancement, le badge, la
+    /// migration, la rotation, le fil et la messagerie la demandaient chacun en
+    /// même temps (audit A5). Les appels simultanés partagent la même lecture ;
+    /// rien n'est gardé une fois qu'elle est finie.
+    private let conversationsInFlight = OSAllocatedUnfairLock<(sessionId: String?, task: Task<[MessageConversation], Error>)?>(initialState: nil)
+
     /// Toutes les conversations (jusqu'à la borne), en suivant les curseurs : la
     /// recherche, le badge, les cibles de Transférer et l'entrée « Écrire » des
     /// amis ne s'arrêtent plus aux 50 premières (B01).
     func conversations() async throws -> [MessageConversation] {
+        let sessionId = LocalAccountScope.sessionSnapshot()?.sessionId
+        let task: Task<[MessageConversation], Error> = conversationsInFlight.withLock { state in
+            if let state, state.sessionId == sessionId { return state.task }
+            let next = Task { try await self.allConversationPages() }
+            state = (sessionId, next)
+            return next
+        }
+        defer {
+            conversationsInFlight.withLock { state in
+                if state?.task == task { state = nil }
+            }
+        }
+        return try await task.value
+    }
+
+    private func allConversationPages() async throws -> [MessageConversation] {
         var all: [MessageConversation] = []
         var seen = Set<String>()
         var cursor: String?

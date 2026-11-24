@@ -1,3 +1,4 @@
+import os
 import XCTest
 @testable import SignalQuest
 
@@ -121,6 +122,36 @@ final class ConversationPinUnreadTests: XCTestCase {
         let unmuted = muted.with(muted: false, mentionsMuted: true)
         XCTAssertFalse(unmuted.muted)
         XCTAssertFalse(unmuted.mentionsMuted, "Les mentions ne sont coupées que sous sourdine")
+    }
+
+    /// Au lancement, plusieurs services demandent la liste en même temps : une
+    /// seule lecture part, et la suivante, une fois la première finie, relit (audit A5).
+    func testConcurrentListReadsShareOneRequest() async throws {
+        let calls = OSAllocatedUnfairLock(initialState: 0)
+        MockURLProtocol.requestHandler = { request in
+            calls.withLock { $0 += 1 }
+            Thread.sleep(forTimeInterval: 0.3)
+            let json = #"{"conversations":[{"id":"conv-1","isGroup":false,"participants":[]}],"hasMore":false}"#
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                                           headerFields: ["Content-Type": "application/json"])!
+            return (response, Data(json.utf8))
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("list-access-token")
+        let api = APIClient(config: .test, credentials: credentials, session: URLSession(configuration: configuration))
+        let service = MessagesService(api: api)
+
+        async let first = service.conversations()
+        async let second = service.conversations()
+        async let third = service.conversations()
+        let lists = try await [first, second, third]
+        XCTAssertEqual(calls.withLock { $0 }, 1, "trois lectures simultanées, un seul appel")
+        XCTAssertEqual(lists.map { $0.map(\.id) }, [["conv-1"], ["conv-1"], ["conv-1"]])
+
+        _ = try await service.conversations()
+        XCTAssertEqual(calls.withLock { $0 }, 2, "rien n'est gardé une fois la lecture finie")
     }
 
     func testMuteUsesTheServerRoute() async throws {
