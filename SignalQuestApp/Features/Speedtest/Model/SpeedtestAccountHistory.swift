@@ -1,4 +1,5 @@
 import Foundation
+import WidgetKit
 
 /// Tests du compte absents de ce téléphone : réinstallation, autre iPhone, app
 /// Android (UI-12). Un test local envoyé revient du serveur à quelques secondes
@@ -30,6 +31,36 @@ enum SpeedtestAccountHistory {
         guard gap <= delayedUploadWindow, let download = test.downloadAverageMbps else { return false }
         let tolerance = max(0.05, local.downloadAverageMbps * 0.001)
         return abs(download - local.downloadAverageMbps) <= tolerance
+    }
+}
+
+extension SpeedtestAccountHistory {
+    /// Le widget « Dernier Speedtest » suit la règle de « Ton test » à l'accueil
+    /// (UI-06, UI-12) : le test du compte quand il est plus récent que le sien.
+    /// Le widget n'était nourri que par un test lancé sur ce téléphone : après une
+    /// réinstallation, sur un autre iPhone ou après une reconnexion (qui le vide),
+    /// il affichait « Aucun test » alors que le compte en avait (IOS-071).
+    static func widgetSnapshot(for test: SocialShareableSpeedtest,
+                               replacing current: SpeedtestWidgetSnapshot?) -> SpeedtestWidgetSnapshot? {
+        guard let download = test.downloadAverageMbps, let date = test.displayedDate else { return nil }
+        // Même marge que l'accueil : le test de ce téléphone, envoyé, revient du
+        // serveur quelques secondes plus tard ; le local, plus détaillé, reste.
+        if let current, date <= current.date.addingTimeInterval(60) { return nil }
+        return SpeedtestWidgetSnapshot(
+            downloadMbps: download,
+            uploadMbps: test.uploadSpeed,
+            pingMs: test.ping,
+            network: operatorLabel(display: test.operatorDisplay, raw: test.mobileOperator) ?? String(localized: "Réseau"),
+            label: test.id,
+            date: date
+        )
+    }
+
+    /// Recopie dans le widget le dernier test du compte s'il est plus récent.
+    static func refreshWidget(with test: SocialShareableSpeedtest) {
+        guard let snapshot = widgetSnapshot(for: test, replacing: WidgetSharedStore.lastSpeedtest()) else { return }
+        WidgetSharedStore.saveLastSpeedtest(snapshot)
+        WidgetCenter.shared.reloadAllTimelines()
     }
 }
 

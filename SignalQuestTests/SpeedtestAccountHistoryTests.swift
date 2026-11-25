@@ -82,6 +82,28 @@ final class SpeedtestAccountHistoryTests: XCTestCase {
         XCTAssertEqual(SpeedtestAccountHistory.accountOnly(server, local: []).count, 2)
     }
 
+    /// IOS-071 : le widget prend le dernier test du compte quand il est vide ou plus
+    /// ancien, et garde celui de ce téléphone quand c'est le même ou un plus récent.
+    func testWidgetShowsTheAccountTestWhenItsOwnIsMissingOrOlder() {
+        var latest = account("latest", average: 249, at: t0)
+        latest.measuredAt = t0.addingTimeInterval(-20)
+        func widget(_ mbps: Double, at date: Date) -> SpeedtestWidgetSnapshot {
+            SpeedtestWidgetSnapshot(downloadMbps: mbps, uploadMbps: nil, pingMs: nil, network: "SFR", label: "local", date: date)
+        }
+
+        let empty = SpeedtestAccountHistory.widgetSnapshot(for: latest, replacing: nil)
+        XCTAssertEqual(empty?.downloadMbps, 249, "Widget vide : le test du compte s'affiche")
+        XCTAssertEqual(empty?.date, t0.addingTimeInterval(-20), "Heure de mesure, comme à l'écran")
+        XCTAssertEqual(empty?.network, "Orange")
+        XCTAssertEqual(empty?.pingMs, 20)
+        XCTAssertEqual(SpeedtestAccountHistory.widgetSnapshot(for: latest, replacing: widget(50, at: t0.addingTimeInterval(-86_400)))?.downloadMbps,
+                       249, "Widget plus ancien : remplacé")
+        XCTAssertNil(SpeedtestAccountHistory.widgetSnapshot(for: latest, replacing: widget(249, at: t0.addingTimeInterval(-45))),
+                     "Le même test, envoyé de ce téléphone : le local reste")
+        XCTAssertNil(SpeedtestAccountHistory.widgetSnapshot(for: latest, replacing: widget(80, at: t0.addingTimeInterval(3_600))),
+                     "Widget plus récent : gardé")
+    }
+
     func testAverageIsPreferredOverAPeakDownloadSpeed() {
         let test = account("x", average: 50, at: t0)
         XCTAssertEqual(test.downloadAverageMbps, 50, "downloadSpeed may carry the peak for non-iOS sources")

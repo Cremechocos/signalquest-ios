@@ -834,7 +834,8 @@ struct SignalQuestHomeView: View {
         }
         let account = accountLatest.flatMap { test -> DisplayedMeasurement? in
             guard let download = test.downloadAverageMbps else { return nil }
-            return DisplayedMeasurement(date: test.timestamp, downloadMbps: download, latencyMs: test.ping,
+            // Heure de mesure (MEASURED-AT-1), comme le widget et la liste du compte.
+            return DisplayedMeasurement(date: test.displayedDate, downloadMbps: download, latencyMs: test.ping,
                                         technology: TechAccent.shortLabel(for: test.networkType),
                                         operatorName: SpeedtestAccountHistory.operatorLabel(display: test.operatorDisplay, raw: test.mobileOperator))
         }
@@ -1532,7 +1533,10 @@ struct SignalQuestHomeView: View {
         if !forceFresh, Date().timeIntervalSince(lastAccountRefreshAt) < 60 { return }
         lastAccountRefreshAt = Date()
         do {
-            if let latest = try await services.feed.myLatestSpeedtest() { accountLatest = latest }
+            if let latest = try await services.feed.myLatestSpeedtest() {
+                accountLatest = latest
+                SpeedtestAccountHistory.refreshWidget(with: latest)
+            }
             accountLatestFailed = false
         } catch {
             if !error.isCancellation { accountLatestFailed = true }
