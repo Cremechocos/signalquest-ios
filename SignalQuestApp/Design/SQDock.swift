@@ -142,7 +142,14 @@ private struct SQDockAutoMinimize: ViewModifier {
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(iOS 18.0, *) {
+        if #available(iOS 18.0, *), !SQDock.minimizesOnScroll {
+            // Barre native (iOS 26+) : elle se rétracte seule et ne lit pas `isDockMinimized`.
+            // Suivre le défilement pour basculer cet état republiait le routeur à chaque
+            // changement de sens, et toute l'interface qui l'observe se recalculait en plein
+            // défilement (IOS-062). Seule la sonde de présence reste : la barre native reste
+            // déployée sur un écran poussé.
+            content.background(rootPresence)
+        } else if #available(iOS 18.0, *) {
             content.onScrollPhaseChange { _, newPhase in
                 isUserDriven = newPhase == .interacting || newPhase == .tracking
                 if !isUserDriven { accumulated = 0 }
@@ -180,22 +187,24 @@ private struct SQDockAutoMinimize: ViewModifier {
                     setMinimized(false)
                 }
             }
-            // Écran poussé par-dessus la racine : il n'a pas de rétraction au
-            // scroll, le dock y reste donc déployé (dock custom comme tab bar
-            // native). Le signal : la racine quitte la fenêtre à la fin du push.
-            .background(
-                SQDockRootPresence { id, visible in
-                    router.setDockRoot(id, visible: visible)
-                    guard !visible else { return }
-                    accumulated = 0
-                    setMinimized(false)
-                }
-                .frame(width: 0, height: 0)
-                .accessibilityHidden(true)
-            )
+            .background(rootPresence)
         } else {
             content
         }
+    }
+
+    /// Écran poussé par-dessus la racine : il n'a pas de rétraction au
+    /// scroll, le dock y reste donc déployé (dock custom comme tab bar
+    /// native). Le signal : la racine quitte la fenêtre à la fin du push.
+    private var rootPresence: some View {
+        SQDockRootPresence { id, visible in
+            router.setDockRoot(id, visible: visible)
+            guard !visible else { return }
+            accumulated = 0
+            setMinimized(false)
+        }
+        .frame(width: 0, height: 0)
+        .accessibilityHidden(true)
     }
 
     private func setMinimized(_ value: Bool) {
@@ -279,6 +288,13 @@ extension SQDock {
         #else
         false
         #endif
+    }
+
+    /// Seul le dock custom suit le défilement pour se rétracter (`sqDockAutoMinimize`) :
+    /// la barre native d'iOS 26+ le fait d'elle-même (`tabBarMinimizeBehavior`).
+    static var minimizesOnScroll: Bool {
+        if #available(iOS 26.0, *), !usesLegacyDock { return false }
+        return true
     }
 }
 

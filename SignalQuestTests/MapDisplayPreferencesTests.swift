@@ -176,6 +176,19 @@ final class DockFloatingInsetTests: XCTestCase {
         XCTAssertEqual(SQDock.floatingContentInset(subtracting: 500), 0)
     }
 
+    /// IOS-062 : la barre native (iOS 26+) se rétracte seule. Suivre le défilement pour
+    /// basculer `isDockMinimized` republiait le routeur à chaque changement de sens et
+    /// faisait recalculer toute l'interface en plein défilement du fil.
+    func testOnlyTheCustomDockFollowsTheScroll() {
+        if SQDock.usesLegacyDock {
+            XCTAssertTrue(SQDock.minimizesOnScroll)
+        } else if #available(iOS 26.0, *) {
+            XCTAssertFalse(SQDock.minimizesOnScroll, "la barre native se rétracte d'elle-même")
+        } else {
+            XCTAssertTrue(SQDock.minimizesOnScroll)
+        }
+    }
+
     /// Avec le dock custom, le dégagement combiné doit rester substantiel :
     /// c'est lui qui empêche la légende de passer sous la capsule flottante.
     func testLegacyDockKeepsARealClearanceAfterSubtraction() throws {
