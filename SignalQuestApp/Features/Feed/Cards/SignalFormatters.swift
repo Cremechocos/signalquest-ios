@@ -426,7 +426,8 @@ struct CardHeader: View {
     nonisolated static func timeLabel(exact: Bool, now: Date = Date()) -> (Date) -> String {
         { date in
             exact && now.timeIntervalSince(date) >= 86_400
-                ? date.formatted(date: .omitted, time: .shortened)
+                // Même format que la liste Messages (« 09:00 » en français).
+                ? date.formatted(.dateTime.hour().minute())
                 : date.formatted(.sqRelative)
         }
     }

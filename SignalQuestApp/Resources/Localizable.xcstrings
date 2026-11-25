@@ -119498,6 +119498,35 @@
           }
         }
       }
+    },
+    "Cherche une ville ou un lieu pour voir ce qui s’y publie." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search for a city or a place to see what’s posted there."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cherche une ville ou un lieu pour voir ce qui s’y publie."
+          }
+        }
+      }
+    },
+    "SQFormal|Cherche une ville ou un lieu pour voir ce qui s’y publie." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cherchez une ville ou un lieu pour voir ce qui s’y publie."
+          }
+        }
+      },
+      "shouldTranslate" : false
     }
   },
   "version" : "1.0"

@@ -2948,6 +2948,13 @@ struct NearbyZonePicker: View {
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("feed.nearby.zone.result")
                 }
+                if query.trimmingCharacters(in: .whitespaces).count < 2 {
+                    // Feuille vide sans rien dire : une ligne d'aide (recette de l'audit, 25/11).
+                    Label("Cherche une ville ou un lieu pour voir ce qui s’y publie.", systemImage: "magnifyingglass")
+                        .font(SQType.callout)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .listRowSeparator(.hidden)
+                }
                 if searched, results.isEmpty, !query.trimmingCharacters(in: .whitespaces).isEmpty {
                     Text("Aucun lieu trouvé.")
                         .font(SQType.callout)

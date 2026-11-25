@@ -379,7 +379,7 @@ final class FeedContextTests: XCTestCase {
 
         let recent = now.addingTimeInterval(-3_600), dayOld = now.addingTimeInterval(-90_000)
         XCTAssertEqual(CardHeader.timeLabel(exact: true, now: now)(recent), recent.formatted(.sqRelative))
-        XCTAssertEqual(CardHeader.timeLabel(exact: true, now: now)(dayOld), dayOld.formatted(date: .omitted, time: .shortened))
+        XCTAssertEqual(CardHeader.timeLabel(exact: true, now: now)(dayOld), dayOld.formatted(.dateTime.hour().minute()))
         XCTAssertEqual(CardHeader.timeLabel(exact: false, now: now)(dayOld), dayOld.formatted(.sqRelative))
     }
 
