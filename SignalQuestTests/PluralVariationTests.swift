@@ -145,6 +145,8 @@ extension PluralVariationTests {
             ("\(0) site identifié", "\(2) site identifié", "0 site identifié", "2 sites identifiés", "0 sites identified", "2 sites identified"),
             ("\(1) visite", "\(4) visite", "1 visite", "4 visites", "1 visit", "4 visits"),
             ("+ \(1) autre session", "+ \(2) autre session", "+ 1 autre session", "+ 2 autres sessions", "+ 1 other session", "+ 2 other sessions"),
+            // Pastille des filtres du Classement : un seul filtre aujourd'hui, plusieurs avec la r1 de Backend.
+            ("\(1) filtre actif", "\(2) filtre actif", "1 filtre actif", "2 filtres actifs", "1 active filter", "2 active filters"),
         ]
         for (first, second, frFirst, frSecond, enFirst, enSecond) in cases {
             XCTAssertEqual(try served(first, "fr"), frFirst)
