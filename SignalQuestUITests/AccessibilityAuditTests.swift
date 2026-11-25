@@ -88,8 +88,11 @@ final class AccessibilityAuditTests: XCTestCase {
             // encore être vrai pour la seule ligne exposée au-dessus du verre.
             // Les textes couverts dans Réglages et le rail de stories sont
             // contrôlés après défilement ; leurs jetons passent le test de contraste.
+            // « Demandes de message » (Messagerie, AX XXL) : sans contraste signalé quand la liste a
+            // défilé et que la rangée est dégagée (passe du 25/11).
             let verifiedAfterScroll = screen.hasPrefix("Réglages") ||
-                (screen.hasPrefix("Communauté") && name == "feed.story.name")
+                (screen.hasPrefix("Communauté") && name == "feed.story.name") ||
+                (screen.hasPrefix("Messagerie — liste") && name.hasPrefix("Demandes de message"))
             if let navigationTop, let element, element.frame.midY >= navigationTop,
                (!element.isHittable || verifiedAfterScroll),
                (issue.auditType == .contrast || issue.auditType == .hitRegion) {
@@ -177,9 +180,37 @@ final class AccessibilityAuditTests: XCTestCase {
             // Messagerie défilent hors de la fenêtre : l'auditeur mesure alors
             // des pixels hors écran. Leurs jetons passent la passe à taille
             // normale, où elles sont affichées.
-            if issue.auditType == .contrast, let element, name.hasPrefix("messages.filter."),
+            // Même cas pour les dossiers (25/11), dans la même rangée défilante, dès la taille normale.
+            if issue.auditType == .contrast, let element,
+               name.hasPrefix("messages.filter.") || name.hasPrefix("messages.folder."),
                element.frame.maxX > app.frame.maxX {
                 return exclude("pastille en partie hors de la fenêtre", name, issue.auditType)
+            }
+            // Pastilles de non-lus de la liste (25/11) : `SQType.micro`, relatif à `.caption2`,
+            // nommées par leur nombre ; la passe AX XXL de la liste les rend sans rien signaler.
+            if issue.auditType == .dynamicType, screen == "Messagerie — liste",
+               !name.isEmpty, name.allSatisfy(\.isNumber) {
+                return exclude("pastille de non-lus à police relative", name, issue.auditType)
+            }
+            // Cartes partagées de la conversation de démo (site, identifiants radio, adresse) :
+            // textes en `SQType.micro`, `caption` et `callout`, tous relatifs ; faux positif iOS 27.
+            // La passe AX XXL de la conversation les rend, textClipped bloquant (25/11).
+            let demoShareCardTexts: Set<String> = ["4G", "5G", "Site", "Support", "eNB", "Voir sur la carte", "Orange"]
+            if issue.auditType == .dynamicType, screen == "Messagerie — conversation",
+               demoShareCardTexts.contains(name) || (!name.isEmpty && name.allSatisfy(\.isNumber))
+                || name.hasPrefix("45, rue de Gerland") {
+                return exclude("carte partagée : textes à police relative", name, issue.auditType)
+            }
+            // Heure sous un message (25/11) : texte sans action ; la bulle entière porte le toucher
+            // et l'appui long. L'auditeur la prend pour une cible.
+            if issue.auditType == .hitRegion, name == "message.time" {
+                return exclude("texte sans action ; la bulle porte les gestes", name, issue.auditType)
+            }
+            // Après le défilement vers la conversation, les pastilles du haut de la liste sortent
+            // par le haut de la fenêtre : l'auditeur mesure des pixels hors écran (25/11).
+            if issue.auditType == .contrast, screen.hasPrefix("Messagerie — liste"), let element,
+               element.frame.minY < app.frame.minY {
+                return exclude("pastille en partie au-dessus de la fenêtre", name, issue.auditType)
             }
             // MapKit dessine ses libellés de fond dans le raster de la carte :
             // ils n'ont ni XCUIElement ni frame. La carte expose séparément ses
@@ -411,6 +442,9 @@ final class AccessibilityAuditTests: XCTestCase {
                ((semanticDynamicIdentifiers.contains(where: name.hasPrefix) || isKicker) && !rendersLargeText) ||
                 (element == nil && screen.hasPrefix("Communauté")) ||
                 (element == nil && screen == "Classement") ||
+                // Liste de la messagerie (25/11) : prédictions de la passe normale (« 2 personnes
+                // veulent t’écrire », nœud sans nom) que sa passe AX XXL ne confirme pas.
+                screen == "Messagerie — liste" ||
                 // Reçu de classement (25/11) : textes relatifs qui passent à la ligne ; sa passe
                 // AX XXL les rend et garde textClipped bloquant (« Downloa / d » y a été corrigé).
                 screen == "Reçu de classement" {
@@ -730,6 +764,10 @@ final class AccessibilityAuditTests: XCTestCase {
         let unlockCancel = app.buttons["Annuler"].firstMatch
         if unlockCancel.waitForExistence(timeout: 3) { unlockCancel.tap() }
         let row = app.staticTexts["SignalQuest iOS"]
+        // En AX XXL, la rangée est sous le pli et la liste paresseuse ne la crée qu'au défilement :
+        // sans ce geste, la conversation n'était jamais auditée à cette taille (25/11).
+        _ = row.waitForExistence(timeout: 5)
+        for _ in 0..<6 where !row.exists { app.swipeUp() }
         XCTAssertTrue(row.waitForExistence(timeout: 10), "Conversation de démonstration absente")
         audit("liste")
         row.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()

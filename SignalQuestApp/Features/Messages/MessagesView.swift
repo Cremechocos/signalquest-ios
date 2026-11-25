@@ -1667,7 +1667,9 @@ struct MessagesView: View {
                     Text("\(summary.count) personnes veulent t’écrire")
                         .font(SQType.subhead)
                         .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(2)
+                        // Très grand texte : sans limite ; deux lignes y coupaient la phrase (25/11).
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                        .fixedSize(horizontal: false, vertical: dynamicTypeSize.isAccessibilitySize)
                 }
                 Spacer(minLength: SQSpace.sm)
                 Text(verbatim: "\(summary.count)")
