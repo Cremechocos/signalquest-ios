@@ -175,6 +175,25 @@ final class DesignTokenContrastTests: XCTestCase {
         }
     }
 
+    /// Pastilles teintées d'une génération ou d'un opérateur (réseau d'une rangée du
+    /// Classement, générations des blocs de fréquences, PCI de la feuille d'antenne) :
+    /// le texte y est à l'encre. La couleur elle-même n'y tenait pas 4,5:1 (4G du
+    /// Classement : 4,24:1 mesuré sur les pixels de l'audit du 25/11).
+    func testInkReadsOnGenerationAndOperatorTints() {
+        let generations = ["5G", "4G", "3G", "2G"]
+        let tints: [(String, Color)] = generations.map { ($0, SQBrand.techColor($0)) }
+            + generations.map { ("\($0) graphique", SQNetworkColors.generationChartColor($0)) }
+            + SQBrand.operators.sorted { $0.key < $1.key }.map { ($0.key, $0.value.solid) }
+        for (name, tint) in tints {
+            for style in [UIUserInterfaceStyle.light, .dark] {
+                let mode = style == .light ? "clair" : "sombre"
+                let pastille = composite(UIColor(tint).withAlphaComponent(0.14), over: UIColor(SQColor.surface), style)
+                let r = ratio(UIColor(SQColor.label), on: pastille, style)
+                XCTAssertGreaterThanOrEqual(r, 4.5, "encre sur \(name) en \(mode) : \(String(format: "%.2f", r)):1")
+            }
+        }
+    }
+
     /// Les deux autres pastilles n'ont pas besoin d'encre dédiée — ce test le
     /// vérifie, pour qu'on ne l'oublie pas si leurs valeurs changent.
     func testSuccessAndWarningNeedNoDedicatedInk() {

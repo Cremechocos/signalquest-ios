@@ -121,16 +121,44 @@ final class AccessibilityAuditTests: XCTestCase {
             if issue.auditType == .dynamicType, screen.hasPrefix("Carte"), name.hasPrefix("Pays déduit") {
                 return exclude("plafond xxxLarge voulu des contrôles de la carte", name, issue.auditType)
             }
+            // Reçu de classement (25/11) : arbre relu, chaque texte y a son élément (« 1,046, Gb/s
+            // moyen », « 7 jours · Download : de 12e à 2e »…) ; le nœud sans élément est un
+            // pictogramme décoratif (coche, flèche) dont le sens est lu par la rangée.
+            if screen.hasPrefix("Reçu de classement"), name == "sans nom", element == nil,
+               issue.auditType == .elementDetection {
+                return exclude("pictogramme décoratif ; rang et valeur lus par leur rangée", name, issue.auditType)
+            }
+            // En très grand texte, la feuille aux deux tiers coupe sa dernière rangée au bas de la
+            // fenêtre : l'auditeur mesure des pixels hors écran ; elle est entière après défilement.
+            if screen.hasPrefix("Reçu de classement"), issue.auditType == .contrast, let element,
+               element.frame.maxY > app.frame.maxY {
+                return exclude("rangée en partie sous le bas de la fenêtre", name, issue.auditType)
+            }
+            // Reçu en AX XXL : prédictions pour une taille plus grande, infirmées par les captures
+            // du 25/11 en AX XXL et en AX5 (en-tête sur deux et trois lignes, détails empilés).
+            let receiptWholeAtLargestSize = ["Test enregistré", "Chiffre classé", "Gb/s moyen"].contains(name)
+                || name.hasPrefix("Compté dans le classement") || name.hasPrefix("Moyenne ·")
+            if screen == "Reçu de classement — texte accessibilité", issue.auditType == .textClipped,
+               receiptWholeAtLargestSize {
+                return exclude("rendu entier en AX XXL et AX5 (captures du 25/11)", name, issue.auditType)
+            }
+            // Lien « Récompenses » de « Ma progression » (Classement) : `SQType.subhead`, relatif à
+            // `.subheadline`, une ligne entière ; plus grand sur la capture en AX XXL (25/11).
+            if issue.auditType == .dynamicType, screen.hasPrefix("Classement"), name == "Récompenses" {
+                return exclude("police relative, plus grande en AX XXL (capture du 25/11)", name, issue.auditType)
+            }
             // Légende « Tes tests faits sur un autre appareil… » (Tester) : 6,23:1 mesuré sur les
             // pixels (labelSecondary sur bg), au-dessus de la cible de 6:1 sous 13 pt ; l'alerte
             // demeurait même à 8,97:1 en ink2.
             if issue.auditType == .contrast, screen.hasPrefix("Tester"), name.hasPrefix("Tes tests faits") {
                 return exclude("6,23:1 mesuré sur les pixels", name, issue.auditType)
             }
-            // Sélecteur Débit | Expérience : une ligne qui rétrécit jusqu'à 70 % sans être coupée.
-            if issue.auditType == .textClipped, screen.hasPrefix("Tester"),
+            // Sélecteur Débit | Expérience : une ligne qui rétrécit jusqu'à 70 % à taille normale.
+            // En très grand texte, « Expérien… » restait tronqué : les modes s'y empilent depuis
+            // le 25/11, et la passe AX XXL garde textClipped bloquant.
+            if issue.auditType == .textClipped, screen.hasPrefix("Tester"), !screen.hasSuffix("texte accessibilité"),
                name == "Débit" || name == "Expérience" {
-                return exclude("libellé réduit jusqu'à 70 %, jamais coupé", name, issue.auditType)
+                return exclude("libellé réduit jusqu'à 70 % à taille normale", name, issue.auditType)
             }
             // Module Pannes de l'Accueil : il passe à la ligne en très grand texte, rien n'est coupé.
             if issue.auditType == .textClipped, name == "home.module.outages" {
@@ -217,7 +245,10 @@ final class AccessibilityAuditTests: XCTestCase {
                 // `.caption2`, textes en `SQType`), salutation de l'Accueil (date et
                 // titre relatifs) et textes de la pastille des calques de la Carte
                 // (`.footnote` / `.caption2`). La passe AX XXL rend les deux écrans.
-                "home.module.", "home.greeting", "map.layers.", "map.friends."
+                "home.module.", "home.greeting", "map.layers.", "map.friends.",
+                // Classement (25/11) : puces de période `SQChip` (`SQType.chip`, relatif
+                // à `.footnote`), plus grandes sur la capture en AX XXL.
+                "leaderboards.period."
             ]
             // Surtitres en capitales (`sqKicker`, relatif à `.caption2`) : seul style
             // de l'app en capitales trackées, ils n'ont pas d'identifiant propre et
@@ -307,8 +338,11 @@ final class AccessibilityAuditTests: XCTestCase {
             // Leurs textes sont à l'encre ou au gris secondaire, couples verrouillés
             // par DesignTokenContrastTests ; traits de bande par
             // `testANFRBandColorsMeetGraphicThreshold`.
+            // Classement (25/11), ouvert depuis le Profil : même nœud en AX XXL, sous le
+            // verre du dock ; ses textes sont nommés et la pastille 4G passe à l'encre.
             if element == nil, name == "sans nom", issue.auditType == .contrast,
                screen.hasPrefix("Communauté") || screen.hasPrefix("Profil") || screen.hasPrefix("Accueil")
+                || screen.hasPrefix("Classement")
                 || screen == "Réglages" || screen == "Notifications"
                 || screen.hasPrefix("Messagerie") || screen.hasPrefix("Drive Test")
                 || screen.hasPrefix("ANFR — générations et bandes") {
@@ -371,9 +405,15 @@ final class AccessibilityAuditTests: XCTestCase {
             // passe AX XXL, où `.textClipped` reste bloquant : l'exclusion
             // valait aussi dans cette passe, qui ne gardait donc rien (Lot 4c).
             let rendersLargeText = screen.hasSuffix("texte accessibilité")
+            // Classement (25/11) : la prédiction sans nœud de la passe normale ; la passe
+            // AX XXL du même écran garde textClipped bloquant et n'y trouve rien de coupé.
             if issue.auditType == .textClipped,
                ((semanticDynamicIdentifiers.contains(where: name.hasPrefix) || isKicker) && !rendersLargeText) ||
-                (element == nil && screen.hasPrefix("Communauté")) {
+                (element == nil && screen.hasPrefix("Communauté")) ||
+                (element == nil && screen == "Classement") ||
+                // Reçu de classement (25/11) : textes relatifs qui passent à la ligne ; sa passe
+                // AX XXL les rend et garde textClipped bloquant (« Downloa / d » y a été corrigé).
+                screen == "Reçu de classement" {
                 return exclude("composant revu à AX XXL avec textClipped bloquant", name, issue.auditType)
             }
             issues.append("[\(Self.name(for: issue.auditType))] « \(name) » \(frame) · \(detail)")
@@ -585,6 +625,75 @@ final class AccessibilityAuditTests: XCTestCase {
         openANFRBands(in: app)
         audit(app, screen: "ANFR — générations et bandes — texte accessibilité", blocking: true,
               types: Self.renderedLargeTextTypes)
+    }
+
+    /// Classement refondu pour la 191 (74ef7be2) : segmenté, puces de période,
+    /// « Ma progression », podium et rangées, ouverts depuis le Profil.
+    func testAuditLeaderboards() throws {
+        guard #available(iOS 17.0, *) else { throw XCTSkip("Auditeur Apple indisponible avant iOS 17") }
+        let app = launch(["--mock-auth", "--reset-map"])
+        openLeaderboards(in: app)
+        audit(app, screen: "Classement", blocking: true)
+    }
+
+    func testAuditLeaderboardsAtAccessibilityTextSize() throws {
+        guard #available(iOS 17.0, *) else { throw XCTSkip("Auditeur Apple indisponible avant iOS 17") }
+        let app = launch([
+            "--mock-auth", "--reset-map",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXL"
+        ])
+        openLeaderboards(in: app)
+        audit(app, screen: "Classement — texte accessibilité", blocking: true,
+              types: Self.renderedLargeTextTypes)
+    }
+
+    /// Reçu de classement après un test (ad6c967f), en feuille aux deux tiers : iOS 26 la
+    /// réduit à 96 %, et ses boutons de 44 pt mesuraient 40 et 42 pt à l'écran (25/11).
+    func testAuditLeaderboardReceipt() throws {
+        guard #available(iOS 17.0, *) else { throw XCTSkip("Auditeur Apple indisponible avant iOS 17") }
+        let app = launch(["--mock-auth", "--qa-leaderboard-receipt"])
+        let speedTab = SignalQuestUITestSupport.tab(named: "Tester", in: app)
+        XCTAssertTrue(speedTab.waitForExistence(timeout: 25), "Onglet Tester absent")
+        speedTab.tap()
+        let showPlace = app.buttons["speedtest.receipt.showPlace"].firstMatch
+        let close = app.buttons["speedtest.receipt.close"].firstMatch
+        XCTAssertTrue(showPlace.waitForExistence(timeout: 15), "Reçu de classement absent")
+        // La feuille finit de monter avant la mesure.
+        _ = close.waitForExistence(timeout: 5)
+        Thread.sleep(forTimeInterval: 1)
+        for (name, button) in [("Voir ma place", showPlace), ("Fermer", close)] {
+            XCTAssertGreaterThanOrEqual(button.frame.height, 44, "\(name) : \(button.frame.height) pt à l'écran")
+        }
+        audit(app, screen: "Reçu de classement", blocking: true)
+    }
+
+    func testAuditLeaderboardReceiptAtAccessibilityTextSize() throws {
+        guard #available(iOS 17.0, *) else { throw XCTSkip("Auditeur Apple indisponible avant iOS 17") }
+        let app = launch([
+            "--mock-auth", "--qa-leaderboard-receipt",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXL"
+        ])
+        let speedTab = SignalQuestUITestSupport.tab(named: "Tester", in: app)
+        XCTAssertTrue(speedTab.waitForExistence(timeout: 25), "Onglet Tester absent")
+        speedTab.tap()
+        XCTAssertTrue(app.buttons["speedtest.receipt.close"].firstMatch.waitForExistence(timeout: 15),
+                      "Reçu de classement absent")
+        Thread.sleep(forTimeInterval: 1)
+        audit(app, screen: "Reçu de classement — texte accessibilité", blocking: true,
+              types: Self.renderedLargeTextTypes)
+    }
+
+    private func openLeaderboards(in app: XCUIApplication) {
+        let profile = SignalQuestUITestSupport.tab(named: "Profil", in: app)
+        XCTAssertTrue(profile.waitForExistence(timeout: 25), "Onglet Profil absent")
+        profile.tap()
+        let tile = app.buttons["profile.progression.tile.Classements"].firstMatch
+        XCTAssertTrue(tile.waitForExistence(timeout: 15), "Tuile Classements absente")
+        _ = SignalQuestUITestSupport.scrollToHittable(tile, in: app)
+        tile.tap()
+        XCTAssertTrue(app.buttons["leaderboards.filters"].waitForExistence(timeout: 15), "Classement non ouvert")
+        // L'écran précédent part à la fin de la transition : l'audit mesure l'écran seul.
+        XCTAssertTrue(tile.waitForNonExistence(timeout: 10), "Transition vers le Classement inachevée")
     }
 
     private func openANFRBands(in app: XCUIApplication) {

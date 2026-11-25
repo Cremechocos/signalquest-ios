@@ -723,7 +723,9 @@ struct SignalQuestHomeView: View {
                         services.location.requestWhenInUse()
                     }
                 }
-                .fixedSize()
+                // Très grand texte : le libellé passe à la ligne. Gardé sur une ligne, il était
+                // plus large que l'écran et décalait tout l'Accueil hors du cadre.
+                .fixedSize(horizontal: !dynamicTypeSize.isAccessibilitySize, vertical: true)
                 .accessibilityIdentifier("home.location.enable")
             }
         }

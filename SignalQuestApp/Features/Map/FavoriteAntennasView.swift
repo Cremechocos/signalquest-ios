@@ -11,6 +11,7 @@ struct FavoriteAntennasView: View {
     @EnvironmentObject private var networkPath: NetworkPathMonitor
     @EnvironmentObject private var router: AppRouter
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject var favorites: FavoriteAntennasService
     /// Registre des marchés, pour écrire « Orange » et « France » au lieu de « ORANGE » et « FR ».
     @State private var registry: MarketRegistryPayload?
@@ -154,7 +155,8 @@ struct FavoriteAntennasView: View {
             GradientButton("Ouvrir la carte", systemImage: "map", style: .secondary) {
                 router.selectedTab = .map
             }
-            .fixedSize()
+            // Plus grande taille de texte : passe à la ligne plutôt que de sortir de l'écran.
+            .fixedSize(horizontal: !dynamicTypeSize.isAccessibilitySize, vertical: true)
         }
         .padding(.vertical, SQSpace.lg)
     }

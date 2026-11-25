@@ -46,6 +46,7 @@ struct ConversationDetailView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var messages: [MessageItem] = []
     /// Vrai dès que le premier chargement a répondu (succès ou échec) : tant qu'il
@@ -522,7 +523,8 @@ struct ConversationDetailView: View {
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                     GradientButton("Déverrouiller", systemImage: "lock.open") { showUnlockSheet = true }
-                        .fixedSize()
+                        // Plus grande taille de texte : passe à la ligne plutôt que de sortir de l'écran.
+                        .fixedSize(horizontal: !dynamicTypeSize.isAccessibilitySize, vertical: true)
                         .accessibilityIdentifier("conversation.unlock")
                 }
                 .frame(maxWidth: .infinity)
@@ -4367,7 +4369,7 @@ struct ConversationDetailView: View {
                 GradientButton("Déverrouiller", systemImage: BiometricAuth.kind.systemImage, isBusy: isAuthenticating) {
                     Task { await unlockProtection() }
                 }
-                .fixedSize()
+                .fixedSize(horizontal: !dynamicTypeSize.isAccessibilitySize, vertical: true)
                 .accessibilityIdentifier("conversation.veil.unlock")
             }
         }

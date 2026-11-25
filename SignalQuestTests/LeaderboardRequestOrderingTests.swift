@@ -123,6 +123,29 @@ final class LeaderboardRequestOrderingTests: XCTestCase {
         }
     }
 
+    /// « Voir ma place » d'un reçu d'upload ouvre le Classement sur l'upload, pas sur le download
+    /// (limite notée à la livraison d'ad6c967f).
+    func testLeaderboardOpensOnTheReceiptMetric() {
+        let model = LeaderboardsViewModel(service: OrderedLeaderboardService(), category: "upload")
+        XCTAssertEqual(model.metric, .upload)
+        XCTAssertEqual(LeaderboardsViewModel(service: OrderedLeaderboardService()).metric, .download)
+    }
+
+    /// La pastille du bouton Filtres compte ce qui agit sur la mesure affichée : sur Points,
+    /// opérateur et réseau n'ont ni effet ni puce (recette du lot c656bab8, 25/11).
+    func testFilterBadgeCountsOnlyWhatAppliesToTheShownMetric() {
+        let model = LeaderboardsViewModel(service: OrderedLeaderboardService())
+        model.operatorKey = "ORANGE"
+        model.tech = "5G"
+        model.scope = "department"
+        XCTAssertEqual(model.appliedFilterCount, 3)
+        model.tab = .points
+        XCTAssertEqual(model.appliedFilterCount, 1, "sur Points, seul « Mon dép. » s'applique")
+        XCTAssertEqual(model.sheetFilterCount, 3, "les filtres de débit restent posés pour Download et Upload")
+        model.scope = "global"
+        XCTAssertEqual(model.appliedFilterCount, 0)
+    }
+
     /// Contrat classements v1 : opérateur et réseau ne partent que pour les débits, et la
     /// pastille compte les trois filtres de la feuille ; « Réinitialiser » les retire en une
     /// seule relecture.

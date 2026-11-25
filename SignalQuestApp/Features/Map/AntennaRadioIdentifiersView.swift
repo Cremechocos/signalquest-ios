@@ -318,10 +318,12 @@ struct FlowChips: View {
     var body: some View {
         FlowLayout(spacing: 5) {
             ForEach(items, id: \.self) { item in
+                // Encre sur la teinte : le cyan Bouygues ou l'orange sur leur propre
+                // teinte restaient sous 4,5:1 (audit du 25/11).
                 Text(item)
                     .font(SQFont.body(12, .semibold))
                     .monospacedDigit()
-                    .foregroundStyle(tint)
+                    .foregroundStyle(SQColor.label)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
                     .background(tint.opacity(0.13), in: Capsule(style: .continuous))

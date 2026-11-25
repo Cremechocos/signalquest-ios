@@ -94,9 +94,11 @@ final class LeaderboardsViewModel: ObservableObject {
     private let service: LeaderboardServicing
     private let gamification: GamificationServicing?
 
-    init(service: LeaderboardServicing, gamification: GamificationServicing? = nil) {
+    /// `category` : la mesure d'arrivée (« upload » depuis un reçu d'upload).
+    init(service: LeaderboardServicing, gamification: GamificationServicing? = nil, category: String = "download") {
         self.service = service
         self.gamification = gamification
+        self.category = category
     }
 
     var isLoadingCurrent: Bool { tab == .speed ? isLoadingSpeed : isLoadingPoints }
@@ -238,6 +240,12 @@ final class LeaderboardsViewModel: ObservableObject {
         (scope == "global" ? 0 : 1) + (operatorKey == nil ? 0 : 1) + (tech == nil ? 0 : 1)
     }
 
+    /// Pastille du bouton Filtres : ce qui agit sur la mesure affichée. Sur Points, opérateur et
+    /// réseau ne s'appliquent pas et n'ont pas de puce ; la pastille disait « 3 » pour une puce.
+    var appliedFilterCount: Int {
+        metric == .points ? (scope == "global" ? 0 : 1) : sheetFilterCount
+    }
+
     /// « Réinitialiser » de la feuille : seulement ce que la feuille règle, en une relecture.
     func resetSheetFilters() {
         guard sheetFilterCount > 0 else { return }
@@ -270,6 +278,9 @@ struct LeaderboardsView: View {
     /// Écrit seulement quand la carte entre ou sort de la pile paresseuse, jamais à
     /// chaque image du défilement (règle de fluidité d'IOS-062).
     @State private var myPlaceOffscreen = false
+    /// Place gardée sous la liste pour la barre « Ma place » : elle grandit avec le texte,
+    /// sinon la dernière rangée restait sous la barre en très grand texte.
+    @ScaledMetric(relativeTo: .body) private var myPlaceReserve: CGFloat = 64
     private let gamification: GamificationServicing?
     private let currentUser: AuthUser?
 
@@ -278,9 +289,10 @@ struct LeaderboardsView: View {
     init(
         service: LeaderboardServicing,
         gamification: GamificationServicing? = nil,
-        user: AuthUser? = nil
+        user: AuthUser? = nil,
+        category: String = "download"
     ) {
-        _model = StateObject(wrappedValue: LeaderboardsViewModel(service: service, gamification: gamification))
+        _model = StateObject(wrappedValue: LeaderboardsViewModel(service: service, gamification: gamification, category: category))
         self.gamification = gamification
         self.currentUser = user
     }
@@ -303,7 +315,7 @@ struct LeaderboardsView: View {
                 }
                 .padding(.horizontal, SQSpace.xl)
                 .padding(.top, SQSpace.sm)
-                .padding(.bottom, SQDock.floatingContentInset + (myPlace?.rank == nil ? 0 : 64))
+                .padding(.bottom, SQDock.floatingContentInset + (myPlace?.rank == nil ? 0 : myPlaceReserve))
                 .sqReadableWidth()
             }
             .overlay(alignment: .bottom) {
@@ -364,8 +376,8 @@ struct LeaderboardsView: View {
                 showsFilters = true
             }
             .overlay(alignment: .topTrailing) {
-                if model.sheetFilterCount > 0 {
-                    Text("\(model.sheetFilterCount)")
+                if model.appliedFilterCount > 0 {
+                    Text("\(model.appliedFilterCount)")
                         .font(SQType.micro)
                         .monospacedDigit()
                         .foregroundStyle(SQColor.onAccent)
@@ -376,7 +388,7 @@ struct LeaderboardsView: View {
                         .accessibilityHidden(true)
                 }
             }
-            .accessibilityValue(model.sheetFilterCount > 0 ? Text("\(model.sheetFilterCount) filtre actif") : Text(verbatim: ""))
+            .accessibilityValue(model.appliedFilterCount > 0 ? Text("\(model.appliedFilterCount) filtre actif") : Text(verbatim: ""))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -425,7 +437,9 @@ struct LeaderboardsView: View {
     private var activeFilterChip: some View {
         let chips = activeChips
         if !chips.isEmpty {
-            HStack(spacing: SQSpace.xs2) {
+            // Passe à la ligne : en très grand texte ou avec un long nom de département, la
+            // dernière puce sortait de l'écran et ne pouvait plus être retirée.
+            FlowLayout(spacing: SQSpace.xs2) {
                 ForEach(chips, id: \.id) { chip in
                     SQChip(label: chip.label, systemImage: "xmark", restFill: SQColor.chip,
                            spokenLabel: LocalizedStringKey(String(localized: "Retirer le filtre \(chip.label)"))) {
@@ -850,19 +864,42 @@ private struct LeaderboardHeroCard: View {
         }
     }
 
+    /// Le score garde sa taille : « pts » passe dessous s'il ne tient pas à côté, et la
+    /// réduction ne sert qu'en dernier recours. Réduit d'office (`minimumScaleFactor`), il
+    /// tombait à 50 % en très grand texte et paraissait plus petit que « pts » (25/11).
     private var pointsLine: some View {
-        HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs) {
-            Text("\(shownPoints)")
-                .font(SQFont.display(28, .bold))
-                .monospacedDigit()
-                .contentTransition(.numericText())
-                .foregroundStyle(SQColor.label)
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
-            Text("pts")
-                .font(SQType.caption(.semibold))
-                .foregroundStyle(SQColor.labelSecondary)
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs) {
+                scoreText.fixedSize()
+                unitText
+            }
+            VStack(alignment: .leading, spacing: 0) {
+                scoreText.fixedSize()
+                unitText
+            }
+            HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs) {
+                scoreText
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .layoutPriority(1)
+                unitText
+            }
         }
+    }
+
+    private var scoreText: some View {
+        Text("\(shownPoints)")
+            .font(SQFont.display(28, .bold))
+            .monospacedDigit()
+            .contentTransition(.numericText())
+            .foregroundStyle(SQColor.label)
+    }
+
+    private var unitText: some View {
+        Text("pts")
+            .font(SQType.caption(.semibold))
+            .foregroundStyle(SQColor.labelSecondary)
+            .fixedSize()
     }
 
     private var avatarWithRing: some View {
@@ -991,44 +1028,89 @@ private struct MyPlaceBar: View {
             Haptics.light()
             onTap()
         } label: {
-            HStack(spacing: SQSpace.sm) {
-                Text("Ma place").font(SQType.caption(.semibold)).opacity(0.75)
-                Text(LeaderboardsView.ordinal(place.rank))
-                    .font(SQType.heading)
-                    .monospacedDigit()
-                if let total = place.total, !dynamicTypeSize.isAccessibilitySize {
-                    Text("sur \(total.formatted())").font(SQType.caption).opacity(0.75)
-                }
-                if let gained = place.gained {
-                    HStack(spacing: 2) {
-                        Image(systemName: "arrow.up").font(SQType.caption(.bold)).accessibilityHidden(true)
-                        Text(verbatim: gained.formatted()).font(SQType.caption(.bold)).monospacedDigit()
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    // Très grand texte : deux lignes, chaque texte entier sur la sienne ; sur une
+                    // seule, « Ma place » et « Mb/s » se coupaient au milieu du mot.
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: SQSpace.sm) {
+                            caption
+                            Spacer(minLength: SQSpace.sm)
+                            chevron
+                        }
+                        HStack(spacing: SQSpace.sm) {
+                            rank
+                            gainedBadge
+                            Spacer(minLength: SQSpace.sm)
+                            valueText
+                        }
                     }
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(Text("\(gained) places gagnées depuis hier"))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .padding(.vertical, SQSpace.sm)
+                } else {
+                    HStack(spacing: SQSpace.sm) {
+                        caption
+                        rank
+                        if let total = place.total {
+                            Text("sur \(total.formatted())").font(SQType.caption).opacity(0.75)
+                        }
+                        gainedBadge
+                        Spacer(minLength: SQSpace.sm)
+                        valueText
+                        chevron
+                    }
+                    .sqSingleLine()
                 }
-                Spacer(minLength: SQSpace.sm)
-                if let value = place.value {
-                    Text(verbatim: "\(value.number)\u{00A0}\(value.unit)")
-                        .font(SQType.subhead(.bold))
-                        .monospacedDigit()
-                }
-                Image(systemName: "chevron.up")
-                    .font(SQType.caption(.bold))
-                    .accessibilityHidden(true)
             }
-            .sqSingleLine()
             .foregroundStyle(SQColor.onInk)
             .padding(.horizontal, SQSpace.lg)
             .frame(minHeight: 52)
-            .background(SQColor.label, in: Capsule(style: .continuous))
+            .background(SQColor.label, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
             .sqShadowDock()
-            .contentShape(Capsule())
+            .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         }
         .buttonStyle(SQPressButtonStyle(scale: 0.98))
         .accessibilityElement(children: .combine)
         .accessibilityHint("Remonte à ma place")
         .accessibilityIdentifier("leaderboards.myPlace.bar")
+    }
+
+    private var caption: some View {
+        Text("Ma place").font(SQType.caption(.semibold)).opacity(0.75)
+    }
+
+    private var rank: some View {
+        Text(LeaderboardsView.ordinal(place.rank))
+            .font(SQType.heading)
+            .monospacedDigit()
+    }
+
+    @ViewBuilder
+    private var gainedBadge: some View {
+        if let gained = place.gained {
+            HStack(spacing: 2) {
+                Image(systemName: "arrow.up").font(SQType.caption(.bold)).accessibilityHidden(true)
+                Text(verbatim: gained.formatted()).font(SQType.caption(.bold)).monospacedDigit()
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text("\(gained) places gagnées depuis hier"))
+        }
+    }
+
+    @ViewBuilder
+    private var valueText: some View {
+        if let value = place.value {
+            Text(verbatim: "\(value.number)\u{00A0}\(value.unit)")
+                .font(SQType.subhead(.bold))
+                .monospacedDigit()
+        }
+    }
+
+    private var chevron: some View {
+        Image(systemName: "chevron.up")
+            .font(SQType.caption(.bold))
+            .accessibilityHidden(true)
     }
 }
 
@@ -1137,10 +1219,8 @@ private struct FlowLayoutChips: View {
     ]
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: SQSpace.xs2) { chips }
-            VStack(alignment: .leading, spacing: SQSpace.xs2) { chips }
-        }
+        // Passe à la ligne au lieu d'empiler une puce par ligne quand les cinq ne tiennent pas.
+        FlowLayout(spacing: SQSpace.xs2) { chips }
     }
 
     private var chips: some View {
@@ -1340,9 +1420,11 @@ private struct SpeedRowMeta: View {
                 .fixedSize()
             }
             if showsTech, let tech, !tech.isEmpty {
+                // Encre sur la teinte de la génération (comme `TechBadge`) : le bleu 4G
+                // sur sa propre teinte mesurait 4,24:1 en clair (audit du 25/11), moins en sombre.
                 Text(verbatim: tech)
                     .font(SQType.caption(.semibold).monospaced())
-                    .foregroundStyle(SQBrand.techColor(tech))
+                    .foregroundStyle(SQColor.label)
                     .padding(.horizontal, 6)
                     .background(SQBrand.techColor(tech).opacity(0.14), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                     .fixedSize()
@@ -1473,8 +1555,12 @@ private struct LeaderboardRowView<Meta: View>: View {
     }
 
     private var nameAndMeta: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: SQSpace.xs2) {
+        // Très grand texte : « Moi » passe sous le nom, qui gardait sinon « Alexand… ».
+        let nameLayout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 3))
+            : AnyLayout(HStackLayout(spacing: SQSpace.xs2))
+        return VStack(alignment: .leading, spacing: 3) {
+            nameLayout {
                 Text(name)
                     .font(SQType.body(.bold))
                     .foregroundStyle(SQColor.label)
@@ -1662,6 +1748,7 @@ struct LeaderboardReceiptSheet: View {
     /// Ouvre le classement ; `nil` quand l'écran ne peut pas le montrer.
     var onShowLeaderboard: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         ScrollView {
@@ -1686,6 +1773,9 @@ struct LeaderboardReceiptSheet: View {
                     GradientButton("Fermer", style: .secondary) { dismiss() }
                         .accessibilityIdentifier("speedtest.receipt.close")
                 }
+                // Feuille à mi-hauteur : iOS 26 la réduit à 96 %, et les boutons de 44 pt
+                // mesuraient 40 à 42 pt à l'écran (IOS-073) ; 52 pt en tiennent 50.
+                .controlSize(.large)
             }
             .padding(.horizontal, SQSpace.lg)
             .padding(.top, SQSpace.xl)
@@ -1747,34 +1837,75 @@ struct LeaderboardReceiptSheet: View {
         }
     }
 
+    @ViewBuilder
     private func rankMove(before: Int?, after: Int, category: LeaderboardMetric) -> some View {
         let label = String(localized: "7 jours · \(String(localized: String.LocalizationValue(category.title)))")
-        return HStack(spacing: SQSpace.md) {
-            if let before, before != after {
-                Text(LeaderboardsView.ordinal(before))
+        // Très grand texte : la période passe sous les rangs, en pleine largeur ; entre eux,
+        // « Download » se coupait au milieu du mot (« Downloa / d »).
+        if dynamicTypeSize.isAccessibilitySize {
+            rankMoveStacked(before: before, after: after, label: label)
+        } else {
+            HStack(spacing: SQSpace.md) {
+                if let before, before != after {
+                    Text(LeaderboardsView.ordinal(before))
+                        .font(SQFont.display(26, .bold))
+                        .monospacedDigit()
+                        .strikethrough()
+                        .foregroundStyle(SQColor.labelSecondary)
+                    VStack(spacing: 2) {
+                        Image(systemName: "arrow.right").font(SQType.callout(.bold)).foregroundStyle(SQColor.label)
+                        Text(label).font(SQType.caption).foregroundStyle(SQColor.ink2).multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                } else {
+                    Text(before == nil ? String(localized: "Entrée au classement") : String(localized: "Rang inchangé"))
+                        .font(SQType.subhead(.semibold))
+                        .foregroundStyle(SQColor.ink2)
+                    Text(label).font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
+                    Spacer(minLength: SQSpace.sm)
+                }
+                Text(LeaderboardsView.ordinal(after))
                     .font(SQFont.display(26, .bold))
                     .monospacedDigit()
-                    .strikethrough()
-                    .foregroundStyle(SQColor.labelSecondary)
-                VStack(spacing: 2) {
+                    .foregroundStyle(SQColor.label)
+            }
+            .padding(SQSpace.md)
+            .frame(maxWidth: .infinity)
+            .background(SQColor.chip, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(rankMoveSpoken(before: before, after: after, label: label))
+        }
+    }
+
+    private func rankMoveStacked(before: Int?, after: Int, label: String) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs) {
+            HStack(spacing: SQSpace.sm) {
+                if let before, before != after {
+                    Text(LeaderboardsView.ordinal(before))
+                        .font(SQFont.display(26, .bold))
+                        .monospacedDigit()
+                        .strikethrough()
+                        .foregroundStyle(SQColor.labelSecondary)
                     Image(systemName: "arrow.right").font(SQType.callout(.bold)).foregroundStyle(SQColor.label)
-                    Text(label).font(SQType.caption).foregroundStyle(SQColor.ink2).multilineTextAlignment(.center)
                 }
-                .frame(maxWidth: .infinity)
-            } else {
+                Text(LeaderboardsView.ordinal(after))
+                    .font(SQFont.display(26, .bold))
+                    .monospacedDigit()
+                    .foregroundStyle(SQColor.label)
+            }
+            if before == nil || before == after {
                 Text(before == nil ? String(localized: "Entrée au classement") : String(localized: "Rang inchangé"))
                     .font(SQType.subhead(.semibold))
                     .foregroundStyle(SQColor.ink2)
-                Text(label).font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
-                Spacer(minLength: SQSpace.sm)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            Text(LeaderboardsView.ordinal(after))
-                .font(SQFont.display(26, .bold))
-                .monospacedDigit()
-                .foregroundStyle(SQColor.label)
+            Text(label)
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.ink2)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(SQSpace.md)
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(SQColor.chip, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(rankMoveSpoken(before: before, after: after, label: label))
@@ -1788,11 +1919,17 @@ struct LeaderboardReceiptSheet: View {
     }
 
     private func row(_ label: LocalizedStringKey, _ value: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
+        // Très grand texte : la valeur passe sous son libellé ; côte à côte, « Gb/s » se coupait.
+        let stacked = dynamicTypeSize.isAccessibilitySize
+        let layout = stacked
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: SQSpace.sm))
+        return layout {
             Text(label).font(SQType.subhead).foregroundStyle(SQColor.ink2)
-            Spacer(minLength: SQSpace.sm)
+            if !stacked { Spacer(minLength: SQSpace.sm) }
             Text(verbatim: value).font(SQType.subhead(.bold)).monospacedDigit().foregroundStyle(SQColor.label)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
     }
 

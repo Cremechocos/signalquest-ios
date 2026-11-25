@@ -89,6 +89,8 @@ struct SpeedtestView: View {
     /// Reçu de classement joint à l'accusé de réception du test qui vient de finir.
     @State private var leaderboardReceipt: PresentedLeaderboardReceipt?
     @State private var showLeaderboard = false
+    /// Mesure du reçu : « Voir ma place » ouvre le Classement sur l'upload quand le reçu le montre.
+    @State private var leaderboardCategory = "download"
     /// Débit habituel de l'opérateur autour du dernier test (carte verdict).
     @State private var typicalNearby: SpeedtestVerdictCard.Typical?
     /// Tracé de la phase de débit en cours, sous l'anneau.
@@ -183,13 +185,17 @@ struct SpeedtestView: View {
         }
         .navigationDestination(isPresented: $showServerPage) { serverPage }
         .navigationDestination(isPresented: $showLeaderboard) {
-            LeaderboardsView(service: services.leaderboards, gamification: services.gamification, user: user)
+            LeaderboardsView(service: services.leaderboards, gamification: services.gamification, user: user,
+                             category: leaderboardCategory)
         }
         .sheet(item: $leaderboardReceipt) { presented in
             LeaderboardReceiptSheet(
                 receipt: presented.receipt,
                 countedAt: presented.countedAt,
-                onShowLeaderboard: user == nil ? nil : { showLeaderboard = true }
+                onShowLeaderboard: user == nil ? nil : {
+                    leaderboardCategory = presented.receipt.shown?.category == .upload ? "upload" : "download"
+                    showLeaderboard = true
+                }
             )
         }
         // F4 : « Lance un Drive Test » (Siri/Raccourcis) → présente Drive Test
@@ -1983,15 +1989,21 @@ private struct SpeedtestModePicker: View {
     let speedtestRunning: Bool
     @Namespace private var thumb
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         if !speedtestRunning, !experience.running {
-            HStack(spacing: 0) {
+            // Très grand texte : les deux modes s'empilent, comme le sélecteur du Classement ;
+            // côte à côte, « Expérience » restait tronqué même réduit à 70 %.
+            let layout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(spacing: 0))
+                : AnyLayout(HStackLayout(spacing: 0))
+            layout {
                 segment(.throughput, title: "Débit", systemImage: "speedometer")
                 segment(.experience, title: "Expérience", systemImage: "play.rectangle.on.rectangle")
             }
             .padding(SQSpace.xs)
-            .background(SQColor.segTrack, in: Capsule(style: .continuous))
+            .background(SQColor.segTrack, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("speedtest.mode")
         }

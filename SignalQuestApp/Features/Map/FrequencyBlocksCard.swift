@@ -489,9 +489,11 @@ struct FrequencyGenerationTag: View {
     var body: some View {
         let color = SQNetworkColors.generationChartColor(generation)
         let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
+        // Encre sur la teinte de la génération : le bleu 4G sur sa propre teinte restait
+        // sous 4,5:1, comme la pastille du Classement (audit du 25/11).
         Text(verbatim: generation)
             .font(SQType.micro(.bold))
-            .foregroundStyle(color)
+            .foregroundStyle(SQColor.label)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(shape.fill(planned ? Color.clear : color.opacity(0.13)))
