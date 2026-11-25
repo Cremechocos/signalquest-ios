@@ -42,8 +42,12 @@ final class DriveTestSessionLifecycleQATests: XCTestCase {
         XCTAssertTrue(speedTab.waitForExistence(timeout: 20), "Onglet Tester introuvable")
         speedTab.tap()
 
-        let entry = app.buttons["Mode Drive Test"].firstMatch
-        XCTAssertTrue(entry.waitForExistence(timeout: 10), "Bouton « Mode Drive Test » introuvable")
+        // Le Drive Test vit dans le menu « ⋯ » de l'en-tête depuis la refonte d'octobre (0bf1fd26).
+        let more = app.buttons["speedtest.more"].firstMatch
+        XCTAssertTrue(more.waitForExistence(timeout: 10), "Menu « Plus » du Speedtest absent")
+        more.tap()
+        let entry = app.buttons["speedtest.driveTest"].firstMatch
+        XCTAssertTrue(entry.waitForExistence(timeout: 5), "Entrée « Drive Test » du menu introuvable")
         entry.tap()
         _ = app.staticTexts.firstMatch.waitForExistence(timeout: 6)
 
@@ -133,8 +137,12 @@ final class DriveTestSessionLifecycleQATests: XCTestCase {
         let speedTab = SignalQuestUITestSupport.tab(named: "Tester", in: app)
         XCTAssertTrue(speedTab.waitForExistence(timeout: 20), "Onglet Tester introuvable")
         speedTab.tap()
-        let entry = app.buttons["Mode Drive Test"].firstMatch
-        XCTAssertTrue(entry.waitForExistence(timeout: 10), "Bouton « Mode Drive Test » introuvable")
+        // Le Drive Test vit dans le menu « ⋯ » de l'en-tête depuis la refonte d'octobre (0bf1fd26).
+        let more = app.buttons["speedtest.more"].firstMatch
+        XCTAssertTrue(more.waitForExistence(timeout: 10), "Menu « Plus » du Speedtest absent")
+        more.tap()
+        let entry = app.buttons["speedtest.driveTest"].firstMatch
+        XCTAssertTrue(entry.waitForExistence(timeout: 5), "Entrée « Drive Test » du menu introuvable")
         entry.tap()
 
         let acknowledge = app.buttons["J'ai compris"].firstMatch

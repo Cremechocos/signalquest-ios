@@ -107,6 +107,11 @@ final class AccessibilityAuditTests: XCTestCase {
             if issue.auditType == .dynamicType, name == "profile.menu.title" {
                 return exclude("plafond AX3 voulu : le titre déborde de la rangée en AX5", name, issue.auditType)
             }
+            // Titres des rangées de Réglages (`SQSettingsRowLabel`) : même plafond AX3 voulu (DEV-01),
+            // relatif à `.body` jusque-là ; signalés pour « Double authentification » et « Appareils ».
+            if issue.auditType == .dynamicType, name.hasPrefix("settings.label.") {
+                return exclude("plafond AX3 voulu : un mot long dépasse la rangée en AX5", name, issue.auditType)
+            }
             // Graduations de l'échelle de débit : police relative à caption2 et hauteur en
             // @ScaledMetric ; elles grandissent avec le réglage (vu en très grand texte).
             if issue.auditType == .dynamicType, let element,
@@ -200,6 +205,17 @@ final class AccessibilityAuditTests: XCTestCase {
                demoShareCardTexts.contains(name) || (!name.isEmpty && name.allSatisfy(\.isNumber))
                 || name.hasPrefix("45, rue de Gerland") {
                 return exclude("carte partagée : textes à police relative", name, issue.auditType)
+            }
+            // Mêmes cartes, contraste : mesuré sur les captures d'éléments de l'audit du 25/11, de
+            // 6,23:1 (gris secondaire sur la carte reçue) à 14,72:1 (encre claire sur la carte envoyée).
+            if issue.auditType == .contrast, screen == "Messagerie — conversation",
+               demoShareCardTexts.contains(name) || name == "Bouygues Telecom" {
+                return exclude("6,23 à 14,72:1 mesuré sur les pixels (25/11)", name, issue.auditType)
+            }
+            // Titre de l'explication du Drive Test en AX XXL : 19,19:1 sur la capture de l'élément
+            // (25/11) ; l'auditeur lit le verre de la navigation sous sa dernière ligne.
+            if issue.auditType == .contrast, screen.hasPrefix("Drive Test"), name == "drivetest.purpose.title" {
+                return exclude("19,19:1 mesuré sur les pixels (25/11)", name, issue.auditType)
             }
             // Heure sous un message (25/11) : texte sans action ; la bulle entière porte le toucher
             // et l'appui long. L'auditeur la prend pour une cible.
@@ -511,8 +527,12 @@ final class AccessibilityAuditTests: XCTestCase {
         let speed = SignalQuestUITestSupport.tab(named: "Tester", in: app)
         XCTAssertTrue(speed.waitForExistence(timeout: 20), "Onglet Tester absent de l'audit Drive Test")
         speed.tap()
-        let entry = app.buttons["Mode Drive Test"].firstMatch
-        XCTAssertTrue(entry.waitForExistence(timeout: 10), "Entrée Drive Test introuvable")
+        // Le Drive Test vit dans le menu « ⋯ » de l'en-tête depuis la refonte d'octobre (0bf1fd26).
+        let more = app.buttons["speedtest.more"].firstMatch
+        XCTAssertTrue(more.waitForExistence(timeout: 10), "Menu « Plus » du Speedtest absent")
+        more.tap()
+        let entry = app.buttons["speedtest.driveTest"].firstMatch
+        XCTAssertTrue(entry.waitForExistence(timeout: 5), "Entrée Drive Test introuvable")
         entry.tap()
         let acknowledge = app.buttons["J'ai compris"].firstMatch
         XCTAssertTrue(acknowledge.waitForExistence(timeout: 8), "Explication du Drive Test absente")
@@ -533,8 +553,12 @@ final class AccessibilityAuditTests: XCTestCase {
         let speed = SignalQuestUITestSupport.tab(named: "Tester", in: app)
         XCTAssertTrue(speed.waitForExistence(timeout: 20), "Onglet Tester absent de l'audit Drive Test AX XXL")
         speed.tap()
-        let entry = app.buttons["Mode Drive Test"].firstMatch
-        XCTAssertTrue(entry.waitForExistence(timeout: 10), "Entrée Drive Test introuvable")
+        // Le Drive Test vit dans le menu « ⋯ » de l'en-tête depuis la refonte d'octobre (0bf1fd26).
+        let more = app.buttons["speedtest.more"].firstMatch
+        XCTAssertTrue(more.waitForExistence(timeout: 10), "Menu « Plus » du Speedtest absent")
+        more.tap()
+        let entry = app.buttons["speedtest.driveTest"].firstMatch
+        XCTAssertTrue(entry.waitForExistence(timeout: 5), "Entrée Drive Test introuvable")
         entry.tap()
         XCTAssertTrue(app.buttons["drivetest.start"].waitForExistence(timeout: 10))
         audit(app, screen: "Drive Test — texte accessibilité", blocking: true, types: Self.renderedLargeTextTypes)
@@ -775,6 +799,9 @@ final class AccessibilityAuditTests: XCTestCase {
             format: "label CONTAINS %@", "Tu peux partager un post"
         )).firstMatch
         XCTAssertTrue(bubble.waitForExistence(timeout: 10), "Conversation non ouverte")
+        // La conversation défile jusqu'en bas à l'ouverture : audité pendant ce défilement, le
+        // contraste des cartes partagées échouait parfois (6,23 et 14,72:1 sur les pixels, 25/11).
+        Thread.sleep(forTimeInterval: 1.5)
         audit("conversation")
     }
 
