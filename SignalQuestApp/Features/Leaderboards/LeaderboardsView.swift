@@ -730,24 +730,40 @@ private struct LeaderboardHeroCard: View {
     private var progressSummary: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text("Ma progression").sqKicker()
-            HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs) {
-                Text("\(shownPoints)")
-                    .font(SQFont.display(28, .bold))
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-                    .foregroundStyle(SQColor.label)
-                Text("pts")
-                    .font(SQType.caption(.semibold))
-                    .foregroundStyle(SQColor.labelSecondary)
-                Spacer(minLength: SQSpace.xs)
+            // Très grand texte : la pastille de niveau passe sous le score, qui reste
+            // sur une ligne ; à côté, la carte débordait de l'écran (IOS-074).
+            if dynamicTypeSize.isAccessibilitySize {
+                pointsLine
                 LevelPill(level: level, identifier: "leaderboards.hero.level")
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs) {
+                    pointsLine
+                    Spacer(minLength: SQSpace.xs)
+                    LevelPill(level: level, identifier: "leaderboards.hero.level")
+                }
             }
             if let remainingXP {
                 Text("Encore \(remainingXP.formatted()) pts avant le niveau \(level + 1)")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.ink2)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                    .fixedSize(horizontal: false, vertical: dynamicTypeSize.isAccessibilitySize)
             }
+        }
+    }
+
+    private var pointsLine: some View {
+        HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs) {
+            Text("\(shownPoints)")
+                .font(SQFont.display(28, .bold))
+                .monospacedDigit()
+                .contentTransition(.numericText())
+                .foregroundStyle(SQColor.label)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+            Text("pts")
+                .font(SQType.caption(.semibold))
+                .foregroundStyle(SQColor.labelSecondary)
         }
     }
 
@@ -806,12 +822,21 @@ private struct LeaderboardHeroCard: View {
             Image(systemName: icon)
                 .font(SQType.caption(.bold))
                 .foregroundStyle(SQColor.ink2)
-            Text(text)
-                .font(SQType.micro)
-                .monospacedDigit()
-                .sqSingleLine()
-                .fixedSize(horizontal: true, vertical: false)
-                .foregroundStyle(SQColor.ink2)
+            // Très grand texte : la puce passe à la ligne au lieu de sortir de la carte (IOS-074).
+            if dynamicTypeSize.isAccessibilitySize {
+                Text(text)
+                    .font(SQType.micro)
+                    .monospacedDigit()
+                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(SQColor.ink2)
+            } else {
+                Text(text)
+                    .font(SQType.micro)
+                    .monospacedDigit()
+                    .sqSingleLine()
+                    .fixedSize(horizontal: true, vertical: false)
+                    .foregroundStyle(SQColor.ink2)
+            }
         }
         .padding(.horizontal, SQSpace.sm2)
         .frame(minHeight: 26)
