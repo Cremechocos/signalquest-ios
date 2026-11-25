@@ -8,12 +8,15 @@ struct LeaderboardResult: Codable, Equatable {
     let myRank: LeaderboardMyRank?
     let generatedAt: Date?
     let requestId: String?
+    /// Département classé, servi seulement avec `scope=department` (contrat classements v1).
+    let department: LeaderboardDepartment?
 
     enum CodingKeys: String, CodingKey {
-        case category, period, scope, entries, myRank, generatedAt, requestId
+        case category, period, scope, entries, myRank, generatedAt, requestId, department
     }
 
-    init(category: String, period: String, scope: String, entries: [LeaderboardEntry], myRank: LeaderboardMyRank?, generatedAt: Date?, requestId: String?) {
+    init(category: String, period: String, scope: String, entries: [LeaderboardEntry], myRank: LeaderboardMyRank?,
+         generatedAt: Date?, requestId: String?, department: LeaderboardDepartment? = nil) {
         self.category = category
         self.period = period
         self.scope = scope
@@ -21,6 +24,7 @@ struct LeaderboardResult: Codable, Equatable {
         self.myRank = myRank
         self.generatedAt = generatedAt
         self.requestId = requestId
+        self.department = department
     }
 
     // Décodage défensif aligné sur le classement « points » : une entrée malformée
@@ -34,7 +38,13 @@ struct LeaderboardResult: Codable, Equatable {
         myRank = try? c.decodeIfPresent(LeaderboardMyRank.self, forKey: .myRank)
         generatedAt = try? c.decodeIfPresent(Date.self, forKey: .generatedAt)
         requestId = try? c.decodeIfPresent(String.self, forKey: .requestId)
+        department = try? c.decodeIfPresent(LeaderboardDepartment.self, forKey: .department)
     }
+}
+
+struct LeaderboardDepartment: Codable, Equatable {
+    let code: String
+    let name: String?
 }
 
 struct LeaderboardEntry: Codable, Identifiable, Equatable {
@@ -47,10 +57,42 @@ struct LeaderboardEntry: Codable, Identifiable, Equatable {
     let `operator`: String?
     let city: String?
     let capturedAt: Date?
+    /// Test classé, pour ouvrir son détail ; `nil` pour les points ou un test retiré de la carte.
+    let speedtestId: String?
 
     enum CodingKeys: String, CodingKey {
-        case rank, user, value, unit, detail, tech, city, capturedAt
+        case rank, user, value, unit, detail, tech, city, capturedAt, speedtestId
         case `operator` = "operator"
+    }
+
+    init(rank: Int, user: SocialFeedAuthor, value: Double, unit: String, detail: String?, tech: String?,
+         operator: String?, city: String?, capturedAt: Date?, speedtestId: String? = nil) {
+        self.rank = rank
+        self.user = user
+        self.value = value
+        self.unit = unit
+        self.detail = detail
+        self.tech = tech
+        self.operator = `operator`
+        self.city = city
+        self.capturedAt = capturedAt
+        self.speedtestId = speedtestId
+    }
+
+    // Les champs ajoutés par le contrat v1 sont lus sans échec : une valeur malformée ne
+    // doit jamais faire tomber l'entrée (décodage défensif ROB-05).
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        rank = try c.decode(Int.self, forKey: .rank)
+        user = try c.decode(SocialFeedAuthor.self, forKey: .user)
+        value = try c.decode(Double.self, forKey: .value)
+        unit = try c.decode(String.self, forKey: .unit)
+        detail = try? c.decodeIfPresent(String.self, forKey: .detail)
+        tech = try? c.decodeIfPresent(String.self, forKey: .tech)
+        `operator` = try? c.decodeIfPresent(String.self, forKey: .operator)
+        city = try? c.decodeIfPresent(String.self, forKey: .city)
+        capturedAt = try? c.decodeIfPresent(Date.self, forKey: .capturedAt)
+        speedtestId = c.decodeFlexibleString(forKey: .speedtestId)
     }
 
     var id: String { "\(rank)-\(user.id)-\(categoryHint)" }
@@ -66,6 +108,41 @@ struct LeaderboardMyRank: Codable, Equatable {
     let rank: Int
     let total: Int
     let entry: LeaderboardEntry?
+    /// Écart avec le rang juste au-dessus, dans l'unité des entrées ; `nil` au 1er rang.
+    let gapToNext: LeaderboardGap?
+    /// Mon rang sans les contributions d'aujourd'hui (jour de Paris) ; `nil` si je n'étais pas classé.
+    let previousRank: Int?
+
+    enum CodingKeys: String, CodingKey { case rank, total, entry, gapToNext, previousRank }
+
+    init(rank: Int, total: Int, entry: LeaderboardEntry?, gapToNext: LeaderboardGap? = nil, previousRank: Int? = nil) {
+        self.rank = rank
+        self.total = total
+        self.entry = entry
+        self.gapToNext = gapToNext
+        self.previousRank = previousRank
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        rank = try c.decode(Int.self, forKey: .rank)
+        total = try c.decode(Int.self, forKey: .total)
+        entry = try? c.decodeIfPresent(LeaderboardEntry.self, forKey: .entry)
+        gapToNext = try? c.decodeIfPresent(LeaderboardGap.self, forKey: .gapToNext)
+        previousRank = try? c.decodeIfPresent(Int.self, forKey: .previousRank)
+    }
+
+    /// Places gagnées depuis hier ; `nil` quand rien n'est gagné (le contrat ne montre que N > 0).
+    var placesGained: Int? {
+        guard let previousRank else { return nil }
+        let gained = previousRank - rank
+        return gained > 0 ? gained : nil
+    }
+}
+
+struct LeaderboardGap: Codable, Equatable {
+    let value: Double
+    let unit: String
 }
 
 // MARK: - Classement points / niveaux

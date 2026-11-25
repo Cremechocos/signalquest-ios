@@ -692,12 +692,13 @@ final class SignalQuestUITests: XCTestCase {
         speedShot.lifetime = .keepAlways
         add(speedShot)
 
-        // Onglet Points : le niveau fait partie de la ligne accessible combinée.
-        // Les rangées sous le podium sont matérialisées après défilement.
+        // Onglet Points : les sessions de la période font partie de la ligne accessible
+        // combinée (route commune depuis le 25/11). Les rangées sous le podium sont
+        // matérialisées après défilement.
         app.buttons["Points"].tap()
         let fourthRow = app.descendants(matching: .any)["leaderboard.row.4"].firstMatch
         XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(fourthRow, in: app))
-        XCTAssertTrue(fourthRow.label.contains("Niv."))
+        XCTAssertTrue(fourthRow.label.contains("sessions"))
         let pointsShot = XCTAttachment(screenshot: app.screenshot())
         pointsShot.name = "Leaderboards — onglet Points"
         pointsShot.lifetime = .keepAlways

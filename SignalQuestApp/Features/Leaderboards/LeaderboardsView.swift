@@ -41,9 +41,21 @@ final class LeaderboardsViewModel: ObservableObject {
     @Published var category = "download" {
         didSet { if category != oldValue { invalidateSpeed() } }
     }
+    /// Filtre opérateur (clé canonique) des débits ; sans effet sur Points.
+    @Published var operatorKey: String? {
+        didSet { if operatorKey != oldValue { invalidateSpeed() } }
+    }
+    /// Filtre réseau des débits : `5G` ou `4G`.
+    @Published var tech: String? {
+        didSet { if tech != oldValue { invalidateSpeed() } }
+    }
 
     @Published var speedResult: LeaderboardResult = .empty
-    @Published var pointsResult: PointsLeaderboardResult = .empty
+    /// Points = XP de gamification, sur la même route que les débits (décision d'Alexandre du 25/11).
+    @Published var pointsResult: LeaderboardResult = .emptyPoints
+    /// `scope=department` sans département connu pour le membre (400 `DEPARTMENT_REQUIRED`).
+    @Published private(set) var speedDepartmentMissing = false
+    @Published private(set) var pointsDepartmentMissing = false
     @Published var profile: GamificationProfile?
     @Published var isLoadingSpeed = false
     @Published var isLoadingPoints = false
@@ -61,14 +73,22 @@ final class LeaderboardsViewModel: ObservableObject {
         speedGeneration = UUID()
         speedResult = .empty
         speedError = nil
+        speedDepartmentMissing = false
         isLoadingSpeed = false
     }
 
     private func invalidatePoints() {
         pointsGeneration = UUID()
-        pointsResult = .empty
+        pointsResult = .emptyPoints
         pointsError = nil
+        pointsDepartmentMissing = false
         isLoadingPoints = false
+    }
+
+    /// Le serveur ne connaît pas mon département : ce n'est pas une panne, la page le dit.
+    static func isDepartmentMissing(_ error: Error) -> Bool {
+        if case let APIError.http(status, code, _, _, _) = error { return status == 400 && code == "DEPARTMENT_REQUIRED" }
+        return false
     }
 
     private let service: LeaderboardServicing
@@ -123,6 +143,7 @@ final class LeaderboardsViewModel: ObservableObject {
         let requestedPeriod = period
         let requestedScope = scope
         let requestedCategory = category
+        let requestedFilters = LeaderboardFilters(operatorKey: operatorKey, tech: tech)
         if AppEnvironment.usesDemoData {
             speedResult = .demo
             speedError = nil
@@ -133,14 +154,19 @@ final class LeaderboardsViewModel: ObservableObject {
         speedError = nil
         defer { if speedGeneration == generation { isLoadingSpeed = false } }
         do {
-            let response = try await service.leaderboard(period: requestedPeriod, scope: requestedScope, category: requestedCategory)
+            let response = try await service.leaderboard(period: requestedPeriod, scope: requestedScope,
+                                                         category: requestedCategory, filters: requestedFilters)
             guard speedGeneration == generation, !Task.isCancelled else { return }
             speedResult = response
             speedError = nil
             speedStamp += 1
         } catch {
             guard speedGeneration == generation, !Task.isCancelled, !error.isCancellation else { return }
-            speedError = error.userFacingMessage
+            if Self.isDepartmentMissing(error) {
+                speedDepartmentMissing = true
+            } else {
+                speedError = error.userFacingMessage
+            }
         }
     }
 
@@ -150,7 +176,7 @@ final class LeaderboardsViewModel: ObservableObject {
         let requestedPeriod = period
         let requestedScope = scope
         if AppEnvironment.usesDemoData {
-            pointsResult = .demo
+            pointsResult = .demoPoints
             pointsError = nil
             pointsStamp += 1
             return
@@ -159,14 +185,19 @@ final class LeaderboardsViewModel: ObservableObject {
         pointsError = nil
         defer { if pointsGeneration == generation { isLoadingPoints = false } }
         do {
-            let response = try await service.pointsLeaderboard(period: requestedPeriod, scope: requestedScope)
+            let response = try await service.leaderboard(period: requestedPeriod, scope: requestedScope,
+                                                         category: "points", filters: .none)
             guard pointsGeneration == generation, !Task.isCancelled else { return }
             pointsResult = response
             pointsError = nil
             pointsStamp += 1
         } catch {
             guard pointsGeneration == generation, !Task.isCancelled, !error.isCancellation else { return }
-            pointsError = error.userFacingMessage
+            if Self.isDepartmentMissing(error) {
+                pointsDepartmentMissing = true
+            } else {
+                pointsError = error.userFacingMessage
+            }
         }
     }
 
@@ -188,14 +219,32 @@ final class LeaderboardsViewModel: ObservableObject {
         Task { await loadSpeed() }
     }
 
+    func setOperator(_ value: String?) {
+        guard value != operatorKey else { return }
+        operatorKey = value
+        Task { await loadSpeed() }
+    }
+
+    func setTech(_ value: String?) {
+        guard value != tech else { return }
+        tech = value
+        Task { await loadSpeed() }
+    }
+
     /// Filtres rangés dans la feuille « Affiner » qui s'écartent du défaut : le nombre
     /// s'affiche en pastille sur le bouton. La mesure et la période sont à l'écran, elles
     /// ne comptent pas.
-    var sheetFilterCount: Int { scope == "global" ? 0 : 1 }
+    var sheetFilterCount: Int {
+        (scope == "global" ? 0 : 1) + (operatorKey == nil ? 0 : 1) + (tech == nil ? 0 : 1)
+    }
 
-    /// « Réinitialiser » de la feuille : seulement ce que la feuille règle.
+    /// « Réinitialiser » de la feuille : seulement ce que la feuille règle, en une relecture.
     func resetSheetFilters() {
-        setScope("global")
+        guard sheetFilterCount > 0 else { return }
+        scope = "global"
+        operatorKey = nil
+        tech = nil
+        Task { await reloadBoth() }
     }
 
     private func reloadBoth() async {
@@ -214,6 +263,8 @@ struct LeaderboardsView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Membre dont on ouvre le profil depuis une ligne du classement (SOC-44).
     @State private var profileAuthor: SocialFeedAuthor?
+    /// Test ouvert depuis une rangée de débit, quand le serveur donne son identifiant.
+    @State private var openedTest: OpenedLeaderboardTest?
     @State private var showsFilters = false
     /// La carte « Ma place » a quitté l'écran : la barre repliée la remplace en bas.
     /// Écrit seulement quand la carte entre ou sort de la pile paresseuse, jamais à
@@ -281,6 +332,21 @@ struct LeaderboardsView: View {
         .navigationDestinationItemCompat($profileAuthor) { author in
             UserProfileView(userId: author.id, prefill: author, service: services.feed)
         }
+        .sheet(item: $openedTest) { test in
+            AccountSpeedtestDetailSheet(testId: test.id) { [speedtest = services.speedtest] id in
+                try await speedtest.details(id: id)
+            }
+        }
+    }
+
+    /// Une rangée de débit ouvre son test quand le serveur donne son identifiant (test public
+    /// sur la carte), sinon le profil du membre, comme avant.
+    private func open(_ entry: LeaderboardEntry) {
+        if let id = entry.speedtestId, !id.isEmpty {
+            openedTest = OpenedLeaderboardTest(id: id)
+        } else {
+            profileAuthor = entry.user
+        }
     }
 
     /// Retour, titre, puis le bouton des filtres rares avec le nombre de filtres actifs.
@@ -338,14 +404,6 @@ struct LeaderboardsView: View {
                     activeFilterChip
                 }
             }
-            if model.metric == .points, model.period != "all" {
-                Text(model.period == "month"
-                     ? "Points gagnés ces 30 derniers jours ; le total depuis l’inscription est sous chaque score."
-                     : "Points gagnés ces 7 derniers jours ; le total depuis l’inscription est sous chaque score.")
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
         }
     }
 
@@ -361,15 +419,59 @@ struct LeaderboardsView: View {
         }
     }
 
+    /// Filtres actifs de la feuille, chacun retiré d'un toucher. Opérateur et réseau ne
+    /// s'appliquent qu'aux débits : ils ne s'affichent pas sur Points.
     @ViewBuilder
     private var activeFilterChip: some View {
-        if model.scope == "friends" {
-            SQChip(label: "Mes amis", systemImage: "xmark", restFill: SQColor.chip,
-                   spokenLabel: "Retirer le filtre Mes amis") {
-                model.setScope("global")
+        let chips = activeChips
+        if !chips.isEmpty {
+            HStack(spacing: SQSpace.xs2) {
+                ForEach(chips, id: \.id) { chip in
+                    SQChip(label: chip.label, systemImage: "xmark", restFill: SQColor.chip,
+                           spokenLabel: LocalizedStringKey(String(localized: "Retirer le filtre \(chip.label)"))) {
+                        chip.remove()
+                    }
+                    .fixedSize()
+                    .accessibilityIdentifier("leaderboards.activeFilter.\(chip.id)")
+                }
             }
-            .fixedSize()
-            .accessibilityIdentifier("leaderboards.activeFilter.friends")
+        }
+    }
+
+    private var activeChips: [(id: String, label: String, remove: () -> Void)] {
+        var chips: [(id: String, label: String, remove: () -> Void)] = []
+        if model.scope == "friends" {
+            chips.append(("friends", String(localized: "Mes amis"), { model.setScope("global") }))
+        } else if model.scope == "department" {
+            chips.append(("department", departmentLabel, { model.setScope("global") }))
+        }
+        if model.metric != .points {
+            if let op = model.operatorKey {
+                chips.append(("operator", Self.operatorLabel(op), { model.setOperator(nil) }))
+            }
+            if let tech = model.tech {
+                chips.append(("tech", tech, { model.setTech(nil) }))
+            }
+        }
+        return chips
+    }
+
+    /// « Mon dép. », complété du nom servi par le serveur (« Mon dép. · Gard »).
+    private var departmentLabel: String {
+        let result = model.metric == .points ? model.pointsResult : model.speedResult
+        if let name = result.department?.name, !name.isEmpty {
+            return String(localized: "Mon dép. · \(name)")
+        }
+        return String(localized: "Mon dép.")
+    }
+
+    /// Nom affiché d'une clé canonique d'opérateur.
+    static func operatorLabel(_ key: String) -> String {
+        switch key {
+        case "BOUYGUES": return "Bouygues"
+        case "ORANGE": return "Orange"
+        case "FREE": return "Free"
+        default: return key
         }
     }
 
@@ -379,20 +481,13 @@ struct LeaderboardsView: View {
     /// défilement. `nil` sans compte, pendant le premier chargement ou sans rang.
     private var myPlace: MyPlaceData? {
         guard currentUser != nil || AppEnvironment.usesDemoData else { return nil }
-        switch model.metric {
-        case .points:
-            guard let rank = model.pointsResult.currentUserRank else { return nil }
-            return MyPlaceData(
-                rank: rank, total: nil,
-                value: myPoints(entries: model.pointsResult.entries).map { ($0.formatted(), String(localized: "pts")) }
-            )
-        case .download, .upload:
-            guard let rank = model.speedResult.myRank else { return nil }
-            return MyPlaceData(
-                rank: rank.rank, total: rank.total,
-                value: rank.entry.map { (SQUnits.throughputValue(mbps: $0.value), SQUnits.throughputUnit(mbps: $0.value)) }
-            )
-        }
+        let result = model.metric == .points ? model.pointsResult : model.speedResult
+        guard let rank = result.myRank else { return nil }
+        return MyPlaceData(
+            rank: rank.rank, total: rank.total,
+            value: rank.entry.map { Self.valueParts($0.value, unit: $0.unit) },
+            gained: rank.placesGained
+        )
     }
 
     // MARK: Contenu par mesure
@@ -408,7 +503,9 @@ struct LeaderboardsView: View {
     @ViewBuilder
     private var speedContent: some View {
         let entries = model.speedResult.entries
-        if model.isLoadingSpeed && entries.isEmpty {
+        if model.speedDepartmentMissing {
+            departmentMissingState
+        } else if model.isLoadingSpeed && entries.isEmpty {
             LeaderboardSkeleton()
         } else if let error = model.speedError, entries.isEmpty {
             ErrorStateView(title: "Classement indisponible", message: error) {
@@ -427,7 +524,8 @@ struct LeaderboardsView: View {
                     name: entry.user.displayName,
                     avatarUrl: entry.user.avatarUrl,
                     value: Self.valueParts(entry.value, unit: entry.unit),
-                    onOpen: { profileAuthor = entry.user }
+                    opensTest: entry.speedtestId != nil,
+                    onOpen: { open(entry) }
                 )
             })
             .id("speed-\(model.speedStamp)")
@@ -439,9 +537,10 @@ struct LeaderboardsView: View {
                         name: entry.user.displayName,
                         avatarUrl: entry.user.avatarUrl,
                         value: Self.valueParts(entry.value, unit: entry.unit),
-                        isMe: isMe(entry),
+                        isMe: isMe(entry, in: model.speedResult),
                         showsDivider: index > 0,
-                        onOpen: { profileAuthor = entry.user }
+                        opensTest: entry.speedtestId != nil,
+                        onOpen: { open(entry) }
                     ) {
                         SpeedRowMeta(operatorName: entry.operator, tech: entry.tech, city: entry.city, capturedAt: entry.capturedAt)
                     }
@@ -450,34 +549,12 @@ struct LeaderboardsView: View {
         }
     }
 
-    /// Ouvre le profil d'une entrée de points (podium comme rangées) ; `nil` sans identifiant serveur.
-    private func openProfile(for entry: PointsLeaderboardEntry) -> (() -> Void)? {
-        entry.userId.map { userId -> () -> Void in
-            {
-                profileAuthor = SocialFeedAuthor(
-                    id: userId, name: entry.displayName, handle: nil,
-                    avatarUrl: entry.avatarUrl, isFriend: nil, isFollowing: nil,
-                    liveRadio: nil
-                )
-            }
-        }
-    }
-
-    /// Mon score pour la période affichée. Le profil ne porte que le cumul :
-    /// hors « Toujours », il n'est connu que si ma rangée figure dans la page,
-    /// sinon le rang reste seul plutôt qu'à côté d'un total d'une autre période.
-    private func myPoints(entries: [PointsLeaderboardEntry]) -> Int? {
-        if let mine = entries.first(where: isMe) {
-            return mine.score(for: model.period)
-        }
-        guard model.period == "all" else { return nil }
-        return model.profile?.points
-    }
-
     @ViewBuilder
     private var pointsContent: some View {
         let entries = model.pointsResult.entries
-        if model.isLoadingPoints && entries.isEmpty {
+        if model.pointsDepartmentMissing {
+            departmentMissingState
+        } else if model.isLoadingPoints && entries.isEmpty {
             LeaderboardSkeleton()
         } else if let error = model.pointsError, entries.isEmpty {
             ErrorStateView(title: "Classement indisponible", message: error) {
@@ -493,10 +570,10 @@ struct LeaderboardsView: View {
             LeaderboardPodiumView(entries: entries.prefix(3).map { entry in
                 PodiumEntryData(
                     rank: entry.rank,
-                    name: entry.displayName,
-                    avatarUrl: entry.avatarUrl,
-                    value: (entry.score(for: model.period).formatted(), String(localized: "pts")),
-                    onOpen: openProfile(for: entry)
+                    name: entry.user.displayName,
+                    avatarUrl: entry.user.avatarUrl,
+                    value: Self.valueParts(entry.value, unit: entry.unit),
+                    onOpen: { profileAuthor = entry.user }
                 )
             })
             .id("points-\(model.pointsStamp)")
@@ -505,30 +582,49 @@ struct LeaderboardsView: View {
                 ForEach(Array(entries.dropFirst(3).enumerated()), id: \.element.id) { index, entry in
                     LeaderboardRowView(
                         rank: entry.rank,
-                        name: entry.displayName,
-                        avatarUrl: entry.avatarUrl,
-                        value: (entry.score(for: model.period).formatted(), String(localized: "pts")),
-                        subValueText: model.period == "all" ? nil : entry.points.map {
-                            String(localized: "\($0.formatted()) au total")
-                        },
-                        isMe: isMe(entry),
+                        name: entry.user.displayName,
+                        avatarUrl: entry.user.avatarUrl,
+                        value: Self.valueParts(entry.value, unit: entry.unit),
+                        isMe: isMe(entry, in: model.pointsResult),
                         showsDivider: index > 0,
-                        onOpen: openProfile(for: entry)
+                        onOpen: { profileAuthor = entry.user }
                     ) {
-                        PointsRowMeta(level: entry.level, stats: entry.stats)
+                        // « N sessions » de la période, servi par le serveur.
+                        if let detail = entry.detail, !detail.isEmpty {
+                            Text(verbatim: detail)
+                                .font(SQType.caption)
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .sqSingleLine()
+                        }
                     }
                 }
             }
         }
     }
 
+    /// « Mon dép. » sans département connu : on le dit, et on rend tout le classement.
+    private var departmentMissingState: some View {
+        VStack(spacing: SQSpace.md) {
+            EmptyStateView(title: String(localized: "Pas encore de département"),
+                           message: String(localized: "Ton département apparaît après ta première contribution localisée."),
+                           systemImage: "mappin.and.ellipse")
+            GradientButton("Voir tout le monde", systemImage: "person.2", style: .secondary) {
+                model.setScope("global")
+            }
+            .accessibilityIdentifier("leaderboards.department.everyone")
+            .padding(.horizontal, SQSpace.xl)
+            .padding(.bottom, SQSpace.lg)
+        }
+        .sqCardBackground()
+    }
+
     /// État vide ; entre amis, un bouton rend tout le classement d'un geste.
     private func emptyState(title: String, message: String, systemImage: String) -> some View {
         VStack(spacing: SQSpace.md) {
             EmptyStateView(title: title, message: message, systemImage: systemImage)
-            if model.scope == "friends" {
+            if model.scope != "global" || model.sheetFilterCount > 0 {
                 GradientButton("Voir tout le monde", systemImage: "person.2", style: .secondary) {
-                    model.setScope("global")
+                    model.resetSheetFilters()
                 }
                 .accessibilityIdentifier("leaderboards.empty.everyone")
                 .padding(.horizontal, SQSpace.xl)
@@ -581,15 +677,15 @@ struct LeaderboardsView: View {
         return formatter.string(from: NSNumber(value: rank)) ?? "\(rank)"
     }
 
-    private func isMe(_ entry: LeaderboardEntry) -> Bool {
+    private func isMe(_ entry: LeaderboardEntry, in result: LeaderboardResult) -> Bool {
         if let uid = currentUser?.id { return entry.user.id == uid }
-        return model.speedResult.myRank?.rank == entry.rank
+        return result.myRank?.rank == entry.rank
     }
+}
 
-    private func isMe(_ entry: PointsLeaderboardEntry) -> Bool {
-        if let uid = currentUser?.id, let entryUid = entry.userId { return entryUid == uid }
-        return model.pointsResult.currentUserRank == entry.rank
-    }
+/// Identifiant d'un test ouvert depuis le classement, pour `.sheet(item:)`.
+private struct OpenedLeaderboardTest: Identifiable {
+    let id: String
 }
 
 // MARK: - Segmenté des mesures
@@ -644,6 +740,8 @@ private struct MyPlaceData {
     let rank: Int
     let total: Int?
     let value: (number: String, unit: String)?
+    /// Places gagnées depuis hier (jour de Paris), seulement quand il y en a.
+    var gained: Int? = nil
 }
 
 // MARK: - Carte héros « ma progression »
@@ -901,6 +999,14 @@ private struct MyPlaceBar: View {
                 if let total = place.total, !dynamicTypeSize.isAccessibilitySize {
                     Text("sur \(total.formatted())").font(SQType.caption).opacity(0.75)
                 }
+                if let gained = place.gained {
+                    HStack(spacing: 2) {
+                        Image(systemName: "arrow.up").font(SQType.caption(.bold)).accessibilityHidden(true)
+                        Text(verbatim: gained.formatted()).font(SQType.caption(.bold)).monospacedDigit()
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(Text("\(gained) places gagnées depuis hier"))
+                }
                 Spacer(minLength: SQSpace.sm)
                 if let value = place.value {
                     Text(verbatim: "\(value.number)\u{00A0}\(value.unit)")
@@ -942,9 +1048,24 @@ private struct LeaderboardFiltersSheet: View {
                     Text("Qui").sqKicker().accessibilityAddTraits(.isHeader)
                     MapSegmented(
                         selection: Binding(get: { model.scope }, set: { model.setScope($0) }),
-                        options: [("global", String(localized: "Tout le monde")), ("friends", String(localized: "Mes amis"))],
+                        options: [("global", String(localized: "Tout le monde")), ("friends", String(localized: "Mes amis")),
+                                  ("department", String(localized: "Mon dép."))],
                         identifier: "leaderboards.filters.scope"
                     )
+                }
+                if model.metric != .points {
+                    VStack(alignment: .leading, spacing: SQSpace.sm) {
+                        Text("Opérateur").sqKicker().accessibilityAddTraits(.isHeader)
+                        FlowLayoutChips(model: model)
+                    }
+                    VStack(alignment: .leading, spacing: SQSpace.sm) {
+                        Text("Réseau").sqKicker().accessibilityAddTraits(.isHeader)
+                        MapSegmented(
+                            selection: Binding(get: { model.tech ?? "all" }, set: { model.setTech($0 == "all" ? nil : $0) }),
+                            options: [("all", String(localized: "Tous")), ("5G", "5G"), ("4G", "4G")],
+                            identifier: "leaderboards.filters.tech"
+                        )
+                    }
                 }
                 if model.metric != .points {
                     VStack(alignment: .leading, spacing: SQSpace.md) {
@@ -1005,6 +1126,36 @@ private struct LeaderboardFiltersSheet: View {
     }
 }
 
+/// Puces des opérateurs de la feuille : Tous, puis les quatre réseaux, avec leur couleur
+/// doublée du nom.
+private struct FlowLayoutChips: View {
+    @ObservedObject var model: LeaderboardsViewModel
+
+    private static let operators: [(key: String?, label: String, colorName: String?)] = [
+        (nil, "Tous", nil), ("ORANGE", "Orange", "Orange"), ("SFR", "SFR", "SFR"),
+        ("BOUYGUES", "Bouygues", "Bouygues Telecom"), ("FREE", "Free", "Free Mobile")
+    ]
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: SQSpace.xs2) { chips }
+            VStack(alignment: .leading, spacing: SQSpace.xs2) { chips }
+        }
+    }
+
+    private var chips: some View {
+        ForEach(Self.operators, id: \.label) { option in
+            SQChip(label: option.label, isSelected: model.operatorKey == option.key,
+                   dot: option.colorName.map { SQBrand.operatorColor($0) },
+                   selectedFill: SQColor.label, selectedInk: SQColor.onInk) {
+                model.setOperator(option.key)
+            }
+            .fixedSize()
+            .accessibilityIdentifier("leaderboards.filters.operator.\(option.key ?? "all")")
+        }
+    }
+}
+
 // MARK: - Podium
 
 private struct PodiumEntryData: Identifiable, Equatable {
@@ -1012,7 +1163,9 @@ private struct PodiumEntryData: Identifiable, Equatable {
     let name: String
     let avatarUrl: URL?
     let value: (number: String, unit: String)
-    /// Ouvre le profil du membre ; `nil` quand le serveur ne donne pas son identifiant.
+    /// Le toucher ouvre le test classé plutôt que le profil.
+    var opensTest = false
+    /// Ouvre le test ou le profil ; `nil` quand le serveur ne donne pas d'identifiant.
     var onOpen: (() -> Void)? = nil
 
     var id: Int { rank }
@@ -1055,7 +1208,7 @@ private struct LeaderboardPodiumView: View {
                 // Même geste que les rangées : le podium ouvre aussi le profil.
                 Button(action: onOpen) { PodiumCard(entry: entry) }
                     .buttonStyle(SQPressButtonStyle(scale: 0.98))
-                    .accessibilityHint("Ouvre son profil")
+                    .accessibilityHint(entry.opensTest ? Text("Ouvre le test") : Text("Ouvre son profil"))
             } else {
                 PodiumCard(entry: entry)
             }
@@ -1205,74 +1358,6 @@ private struct SpeedRowMeta: View {
     }
 }
 
-// MARK: - Compteurs des rangées Points
-
-/// Pastille de niveau + compteurs d'activité, sur UNE ligne.
-///
-/// Le nombre de compteurs se dégrade (3 → 2 → 1 → 0) au lieu de laisser la
-/// rangée replier ses chiffres : sur un iPhone standard, pastille + 3 compteurs
-/// + nom + score dépassent la largeur disponible, et l'`HStack` coupait alors
-/// « 383 » en trois lignes d'un chiffre. Les compteurs à zéro sont retirés en
-/// amont — un `if` dans l'`HStack` laissait une espace fantôme à leur place.
-private struct PointsRowMeta: View {
-    let level: Int?
-    let stats: PointsLeaderboardStats?
-
-    // `label` : phrase lue par VoiceOver (« 320 validations ») — les icônes seules
-    // ne disent pas à quoi se rapporte le chiffre.
-    private var counters: [(icon: String, count: Int, label: String)] {
-        guard let stats else { return [] }
-        var result: [(icon: String, count: Int, label: String)] = []
-        if let value = stats.validations, value > 0 {
-            result.append(("checkmark.seal.fill", value, String(localized: "\(value) validation")))
-        }
-        if let value = stats.photos, value > 0 {
-            result.append(("camera.fill", value, String(localized: "\(value) photo")))
-        }
-        if let value = stats.speedtests, value > 0 {
-            result.append(("speedometer", value, String(localized: "\(value) speedtest")))
-        }
-        return result
-    }
-
-    var body: some View {
-        let counters = counters
-        ViewThatFits(in: .horizontal) {
-            line(Array(counters.prefix(3)))
-            line(Array(counters.prefix(2)))
-            line(Array(counters.prefix(1)))
-            line([])
-        }
-    }
-
-    private func line(_ counters: [(icon: String, count: Int, label: String)]) -> some View {
-        HStack(spacing: SQSpace.sm) {
-            if let level { LevelPill(level: level) }
-            ForEach(Array(counters.enumerated()), id: \.offset) { _, counter in
-                statCount(icon: counter.icon, count: counter.count, label: counter.label)
-            }
-            // Sans ce ressort, l'`HStack` centrerait la ligne dans la largeur que
-            // lui propose la rangée au lieu de la coller à gauche du nom.
-            Spacer(minLength: 0)
-        }
-    }
-
-    private func statCount(icon: String, count: Int, label: String) -> some View {
-        HStack(spacing: 3) {
-            Image(systemName: icon)
-                .font(SQType.micro)
-            Text(count.formatted())
-                .font(SQType.micro)
-                .monospacedDigit()
-                .sqSingleLine()
-        }
-        .foregroundStyle(SQColor.labelSecondary)
-        .fixedSize(horizontal: true, vertical: false)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(label)
-    }
-}
-
 // MARK: - Pastille niveau
 
 private struct LevelPill: View {
@@ -1311,8 +1396,10 @@ private struct LeaderboardRowView<Meta: View>: View {
     let isMe: Bool
     /// Filet au-dessus de la rangée, sauf pour la première.
     var showsDivider = false
-    /// Ouvre le profil du membre (SOC-44) ; `nil` quand le serveur ne donne
-    /// pas son identifiant.
+    /// Le toucher ouvre le test classé plutôt que le profil.
+    var opensTest = false
+    /// Ouvre le test ou le profil du membre (SOC-44) ; `nil` quand le serveur ne
+    /// donne pas son identifiant.
     var onOpen: (() -> Void)? = nil
     @ViewBuilder var meta: () -> Meta
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -1322,7 +1409,7 @@ private struct LeaderboardRowView<Meta: View>: View {
             if let onOpen {
                 Button(action: onOpen) { row }
                     .buttonStyle(.plain)
-                    .accessibilityHint("Ouvre son profil")
+                    .accessibilityHint(opensTest ? Text("Ouvre le test") : Text("Ouvre son profil"))
                     .accessibilityIdentifier("leaderboard.row.\(rank)")
             } else {
                 row.accessibilityIdentifier("leaderboard.row.\(rank)")
@@ -1513,31 +1600,36 @@ extension LeaderboardResult {
             period: "week",
             scope: "global",
             entries: entries,
-            myRank: LeaderboardMyRank(rank: 42, total: 1204, entry: nil),
+            myRank: LeaderboardMyRank(rank: 42, total: 1204, entry: nil, previousRank: 45),
             generatedAt: Date(),
             requestId: "demo"
         )
     }
-}
 
-extension PointsLeaderboardResult {
-    static var empty: PointsLeaderboardResult {
-        PointsLeaderboardResult(scope: "global", period: "week", entries: [], currentUserRank: nil)
+    static var emptyPoints: LeaderboardResult {
+        LeaderboardResult(category: "points", period: "week", scope: "global", entries: [],
+                          myRank: nil, generatedAt: nil, requestId: nil)
     }
 
-    static var demo: PointsLeaderboardResult {
-        PointsLeaderboardResult(
-            scope: "global",
-            period: "week",
-            entries: [
-                PointsLeaderboardEntry(rank: 1, userId: "u1", name: "Camille", avatarUrl: nil, points: 12480, periodPoints: 1240, level: 18, badges: [], stats: PointsLeaderboardStats(validations: 320, photos: 64, speedtests: 210, badges: 9)),
-                PointsLeaderboardEntry(rank: 2, userId: "u2", name: "Nora", avatarUrl: nil, points: 9860, periodPoints: 980, level: 15, badges: [], stats: PointsLeaderboardStats(validations: 244, photos: 41, speedtests: 188, badges: 7)),
-                PointsLeaderboardEntry(rank: 3, userId: "u3", name: "Alex", avatarUrl: nil, points: 8120, periodPoints: 760, level: 13, badges: [], stats: PointsLeaderboardStats(validations: 198, photos: 27, speedtests: 154, badges: 6)),
-                PointsLeaderboardEntry(rank: 4, userId: "u4", name: "Lina", avatarUrl: nil, points: 6450, periodPoints: 540, level: 11, badges: [], stats: PointsLeaderboardStats(validations: 130, photos: 33, speedtests: 96, badges: 5)),
-                PointsLeaderboardEntry(rank: 5, userId: "u5", name: "Théo", avatarUrl: nil, points: 5210, periodPoints: 430, level: 10, badges: [], stats: PointsLeaderboardStats(validations: 104, photos: 18, speedtests: 88, badges: 4))
-            ],
-            currentUserRank: 12
-        )
+    /// Points de démonstration, à la forme de `category=points` : XP de la période, et
+    /// « N sessions » en détail.
+    static var demoPoints: LeaderboardResult {
+        let rows: [(String, String, Double, Int)] = [
+            ("Camille", "camille", 1240, 14), ("Nora", "nora", 980, 11), ("Alex", "alex", 760, 9),
+            ("Lina", "lina", 540, 6), ("Théo", "theo", 430, 5)
+        ]
+        let entries = rows.enumerated().map { index, row in
+            LeaderboardEntry(
+                rank: index + 1,
+                user: SocialFeedAuthor(id: "u\(index + 1)", name: row.0, handle: row.1, avatarUrl: nil,
+                                       isFriend: false, isFollowing: false, liveRadio: nil),
+                value: row.2, unit: "pts", detail: "\(row.3) sessions", tech: nil, operator: nil,
+                city: nil, capturedAt: nil
+            )
+        }
+        return LeaderboardResult(category: "points", period: "week", scope: "global", entries: entries,
+                                 myRank: LeaderboardMyRank(rank: 12, total: 214, entry: nil, previousRank: 15),
+                                 generatedAt: Date(), requestId: "demo")
     }
 }
 

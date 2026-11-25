@@ -123,6 +123,84 @@ final class LeaderboardRequestOrderingTests: XCTestCase {
         }
     }
 
+    /// Contrat classements v1 : opérateur et réseau ne partent que pour les débits, et la
+    /// pastille compte les trois filtres de la feuille ; « Réinitialiser » les retire en une
+    /// seule relecture.
+    func testOperatorAndNetworkFiltersReachTheSpeedRequestOnly() async throws {
+        let speedQuery = LeaderboardService.query(period: "week", scope: "department", category: "download",
+                                                  filters: LeaderboardFilters(operatorKey: "SFR", tech: "5G"))
+        XCTAssertEqual(speedQuery.map { "\($0.name)=\($0.value ?? "")" },
+                       ["period=week", "scope=department", "category=download", "operator=SFR", "tech=5G"])
+        let pointsQuery = LeaderboardService.query(period: "month", scope: "global", category: "points",
+                                                   filters: LeaderboardFilters(operatorKey: "SFR", tech: "5G"))
+        XCTAssertEqual(pointsQuery.map(\.name), ["period", "scope", "category"], "Points ne porte pas les filtres de débit")
+
+        let service = OrderedLeaderboardService()
+        let model = LeaderboardsViewModel(service: service)
+        model.setOperator("ORANGE")
+        try await waitForRequests(service.speed, count: 1)
+        model.setTech("4G")
+        try await waitForRequests(service.speed, count: 2)
+        model.scope = "friends"
+        XCTAssertEqual(model.sheetFilterCount, 3)
+        let speedRequests = await service.speed.signatures
+        XCTAssertEqual(speedRequests, ["week/global/download/ORANGE", "week/global/download/ORANGE+4G"])
+
+        model.resetSheetFilters()
+        XCTAssertEqual(model.sheetFilterCount, 0)
+        XCTAssertNil(model.operatorKey)
+        XCTAssertNil(model.tech)
+        XCTAssertEqual(model.scope, "global")
+        try await waitForRequests(service.speed, count: 3)
+        try await waitForRequests(service.points, count: 1)
+        let afterReset = await service.speed.signatures
+        XCTAssertEqual(afterReset.last, "week/global/download")
+        let pointsRequests = await service.points.signatures
+        XCTAssertEqual(pointsRequests, ["week/global"], "Points relu une fois, sur la route commune")
+        for index in 0..<3 { await service.speed.succeed(index) }
+        await service.points.succeed(0)
+    }
+
+    /// Les champs du contrat v1 se décodent, et une valeur malformée ne fait tomber ni
+    /// l'entrée ni mon rang ; « +N places » ne paraît que pour un gain.
+    func testVersionOneFieldsDecodeWithoutEverDroppingAnEntryOrTheRank() throws {
+        let raw = #"""
+        {"category":"download","period":"week","scope":"department",
+         "department":{"code":"30","name":"Gard"},
+         "entries":[
+          {"rank":1,"user":{"id":"a","name":"A"},"value":1046.4,"unit":"Mbps","tech":"5G NSA","operator":"Orange",
+           "city":"Nîmes","capturedAt":"2026-11-24T18:02:11.000Z","speedtestId":"st-1"},
+          {"rank":2,"user":{"id":"b","name":"B"},"value":900,"unit":"Mbps","speedtestId":{"bad":true},"city":null}
+         ],
+         "myRank":{"rank":4,"total":13,"entry":null,"gapToNext":{"value":12.3,"unit":"Mbps"},"previousRank":6}}
+        """#
+        let result = try JSONDecoder.signalQuest.decode(LeaderboardResult.self, from: Data(raw.utf8))
+        XCTAssertEqual(result.department, LeaderboardDepartment(code: "30", name: "Gard"))
+        XCTAssertEqual(result.entries.count, 2, "un speedtestId malformé ne fait pas tomber l'entrée")
+        XCTAssertEqual(result.entries[0].speedtestId, "st-1")
+        XCTAssertNil(result.entries[1].speedtestId)
+        XCTAssertEqual(result.myRank?.gapToNext, LeaderboardGap(value: 12.3, unit: "Mbps"))
+        XCTAssertEqual(result.myRank?.placesGained, 2)
+
+        let malformedRank = #"{"entries":[],"myRank":{"rank":4,"total":13,"gapToNext":"x","previousRank":"y"}}"#
+        let degraded = try JSONDecoder.signalQuest.decode(LeaderboardResult.self, from: Data(malformedRank.utf8))
+        XCTAssertEqual(degraded.myRank?.rank, 4, "un gapToNext malformé ne fait pas tomber mon rang")
+        XCTAssertNil(degraded.myRank?.gapToNext)
+        XCTAssertNil(degraded.myRank?.placesGained)
+
+        XCTAssertNil(LeaderboardMyRank(rank: 6, total: 13, entry: nil, previousRank: 4).placesGained, "un recul n'affiche rien")
+        XCTAssertNil(LeaderboardMyRank(rank: 6, total: 13, entry: nil, previousRank: 6).placesGained)
+    }
+
+    /// « Mon dép. » sans département : un état dédié, pas une panne.
+    func testMissingDepartmentIsNotAnOutage() {
+        XCTAssertTrue(LeaderboardsViewModel.isDepartmentMissing(
+            APIError.http(status: 400, code: "DEPARTMENT_REQUIRED", message: "", requestId: nil, retryAfter: nil)))
+        XCTAssertFalse(LeaderboardsViewModel.isDepartmentMissing(
+            APIError.http(status: 400, code: "INVALID_FILTER", message: "", requestId: nil, retryAfter: nil)))
+        XCTAssertFalse(LeaderboardsViewModel.isDepartmentMissing(APIError.transport("offline")))
+    }
+
     func testRankedValuesUseBitsPerSecondAndKeepOtherUnits() {
         let speed = LeaderboardsView.valueText(712, unit: "Mbps")
         XCTAssertTrue(speed.hasPrefix("712"), speed)
@@ -194,8 +272,14 @@ private struct OrderedLeaderboardService: LeaderboardServicing {
     let speed = OrderedLeaderboardGate()
     let points = OrderedLeaderboardGate()
 
-    func leaderboard(period: String, scope: String, category: String) async throws -> LeaderboardResult {
-        try await speed.request("\(period)/\(scope)/\(category)")
+    func leaderboard(period: String, scope: String, category: String, filters: LeaderboardFilters) async throws -> LeaderboardResult {
+        // Points passe par la même route depuis le 25/11 : sa porte reste à part pour les tests.
+        if category == "points" {
+            try await points.request("\(period)/\(scope)")
+        } else {
+            let suffix = [filters.operatorKey, filters.tech].compactMap { $0 }.joined(separator: "+")
+            try await speed.request("\(period)/\(scope)/\(category)" + (suffix.isEmpty ? "" : "/\(suffix)"))
+        }
         return LeaderboardResult(category: category, period: period, scope: scope,
                                  entries: [], myRank: nil, generatedAt: nil, requestId: nil)
     }

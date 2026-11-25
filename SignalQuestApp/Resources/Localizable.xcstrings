@@ -119616,54 +119616,6 @@
         }
       }
     },
-    "Points gagnés ces 7 derniers jours ; le total depuis l’inscription est sous chaque score." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Points earned over the last 7 days; the all-time total is under each score."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Points gagnés ces 7 derniers jours ; le total depuis l’inscription est sous chaque score."
-          }
-        }
-      }
-    },
-    "Points gagnés ces 30 derniers jours ; le total depuis l’inscription est sous chaque score." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Points earned over the last 30 days; the all-time total is under each score."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Points gagnés ces 30 derniers jours ; le total depuis l’inscription est sous chaque score."
-          }
-        }
-      }
-    },
-    "Retirer le filtre Mes amis" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remove the My friends filter"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Retirer le filtre Mes amis"
-          }
-        }
-      }
-    },
     "Ma place" : {
       "localizations" : {
         "en" : {
@@ -119911,6 +119863,154 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "Mon dép." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My department"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mon dép."
+          }
+        }
+      }
+    },
+    "Mon dép. · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My department · %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mon dép. · %@"
+          }
+        }
+      }
+    },
+    "Retirer le filtre %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove the %@ filter"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer le filtre %@"
+          }
+        }
+      }
+    },
+    "Pas encore de département" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No department yet"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas encore de département"
+          }
+        }
+      }
+    },
+    "Ton département apparaît après ta première contribution localisée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your department shows up after your first located contribution."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton département apparaît après ta première contribution localisée."
+          }
+        }
+      }
+    },
+    "SQFormal|Ton département apparaît après ta première contribution localisée." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre département apparaît après votre première contribution localisée."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "%lld places gagnées depuis hier" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld place gained since yesterday"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld places gained since yesterday"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld place gagnée depuis hier"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld places gagnées depuis hier"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Ouvre le test" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the test"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre le test"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
