@@ -2,7 +2,7 @@ import XCTest
 
 /// Vérifie la rétraction du DOCK CUSTOM pré-iOS 26 au scroll (équivalent
 /// custom de `tabBarMinimizeBehavior(.onScrollDown)`) : scroll vers le bas →
-/// pastille (icône de l'onglet actif seule) ; tap sur la pastille → dock
+/// libellés masqués, cinq icônes gardées (dock Halo) ; tap sur un onglet → dock
 /// redéployé ; remontée → dock redéployé. Captures attachées à chaque étape.
 /// Le simulateur iOS 26+ affiche la barre système native : `--qa-legacy-dock`
 /// force le dock custom pour tester le chemin pré-iOS 26.
@@ -44,31 +44,47 @@ final class DockMinimizeQATests: XCTestCase {
         Thread.sleep(forTimeInterval: 5)
         snap(app, "dock-01-deploye")
 
-        // Scroll vers le bas → le dock se rétracte en pastille.
+        // Dock Halo : rétracté, il garde ses cinq onglets et masque leurs libellés.
+        // Le signe observable est donc la hauteur de la barre, pas une pastille.
+        let dock = app.descendants(matching: .any)["main.navigation"]
+        XCTAssertTrue(dock.waitForExistence(timeout: 5), "dock absent")
+        let deployed = dock.frame.height
+
+        // Scroll vers le bas → libellés masqués.
         app.swipeUp()
-        let pill = app.buttons["Déployer la navigation"]
-        XCTAssertTrue(pill.waitForExistence(timeout: 4), "dock non rétracté après un scroll vers le bas")
+        XCTAssertTrue(waitForHeight(of: dock, { $0 < deployed - 4 }), "dock non rétracté après un scroll vers le bas")
         snap(app, "dock-02-retracte")
 
-        // Tap sur la pastille → dock redéployé (les 5 onglets reviennent).
-        pill.tap()
-        XCTAssertTrue(app.buttons["Carte"].waitForExistence(timeout: 4), "dock non redéployé après tap sur la pastille")
+        // Tap sur l'onglet courant de la barre rétractée → dock redéployé.
+        communaute.tap()
+        XCTAssertTrue(waitForHeight(of: dock, { $0 >= deployed - 1 }), "dock non redéployé après un tap")
         snap(app, "dock-03-redeploye-tap")
 
         // Re-rétracte (double swipe : le feed peut être revenu en haut après
         // un rechargement), puis remonte : le dock doit se redéployer seul.
         app.swipeUp()
         app.swipeUp()
-        XCTAssertTrue(pill.waitForExistence(timeout: 4), "dock non rétracté au second scroll")
+        XCTAssertTrue(waitForHeight(of: dock, { $0 < deployed - 4 }), "dock non rétracté au second scroll")
         app.swipeDown()
         app.swipeDown()
-        XCTAssertTrue(app.buttons["Carte"].waitForExistence(timeout: 4), "dock non redéployé après remontée")
+        XCTAssertTrue(waitForHeight(of: dock, { $0 >= deployed - 1 }), "dock non redéployé après remontée")
         snap(app, "dock-04-redeploye-scroll")
 
         // Carte : dock verre au-dessus des tuiles (vérif matériau Liquid Glass).
         SignalQuestUITestSupport.tab(named: "Carte", in: app).tap()
         Thread.sleep(forTimeInterval: 9)
         snap(app, "dock-05-carte-verre")
+    }
+
+    /// Attend (4 s au plus) que la hauteur de l'élément vérifie la condition : la
+    /// rétraction est animée.
+    private func waitForHeight(of element: XCUIElement, _ condition: (CGFloat) -> Bool) -> Bool {
+        let deadline = Date().addingTimeInterval(4)
+        repeat {
+            if condition(element.frame.height) { return true }
+            Thread.sleep(forTimeInterval: 0.2)
+        } while Date() < deadline
+        return condition(element.frame.height)
     }
 
     private func snap(_ app: XCUIApplication, _ name: String) {
