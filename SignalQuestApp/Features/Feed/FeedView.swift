@@ -139,7 +139,7 @@ final class FeedViewModel: ObservableObject {
 
     private func reloadKeepingPage() async {
         queryRevision = UUID()
-        pendingCount = 0; pendingItems = []; knownIds.removeAll(); needsLiveCheck = false; liveCheckID = nil
+        pendingCount = 0; pendingItems = []; pendingBaseline = nil; knownIds.removeAll(); needsLiveCheck = false; liveCheckID = nil
         restartStream()
         await load()
     }
@@ -235,6 +235,20 @@ final class FeedViewModel: ObservableObject {
     /// Les publications annoncées par la pastille, plus récentes que tout ce qui est affiché.
     /// Un toucher les insère en tête, quel que soit le tri (Fil Communauté, C2/C8).
     private var pendingItems: [UnifiedSocialFeedItem] = []
+    /// Référence de la pastille, prise à l'ouverture de l'onglet (ou après un changement de tri,
+    /// de zone, un rechargement) par une lecture `latest` : en Pertinence, la page classée ne
+    /// contient pas les plus récentes, qui seraient sinon annoncées dès l'ouverture (règle
+    /// commune du 25/11, défaut vu en prod sur le Web).
+    private struct PendingBaseline {
+        let ids: Set<String>
+        let newest: Date?
+        init(_ items: [UnifiedSocialFeedItem]) {
+            ids = Set(items.map(\.id))
+            newest = items.compactMap(\.createdAt).max()
+        }
+    }
+    private var pendingBaseline: PendingBaseline?
+    private var baselineTask: Task<Void, Never>?
     @Published private(set) var trendingHashtags: [TrendingHashtag] = []
     private struct Query: Equatable {
         let tab: FeedTab
@@ -270,7 +284,7 @@ final class FeedViewModel: ObservableObject {
         queryRevision = UUID(); loadRevision = UUID()
         detailReceipts.removeAll()
         page = nil; errorMessage = nil; isLoading = true; isLoadingMore = false
-        pendingCount = 0; pendingItems = []; knownIds.removeAll(); needsLiveCheck = false; liveCheckID = nil
+        pendingCount = 0; pendingItems = []; pendingBaseline = nil; knownIds.removeAll(); needsLiveCheck = false; liveCheckID = nil
         if metadataOwner != LocalAccountScope.currentOwnerScopeId { trendingHashtags = [] }
         restartStream()
     }
@@ -346,6 +360,11 @@ final class FeedViewModel: ObservableObject {
         guard streamTask == nil else { return }
         streamFactory = factory
         restartStream()
+        // Flux repris sur une page déjà affichée (retour sur le fil) : la référence d'abord.
+        if page != nil, !isLoading, pendingBaseline == nil {
+            let context = query, loading = loadRevision
+            baselineTask = Task { [weak self] in await self?.establishPendingBaseline(context: context, loading: loading) }
+        }
     }
 
     private func restartStream() {
@@ -418,6 +437,8 @@ final class FeedViewModel: ObservableObject {
                 }
             }
         }
+        // La lecture d'ouverture d'abord : sans elle, cette relecture servirait de référence.
+        if pendingBaseline == nil, let baselineTask { await baselineTask.value }
         let loading = loadRevision
         do {
             // Toujours en `latest`, jamais mis en cache, quel que soit le tri affiché : la première
@@ -426,8 +447,11 @@ final class FeedViewModel: ObservableObject {
                                                             near: context.near, sort: .latest)
             guard context == query, streamID == streamRevision, loading == loadRevision,
                   !Task.isCancelled, let page else { return }
+            // Sans référence encore (lecture d'ouverture ratée ou en cours), celle-ci la fixe.
+            guard let baseline = pendingBaseline else { pendingBaseline = PendingBaseline(freshPage.items); return }
             let fresh = Self.newerItems(in: freshPage.items, than: page.items + pendingItems,
-                                        excluding: knownIds.union(deferredDeletions.keys))
+                                        excluding: knownIds.union(deferredDeletions.keys).union(baseline.ids),
+                                        after: baseline.newest)
             knownIds.formUnion(fresh.map(\.id))
             pendingItems = fresh + pendingItems
             pendingCount = pendingItems.count
@@ -440,9 +464,9 @@ final class FeedViewModel: ObservableObject {
     /// affichée. Une publication ancienne qui remonte (classement recalculé) ou une publication
     /// en cours de suppression n'est pas une nouveauté.
     nonisolated static func newerItems(in candidates: [UnifiedSocialFeedItem], than shown: [UnifiedSocialFeedItem],
-                                       excluding ids: Set<String>) -> [UnifiedSocialFeedItem] {
+                                       excluding ids: Set<String>, after reference: Date? = nil) -> [UnifiedSocialFeedItem] {
         let shownIds = Set(shown.map(\.id))
-        let newest = shown.compactMap(\.createdAt).max()
+        let newest = (shown.compactMap(\.createdAt) + [reference].compactMap { $0 }).max()
         var seen = Set<String>()
         return candidates.filter { item in
             guard !shownIds.contains(item.id), !ids.contains(item.id), seen.insert(item.id).inserted else { return false }
@@ -450,6 +474,14 @@ final class FeedViewModel: ObservableObject {
             guard let created = item.createdAt else { return false }
             return created > newest
         }
+    }
+
+    /// Lecture `latest` d'ouverture : elle fixe la référence de la pastille, sans rien annoncer.
+    private func establishPendingBaseline(context: Query, loading: UUID) async {
+        guard let items = try? await service.loadFeedItems(cursor: nil, hashtag: context.hashtag, tab: context.tab,
+                                                           near: context.near, sort: .latest).items,
+              context == query, loading == loadRevision, pendingBaseline == nil else { return }
+        pendingBaseline = PendingBaseline(items)
     }
 
     /// Toucher la pastille insère les nouveautés en tête, sans relire le tri affiché (figé 60 s
@@ -485,7 +517,7 @@ final class FeedViewModel: ObservableObject {
         defer { if context == query && loadRevision == request { isLoading = false } }
         if AppEnvironment.usesDemoData {
             page = .demo; trendingHashtags = page?.trendingHashtags ?? []
-            pendingCount = 0; pendingItems = []; knownIds.removeAll()
+            pendingCount = 0; pendingItems = []; pendingBaseline = nil; knownIds.removeAll()
             return
         }
         Task { await service.retryPendingPosts() }
@@ -510,7 +542,15 @@ final class FeedViewModel: ObservableObject {
             // Un GET démarré après le reçu peut désormais faire autorité.
             detailReceipts = detailReceipts.filter { $0.value.revision > receiptRevisionAtStart }
             trendingHashtags = loaded.trendingHashtags; metadataOwner = context.owner
-            pendingCount = 0; pendingItems = []; knownIds.removeAll()
+            pendingCount = 0; pendingItems = []; pendingBaseline = nil; knownIds.removeAll()
+            if context.tab.isChronological(for: context.sort) {
+                // Page déjà lue en `latest` : elle sert de référence, sans autre requête.
+                pendingBaseline = PendingBaseline(loaded.items)
+            } else if streamFactory != nil {
+                // Seulement quand le flux en direct tourne : sans lui, aucune pastille à régler.
+                let loading = loadRevision
+                baselineTask = Task { [weak self] in await self?.establishPendingBaseline(context: context, loading: loading) }
+            }
             if needsLiveCheck, streamFactory != nil {
                 needsLiveCheck = false
                 let streamID = streamRevision

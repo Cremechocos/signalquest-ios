@@ -333,6 +333,38 @@ final class FeedContextTests: XCTestCase {
         XCTAssertTrue(model.followingCountFailed)
     }
 
+    /// Règle commune du 25/11 (défaut vu en prod sur le Web) : en Pertinence, la page classée ne
+    /// contient pas les plus récentes ; la lecture `latest` d'ouverture fixe la référence, et seul
+    /// ce qui arrive ensuite est annoncé.
+    func testRelevancePillDoesNotAnnounceRecentPostsAtOpening() async throws {
+        func dated(_ id: String, _ iso: String) -> UnifiedSocialFeedItem {
+            let raw = #"{"id":"\#(id)","kind":"post","author":{"id":"qa-author","name":"Recette"},"text":"\#(id)","createdAt":"\#(iso)"}"#
+            return try! JSONDecoder.signalQuest.decode(UnifiedSocialFeedItem.self, from: Data(raw.utf8))
+        }
+        let ranked = dated("ranked", "2026-11-22T08:00:00Z"), recent = dated("recent", "2026-11-25T01:00:00Z")
+        let brandNew = dated("new", "2026-11-25T02:00:00Z")
+        let streams = FeedFixtureStreams(), calls = FeedCallCount()
+        let model = FeedViewModel(service: FeedContextFixture { _, _, _ in
+            switch await calls.next() {
+            case 1: return Self.page("relevance", items: [ranked])          // page classée
+            case 2, 3: return Self.page("latest", items: [recent, ranked])   // ouverture, puis relecture
+            default: return Self.page("latest", items: [brandNew, recent, ranked])
+            }
+        }, liveCheckInterval: 0)
+        await model.load()
+        XCTAssertFalse(model.isChronological)
+        model.startStream { streams.make() }
+        defer { model.stopStream() }
+        let raw = String(decoding: try JSONEncoder.signalQuest.encode(Self.page("global", items: [Self.item("x")])), as: UTF8.self)
+        streams.emit(0, raw)
+        try await Task.sleep(for: .milliseconds(400))
+        XCTAssertEqual(model.pendingCount, 0, "« recent » était déjà en ligne à l'ouverture")
+        streams.emit(0, raw)
+        await eventually { model.pendingCount == 1 }
+        await model.applyPending()
+        XCTAssertEqual(model.page?.items.map(\.id), ["new", "ranked"])
+    }
+
     /// C8 : changer de tri garde la page affichée jusqu'à l'arrivée de la nouvelle.
     func testChangingTheSortKeepsThePageUntilTheNewOneArrives() async throws {
         let key = FeedViewModel.feedSortKey(ownerScopeId: LocalAccountScope.currentOwnerScopeId)
