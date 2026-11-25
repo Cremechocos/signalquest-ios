@@ -119527,6 +119527,22 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "Ordre chronologique" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chronological order"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ordre chronologique"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

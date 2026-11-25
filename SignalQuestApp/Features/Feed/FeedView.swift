@@ -1126,7 +1126,9 @@ struct FeedView: View {
     var body: some View {
         ScrollViewReader { proxy in
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: SQSpace.md) {
+            // Onglets épinglés par la Section (pinnedViews) : l'en-tête et les stories partent au
+            // défilement sans qu'aucun état ne suive l'offset image par image (IOS-062).
+            LazyVStack(alignment: .leading, spacing: SQSpace.md, pinnedViews: [.sectionHeaders]) {
                 // La marge du haut appartient à l'ancre : revenir en tête
                 // retrouve la position de repos, pas 8 pt plus haut.
                 header
@@ -1156,9 +1158,7 @@ struct FeedView: View {
                     // scroll fuie sous les bords (1re bulle alignée à 20 pt).
                     .padding(.horizontal, -SQSpace.lg)
                 }
-                composerPrompt
-                feedTabs
-                if model.tab.sortKey != nil { sortPicker }
+                Section {
                 if let tag = model.selectedHashtag { hashtagFilter(tag) }
                 if model.tab == .nearby, model.selectedHashtag == nil, model.nearbyPosition == .ready {
                     nearbyZoneBar
@@ -1223,6 +1223,9 @@ struct FeedView: View {
                             .frame(maxWidth: .infinity)
                     }
                 }
+                } header: {
+                    feedTabs
+                }
             }
             .padding(.horizontal, SQSpace.lg)
             .padding(.bottom, SQSpace.xxl)
@@ -1237,10 +1240,13 @@ struct FeedView: View {
                         proxy.scrollTo(Self.topAnchor, anchor: .top)
                     }
                 }
-                .padding(.top, SQSpace.sm)
+                // Sous les onglets épinglés : la pastille ne les recouvre jamais.
+                .padding(.top, SQSpace.sm + 48)
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
+        // Publier, depuis n'importe où dans le fil (Fil Communauté, haut du fil du 25/11).
+        .overlay(alignment: .bottomTrailing) { composeButton }
         .sqAnimation(SQMotion.snappy, value: model.pendingCount > 0)
         // Pastille annoncée sans déplacer le focus de VoiceOver (C7).
         .onChangeCompat(of: model.pendingCount) { old, new in
@@ -1288,6 +1294,15 @@ struct FeedView: View {
             }
         }
         .signalQuestBackground()
+        // Sous la barre d'état, un fond opaque : le contenu défile jusque-là, et l'en-tête parti
+        // transparaissait au-dessus des onglets épinglés. Encart de hauteur nulle posé sur la zone
+        // sûre, dont le fond s'étend à la barre d'état : aucune mesure au défilement.
+        .safeAreaInset(edge: .top, spacing: 0) {
+            Color.clear
+                .frame(height: 0)
+                .background(SQColor.bg)
+                .accessibilityHidden(true)
+        }
         .task {
             isFeedVisible = true
             // Le dernier onglet ouvert, relu avant le premier chargement : changer d'onglet
@@ -2114,60 +2129,26 @@ struct FeedView: View {
 
     /// « Quoi de neuf ? » : la publication commence ici, en une ligne. Photo
     /// et Speedtest ouvrent la même feuille, la pièce jointe déjà choisie.
-    private var composerPrompt: some View {
-        HStack(spacing: SQSpace.sm2) {
-            Button {
-                Haptics.light()
-                composerRequest = ComposerRequest(start: nil)
-            } label: {
-                HStack(spacing: SQSpace.sm2) {
-                    SQAvatar(url: currentUser?.avatarUrl, name: currentUser?.displayName ?? "", size: 36)
-                        .accessibilityHidden(true)
-                    // Encre de puce : le gris secondaire manque de contraste au rendu.
-                    Text("Quoi de neuf ?")
-                        .font(SQType.subhead)
-                        .foregroundStyle(SQColor.chipInk)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("feed.compose.prompt")
-                        .padding(.vertical, SQSpace.xs)
-                        .padding(.horizontal, SQSpace.md2)
-                        .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
-                        .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Créer une publication")
-            .accessibilityIdentifier("community.header.action.publish")
-            composerAttachmentButton(.photo, systemImage: "photo", label: "Ajouter une photo")
-            composerAttachmentButton(.speedtest, systemImage: "speedometer", label: "Joindre un speedtest")
-        }
-        .padding(.leading, SQSpace.sm2)
-        .padding(.trailing, SQSpace.xs)
-        .padding(.vertical, SQSpace.xs)
-        .sqSoftCard()
-    }
-
-    private func composerAttachmentButton(
-        _ attachment: ComposerStartAttachment,
-        systemImage: String,
-        label: String
-    ) -> some View {
+    /// Crayon flottant : ouvre le composer, où photo et speedtest se joignent. Remplace la rangée
+    /// « Quoi de neuf ? » (choix d'Alexandre du 25/11) ; la safe area du dock le garde au-dessus.
+    private var composeButton: some View {
         Button {
             Haptics.light()
-            composerRequest = ComposerRequest(start: attachment)
+            composerRequest = ComposerRequest(start: nil)
         } label: {
-            Image(systemName: systemImage)
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(SQColor.chipInk)
-                .frame(width: 38, height: 38)
-                .background(SQColor.chip, in: Circle())
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
+            Image(systemName: "square.and.pencil")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(SQColor.onInk)
+                .frame(width: 56, height: 56)
+                .background(SQColor.label, in: Circle())
+                .sqShadowDock()
+                .contentShape(Circle())
         }
         .buttonStyle(SQPressButtonStyle())
-        .accessibilityLabel(LocalizedStringKey(label))
-        .accessibilityIdentifier("community.compose.\(attachment.rawValue)")
+        .padding(.trailing, SQSpace.lg)
+        .padding(.bottom, SQSpace.md)
+        .accessibilityLabel("Créer une publication")
+        .accessibilityIdentifier("community.header.action.publish")
     }
 
     /// L'onglet « Photos », en galerie.
@@ -2232,6 +2213,16 @@ struct FeedView: View {
 
     /// `⋯` — les destinations de la communauté qui ne méritent pas un bouton
     /// permanent, mais qu'on cherchait jusqu'ici dans l'onglet Profil.
+    private var chronologicalBinding: Binding<Bool> {
+        Binding(
+            get: { model.sort(for: model.tab) == .latest },
+            set: { on in
+                Haptics.selection()
+                Task { await model.selectSort(on ? .latest : .relevance) }
+            }
+        )
+    }
+
     private var communityMenu: some View {
         Menu {
             Button { showFriends = true } label: {
@@ -2254,6 +2245,14 @@ struct FeedView: View {
                 Task { await model.select(.saved) }
             } label: {
                 Label("Enregistrés", systemImage: "bookmark")
+            }
+            // « Pour toi » est le fil classé : l'ordre chronologique n'est qu'une option, pour
+            // l'onglet affiché, gardée avec le compte (feedSort). Remplace « Pertinence | Récent ».
+            if model.tab.sortKey != nil {
+                Divider()
+                Toggle(isOn: chronologicalBinding) {
+                    Label("Ordre chronologique", systemImage: "clock")
+                }
             }
         } label: {
             Image(systemName: "ellipsis")
@@ -2483,13 +2482,14 @@ struct FeedView: View {
         FeedTab.allCases.filter { $0 != .saved || model.tab == .saved }
     }
 
-    /// Barre d'onglets du fil : pastilles, l'active pleine encre.
+    /// Barre d'onglets du fil : texte souligné, l'active à l'encre. Épinglée en haut au défilement,
+    /// d'où le fond opaque qui couvre toute la largeur.
     ///
-    /// Défilante horizontalement : à Dynamic Type élevé, six capsules ne tiennent
+    /// Défilante horizontalement : à Dynamic Type élevé, quatre onglets ne tiennent
     /// pas sur une largeur d'iPhone, et une barre segmentée les tronquerait.
     private var feedTabs: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: SQSpace.sm) {
+            HStack(spacing: SQSpace.lg) {
                 ForEach(visibleTabs) { tab in
                     let selected = model.tab == tab
                     Button {
@@ -2497,15 +2497,16 @@ struct FeedView: View {
                         Task { await model.select(tab) }
                     } label: {
                         Text(LocalizedStringKey(tab.title))
-                            .font(SQType.subhead(.semibold))
+                            .font(SQType.subhead(selected ? .bold : .semibold))
                             .sqSingleLine()
                             .fixedSize(horizontal: true, vertical: false)
-                            .padding(.horizontal, SQSpace.md2)
-                            .frame(minHeight: 34)
-                            .foregroundStyle(selected ? SQColor.onInk : SQColor.chipInk)
-                            .background(selected ? SQColor.label : SQColor.chip,
-                                        in: Capsule(style: .continuous))
+                            .foregroundStyle(selected ? SQColor.label : SQColor.chipInk)
                             .frame(minHeight: 44)
+                            .overlay(alignment: .bottom) {
+                                Capsule(style: .continuous)
+                                    .fill(selected ? SQColor.label : Color.clear)
+                                    .frame(height: 3)
+                            }
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(SQPressButtonStyle(scale: 0.97))
@@ -2517,42 +2518,13 @@ struct FeedView: View {
             }
             .padding(.horizontal, SQSpace.lg)
         }
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(SQColor.separator).frame(height: 1).accessibilityHidden(true)
+        }
         // Le rail déborde volontairement des marges de l'écran, comme celui des
         // stories : la première pastille reste alignée sur la marge.
         .padding(.horizontal, -SQSpace.lg)
-    }
-
-    /// « Pertinence | Récent » sous les onglets qui le proposent (Fil Communauté, C8). Un groupe
-    /// de deux choix exclusifs : VoiceOver annonce le choix actif par `.isSelected`.
-    private var sortPicker: some View {
-        HStack(spacing: SQSpace.xs) {
-            ForEach(FeedSortChoice.allCases, id: \.self) { choice in
-                let selected = model.sort(for: model.tab) == choice
-                Button {
-                    Haptics.selection()
-                    Task { await model.selectSort(choice) }
-                } label: {
-                    Text(choice == .relevance ? "Pertinence" : "Récent")
-                        .font(SQType.caption.weight(selected ? .bold : .semibold))
-                        .sqSingleLine()
-                        .padding(.horizontal, SQSpace.md)
-                        .frame(minHeight: 30)
-                        .foregroundStyle(selected ? SQColor.label : SQColor.chipInk)
-                        .background(selected ? SQColor.surface : Color.clear,
-                                    in: Capsule(style: .continuous))
-                        .frame(minHeight: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
-                .accessibilityIdentifier("feed.sort.\(choice.rawValue)")
-            }
-        }
-        .padding(.horizontal, SQSpace.xxs)
-        .background(SQColor.chip, in: Capsule(style: .continuous))
-        .frame(maxHeight: 44)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Ordre du fil")
+        .background(SQColor.bg)
     }
 
     /// « Changer de zone » : une ville choisie à la main, même sans localisation.
