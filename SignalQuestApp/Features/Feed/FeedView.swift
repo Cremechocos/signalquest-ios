@@ -325,6 +325,15 @@ final class FeedViewModel: ObservableObject {
     }
     @Published private(set) var nearbyZone: NearbyZone?
 
+    /// L'état vide affiché propose déjà « Publier » (Autour sans publication) : le crayon
+    /// flottant se retire pour ne pas doubler l'action (règle commune du 25/11). Mêmes
+    /// conditions que celles qui affichent cet état vide dans la vue.
+    var emptyStateOffersPublish: Bool {
+        guard tab == .nearby, selectedHashtag == nil, nearbyPosition == .ready,
+              !isLoading, errorMessage == nil, let page else { return false }
+        return page.items.isEmpty
+    }
+
     func chooseNearbyZone(name: String, coordinate: CLLocationCoordinate2D) async {
         nearbyZone = NearbyZone(name: name, point: FeedNearPoint(coordinate))
         guard tab.needsPosition else { return }
@@ -1246,7 +1255,9 @@ struct FeedView: View {
             }
         }
         // Publier, depuis n'importe où dans le fil (Fil Communauté, haut du fil du 25/11).
-        .overlay(alignment: .bottomTrailing) { composeButton }
+        .overlay(alignment: .bottomTrailing) {
+            if !model.emptyStateOffersPublish { composeButton }
+        }
         .sqAnimation(SQMotion.snappy, value: model.pendingCount > 0)
         // Pastille annoncée sans déplacer le focus de VoiceOver (C7).
         .onChangeCompat(of: model.pendingCount) { old, new in

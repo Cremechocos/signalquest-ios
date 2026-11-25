@@ -547,6 +547,26 @@ final class FeedContextTests: XCTestCase {
         XCTAssertEqual(model.nearbyPosition, .unavailable)
     }
 
+    /// Règle commune du 25/11 : Autour vide propose déjà « Publier », le crayon flottant se retire ;
+    /// partout ailleurs, et dès qu'une publication arrive, il revient.
+    func testEmptyNearbyOffersPublishInsteadOfThePencil() async throws {
+        let empty = try JSONDecoder.signalQuest.decode(SocialFeedPage.self, from: Data(#"{"items":[]}"#.utf8))
+        let model = FeedViewModel(service: FeedContextFixture { _, _, _ in empty })
+        await model.load()
+        XCTAssertFalse(model.emptyStateOffersPublish, "Pour toi vide n'a pas de « Publier »")
+        await model.select(.nearby)
+        XCTAssertFalse(model.emptyStateOffersPublish, "sans position, l'état vide n'est pas affiché")
+        await model.chooseNearbyZone(name: "Lyon", coordinate: CLLocationCoordinate2D(latitude: 45.76, longitude: 4.84))
+        XCTAssertTrue(model.emptyStateOffersPublish, "Autour vide : le crayon se retire")
+        model.selectedHashtag = "alpha"
+        XCTAssertFalse(model.emptyStateOffersPublish, "un hashtag a son propre état vide, sans « Publier »")
+
+        let full = FeedViewModel(service: FeedContextFixture { _, _, _ in Self.page("page", items: [Self.item("a")]) })
+        await full.chooseNearbyZone(name: "Lyon", coordinate: CLLocationCoordinate2D(latitude: 45.76, longitude: 4.84))
+        await full.select(.nearby)
+        XCTAssertFalse(full.emptyStateOffersPublish, "des publications : le crayon reste")
+    }
+
     /// Plan Fil Communauté, B4 : le rayon de « Autour » vient de la réponse, jamais d'une constante.
     func testNearbyRadiusIsReadFromTheResponse() async throws {
         let raw = #"{"items":[],"nextCursor":null,"nearRadiusKm":25}"#
