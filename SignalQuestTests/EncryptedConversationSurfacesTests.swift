@@ -95,6 +95,23 @@ final class EncryptedConversationSurfacesTests: XCTestCase {
         XCTAssertNotNil(Surfaces.v2SendFailureMessage(.membersNotTrusted(["u"])))
     }
 
+    /// IOS-077 : un échec à réessayer dû au chiffrement qui se prépare ne parle pas de connexion ;
+    /// le vrai réseau garde « Connexion instable ».
+    func testRetryableFailureNamesEncryptionPreparationNotTheConnection() {
+        typealias Surfaces = EncryptedConversationSurfaces
+        let enrolling = E2EEV2TransportFailure(kind: .retryable, message: "e2ee-device-enrolling")
+        let directory = E2EEV2TransportFailure(kind: .retryable, message: "e2ee-v2-device-directory-unavailable")
+        let network = E2EEV2TransportFailure(kind: .retryable, message: "e2ee-transport-unavailable")
+        let preparing = String(localized: "Le chiffrement de cet appareil se prépare. Réessaie dans un instant.")
+        let unstable = String(localized: "Connexion instable. Réessaie.")
+        XCTAssertNotEqual(preparing, unstable)
+        XCTAssertEqual(Surfaces.retryableFailureText(enrolling), preparing, "Inscription de l'appareil en cours")
+        XCTAssertEqual(Surfaces.retryableFailureText(directory), preparing, "Annuaire des appareils pas encore vérifié")
+        XCTAssertEqual(Surfaces.retryableFailureText(network), unstable, "Le réseau garde son texte")
+        XCTAssertEqual(Surfaces.v2SendFailureMessage(.failure(enrolling)), preparing, "L'envoi dit la même chose")
+        XCTAssertEqual(Surfaces.v2SendFailureMessage(.failure(network)), unstable)
+    }
+
     /// IOS-001 : une photo de la galerie part chiffrée vers une conversation v2, écriture v2
     /// ouverte ; partout ailleurs, la feuille garde ses chemins (clair, ou ligne grisée).
     func testPhotoShareGoesEncryptedOnlyToAV2ConversationWithWritesOpen() throws {

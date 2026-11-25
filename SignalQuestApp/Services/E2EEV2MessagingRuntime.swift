@@ -904,7 +904,7 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
             throw E2EEV2MessagingError(String(localized: "Ce membre doit mettre à jour SignalQuest pour rejoindre ce groupe chiffré."))
         case .failure(let failure):
             throw E2EEV2MessagingError(failure.kind == .retryable
-                ? String(localized: "Connexion instable. Réessaie.")
+                ? EncryptedConversationSurfaces.retryableFailureText(failure)
                 : String(localized: "Ce changement n’a pas pu être fait dans la conversation chiffrée."))
         }
     }

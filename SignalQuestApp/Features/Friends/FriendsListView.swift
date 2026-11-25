@@ -501,7 +501,7 @@ struct FriendsListView: View {
                 }
             case .failure(let failure):
                 model.errorMessage = failure.kind == .retryable
-                    ? String(localized: "Connexion instable. Réessaie.")
+                    ? EncryptedConversationSurfaces.retryableFailureText(failure)
                     : String(localized: "La conversation n’a pas pu être ouverte.")
             }
         } catch {

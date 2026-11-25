@@ -1571,7 +1571,7 @@ extension AppServices {
                 throw MessageRequestLimitError(failure: failure)
             case .failure(let failure):
                 throw E2EEV2MessagingError(failure.kind == .retryable
-                    ? String(localized: "Connexion instable. Réessaie.")
+                    ? EncryptedConversationSurfaces.retryableFailureText(failure)
                     : String(localized: "La conversation chiffrée n’a pas pu être créée."))
             }
         }

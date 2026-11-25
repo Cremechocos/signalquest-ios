@@ -91,6 +91,21 @@ enum EncryptedConversationSurfaces {
         return v2Enabled ? .v2 : .unavailable
     }
 
+    /// Échecs « à réessayer » qui ne viennent pas du réseau : le chiffrement de cet
+    /// appareil se prépare (inscription pas encore acceptée, annuaire des appareils
+    /// pas encore vérifié). « Connexion instable » y était faux (IOS-077).
+    static let preparingEncryptionMessages: Set<String> = [
+        "e2ee-device-enrolling",
+        "e2ee-v2-device-directory-unavailable",
+    ]
+
+    /// Texte d'un échec `.retryable` : la préparation du chiffrement ou le réseau.
+    static func retryableFailureText(_ failure: E2EEV2TransportFailure) -> String {
+        preparingEncryptionMessages.contains(failure.message)
+            ? String(localized: "Le chiffrement de cet appareil se prépare. Réessaie dans un instant.")
+            : String(localized: "Connexion instable. Réessaie.")
+    }
+
     /// Ce que dit l'app quand un envoi v2 ne part pas ; `nil` quand le serveur l'a accepté.
     /// Les messages restent gardés sur l'appareil (file durable) : le texte le dit sans promettre une heure.
     /// `keptForRetry` : le texte reste gardé avec un bouton Renvoyer (le fil) ; sinon rien n'est gardé (le transfert).
@@ -113,7 +128,7 @@ enum EncryptedConversationSurfaces {
             return MessageRequestLimitError(failure: failure).errorDescription
         case .failure(let failure):
             return failure.kind == .retryable
-                ? String(localized: "Connexion instable. Réessaie.")
+                ? retryableFailureText(failure)
                 : String(localized: "Ce message chiffré n’a pas pu être envoyé.")
         }
     }

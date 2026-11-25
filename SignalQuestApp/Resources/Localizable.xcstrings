@@ -119883,6 +119883,34 @@
           }
         }
       }
+    },
+    "Le chiffrement de cet appareil se prépare. Réessaie dans un instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encryption on this device is getting ready. Try again in a moment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le chiffrement de cet appareil se prépare. Réessaie dans un instant."
+          }
+        }
+      }
+    },
+    "SQFormal|Le chiffrement de cet appareil se prépare. Réessaie dans un instant." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le chiffrement de cet appareil se prépare. Réessayez dans un instant."
+          }
+        }
+      },
+      "shouldTranslate" : false
     }
   },
   "version" : "1.0"
