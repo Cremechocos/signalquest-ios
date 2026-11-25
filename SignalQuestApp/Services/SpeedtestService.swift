@@ -453,6 +453,87 @@ private struct CloudflareSpeedtestFailure: LocalizedError, CloudflareEngineFailu
 
 // MARK: - Service implementation
 
+/// IOS-063 : la génération radio PENDANT la mesure. Lue avant le test, téléphone au repos,
+/// elle pouvait dire « 5G NSA » quand le lien servait en 4G, ou l'inverse (test du 24/11).
+/// CoreTelephony est relu au fil de la progression du téléchargement et de l'envoi, au plus
+/// deux fois par seconde ; l'étiquette prend la génération la plus vue pendant le téléchargement.
+final class SpeedtestRadioTechnologyLog: @unchecked Sendable {
+    private struct State {
+        var lastPhase: SpeedtestPhase = .idle
+        var lastSampleAt: TimeInterval = -.infinity
+        var download: [CellularRadioTechnology] = []
+        var lastDownloadSample: Date?
+        var seen: Set<CellularRadioTechnology> = []
+    }
+
+    static let minimumInterval: TimeInterval = 0.5
+    private let state = OSAllocatedUnfairLock(initialState: State())
+    private let read: @Sendable () -> CellularRadioTechnology?
+    private let now: @Sendable () -> TimeInterval
+
+    init(read: @escaping @Sendable () -> CellularRadioTechnology?,
+         now: @escaping @Sendable () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }) {
+        self.read = read
+        self.now = now
+    }
+
+    /// Une lecture au changement d'étape, puis au plus une par `minimumInterval`.
+    func observe(_ phase: SpeedtestPhase) {
+        guard phase == .download || phase == .upload else { return }
+        let instant = now()
+        let due = state.withLock { s -> Bool in
+            guard s.lastPhase != phase || instant - s.lastSampleAt >= Self.minimumInterval else { return false }
+            s.lastPhase = phase
+            s.lastSampleAt = instant
+            return true
+        }
+        guard due, let technology = read() else { return }
+        state.withLock { s in
+            s.seen.insert(technology)
+            if phase == .download {
+                s.download.append(technology)
+                s.lastDownloadSample = Date()
+            }
+        }
+    }
+
+    /// La plus vue pendant le téléchargement ; à égalité, la plus récente.
+    var downloadTechnology: CellularRadioTechnology? {
+        state.withLock { s in
+            var counts: [CellularRadioTechnology: Int] = [:]
+            var best: CellularRadioTechnology?
+            for technology in s.download {
+                counts[technology, default: 0] += 1
+                if let current = best, counts[current, default: 0] > counts[technology, default: 0] { continue }
+                best = technology
+            }
+            return best
+        }
+    }
+
+    /// nil sans aucune lecture ; vrai dès que deux générations ont été vues.
+    var changed: Bool? {
+        state.withLock { s in s.seen.isEmpty ? nil : s.seen.count > 1 }
+    }
+
+    /// Étiquette, preuve radio et changement décrivent le lien pendant la mesure ; hors
+    /// cellulaire, ou sans lecture, le résultat reste tel quel.
+    func applied(to result: SpeedtestRunResult) -> SpeedtestRunResult {
+        guard result.connectionType == .cellular else { return result }
+        var updated = result
+        if let technology = downloadTechnology, technology != result.cellularTechnology {
+            updated.cellularTechnology = technology
+            updated.radioEvidence = SpeedtestRadioEvidence.technologySnapshot(
+                technology: technology,
+                observedAt: state.withLock { $0.lastDownloadSample } ?? Date(),
+                location: result.coordinate
+            )
+        }
+        if let changed { updated.networkChangedDuringTest = changed }
+        return updated
+    }
+}
+
 final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     /// Verrou du test en cours (CAR-05).
     private let runGate = SpeedtestRunGate()
@@ -473,6 +554,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     private let cloudflareFallbackPolicy: CloudflareAutoFallbackPolicy
     private let invalidatePublicMap: @Sendable () async -> Void
     private let vpnIsActive: @Sendable () -> Bool
+    /// Génération radio du moment (IOS-063), relue pendant la mesure.
+    private let radioTechnology: @Sendable () -> CellularRadioTechnology?
     static let pendingSaveKey = "pending-speedtest-saves"
     static let rescueSaveKey = "pending-speedtest-rescue"
     /// Dossier de la file d'attente durable (partagé entre l'init durable et la migration).
@@ -501,7 +584,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         pendingStore: SpeedtestPendingStoring? = nil,
         rescueStore: SpeedtestPendingStoring? = nil,
         invalidatePublicMap: @escaping @Sendable () async -> Void = {},
-        vpnIsActive: @escaping @Sendable () -> Bool = { VPNDetector.isActive() }
+        vpnIsActive: @escaping @Sendable () -> Bool = { VPNDetector.isActive() },
+        radioTechnology: @escaping @Sendable () -> CellularRadioTechnology? = { CoreTelephonyRadioReader.shared.current() }
     ) {
         // Migration unique : les sauvegardes en attente vivaient dans Caches (purgeable).
         // On les remonte vers Application Support avant toute lecture, pour ne pas perdre
@@ -523,6 +607,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         self.cloudflareFallbackPolicy = cloudflareFallbackPolicy
         self.invalidatePublicMap = invalidatePublicMap
         self.vpnIsActive = vpnIsActive
+        self.radioTechnology = radioTechnology
     }
 
     /// Migration unique Caches → Application Support pour la file d'attente durable.
@@ -567,8 +652,11 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         }
         // SPEEDTEST-FAIL-1 : l'étape atteinte suit la progression, que l'écran l'écoute ou non.
         let probe = SpeedtestFailureProbe()
+        // IOS-063 : la génération suivie pendant le téléchargement et l'envoi.
+        let radio = SpeedtestRadioTechnologyLog(read: radioTechnology)
         let tracked: SpeedtestProgressHandler = { update in
             probe.reach(update.phase)
+            if pathStatus.connection == .cellular { radio.observe(update.phase) }
             progress?(update)
         }
         SpeedtestFailureReporter.noteRunStarted()
@@ -581,7 +669,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 }
             }
             _ = SpeedtestFailureReporter.noteRunEnded()
-            return result
+            return radio.applied(to: result)
         } catch {
             let stop = SpeedtestFailureReporter.noteRunEnded()
             recordFailure(error, cancelled: Task.isCancelled, stop: stop, probe: probe, pathStatus: pathStatus)

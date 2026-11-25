@@ -1920,3 +1920,147 @@ final class SpeedtestTests: XCTestCase {
         }
     }
 }
+
+/// IOS-063 : la génération radio du résultat décrit le lien PENDANT la mesure, pas la lecture
+/// d'avant le test (téléphone au repos), et un changement 4G ↔ 5G part au serveur.
+final class SpeedtestRadioTechnologyDuringTestTests: XCTestCase {
+    /// Lectures successives de CoreTelephony et horloge qui avance d'une seconde par appel.
+    private final class Script: @unchecked Sendable {
+        private let readings = OSAllocatedUnfairLock<[CellularRadioTechnology?]>(initialState: [])
+        private let clock = OSAllocatedUnfairLock<TimeInterval>(initialState: 0)
+        let step: TimeInterval
+        init(_ values: [CellularRadioTechnology?], step: TimeInterval = 1) {
+            self.step = step
+            readings.withLock { $0 = values }
+        }
+        func read() -> CellularRadioTechnology? {
+            readings.withLock { $0.isEmpty ? nil : $0.removeFirst() }
+        }
+        func now() -> TimeInterval {
+            clock.withLock { value in value += step; return value }
+        }
+        var remaining: Int { readings.withLock { $0.count } }
+    }
+
+    private func log(_ script: Script) -> SpeedtestRadioTechnologyLog {
+        SpeedtestRadioTechnologyLog(read: { script.read() }, now: { script.now() })
+    }
+
+    private func result(_ connection: NetworkConnectionKind, start: CellularRadioTechnology?) -> SpeedtestRunResult {
+        var result = SpeedtestRunResult(
+            id: UUID(),
+            label: "iOS speedtest",
+            downloadMbps: 471,
+            downloadAverageMbps: 471,
+            downloadMaxMbps: 513,
+            downloadP90Mbps: 500,
+            downloadP95Mbps: 505,
+            uploadMbps: 21,
+            uploadAverageMbps: 21,
+            uploadMaxMbps: 27,
+            uploadP90Mbps: 25,
+            uploadP95Mbps: 26,
+            pingMs: 28,
+            pingMedianMs: 28,
+            pingMinMs: 28,
+            pingMaxMs: 40,
+            jitterMs: 2,
+            pingProtocol: "TCP",
+            durationSeconds: 20,
+            connectionType: connection,
+            cellularTechnology: start,
+            networkOperatorName: "Orange",
+            wifiSSID: nil,
+            city: "Paris",
+            coordinate: Coordinates(latitude: 48.8566, longitude: 2.3522),
+            serverName: "Paris",
+            createdAt: Date(),
+            downloadSeriesMbps: nil,
+            uploadSeriesMbps: nil,
+            uploadMeasurementSource: nil,
+            deviceModel: nil,
+            osVersion: nil
+        )
+        result.radioEvidence = SpeedtestRadioEvidence.technologySnapshot(technology: start, observedAt: Date(), location: nil)
+        return result
+    }
+
+    private func payloadJSON(_ result: SpeedtestRunResult) throws -> [String: Any] {
+        let payload = SpeedtestSubmission.iosPayload(from: result, streams: 4, deviceModel: "iPhone")
+        let data = try JSONEncoder.signalQuest.encode(payload)
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    }
+
+    /// Le cas du 24/11 : « 5G NSA » lu au repos, le téléchargement servi en 4G puis la 5G
+    /// à l'envoi. L'étiquette suit le téléchargement et le changement est signalé.
+    func testLabelFollowsTheDownloadAndTheChangeIsSent() throws {
+        let script = Script([.fourG, .fourG, .fiveGNSA])
+        let log = log(script)
+        log.observe(.ping)
+        log.observe(.download)
+        log.observe(.download)
+        log.observe(.upload)
+        XCTAssertEqual(script.remaining, 0, "le ping ne lit pas la radio ; téléchargement et envoi oui")
+
+        let applied = log.applied(to: result(.cellular, start: .fiveGNSA))
+
+        XCTAssertEqual(applied.cellularTechnology, .fourG)
+        XCTAssertEqual(applied.speedtestConnectionType, CellularRadioTechnology.fourG.displayName)
+        XCTAssertEqual(applied.networkChangedDuringTest, true)
+        XCTAssertEqual(applied.radioEvidence?.rat, "LTE")
+        XCTAssertEqual(applied.radioEvidence?.is5gNsa, false)
+        let json = try payloadJSON(applied)
+        XCTAssertEqual(json["connectionType"] as? String, CellularRadioTechnology.fourG.displayName)
+        XCTAssertEqual(json["radioTechChangedDuringTest"] as? Bool, true)
+    }
+
+    /// Sans changement, l'information part aussi : « vu, et stable », pas « inconnu ».
+    func testStableGenerationIsSentAsNoChange() throws {
+        let log = log(Script([.fiveGNSA, .fiveGNSA]))
+        log.observe(.download)
+        log.observe(.upload)
+
+        let applied = log.applied(to: result(.cellular, start: .fiveGNSA))
+
+        XCTAssertEqual(applied.cellularTechnology, .fiveGNSA)
+        XCTAssertEqual(applied.networkChangedDuringTest, false)
+        XCTAssertEqual(try payloadJSON(applied)["radioTechChangedDuringTest"] as? Bool, false)
+    }
+
+    /// Une lecture au changement d'étape, puis au plus deux par seconde : la progression
+    /// arrive bien plus souvent, CoreTelephony n'est pas relu à chaque tick.
+    func testReadingsAreThrottledButEachPhaseIsRead() {
+        let script = Script([.fourG, .fiveGNSA, .fiveGNSA], step: 0.1)
+        let log = log(script)
+        for _ in 0..<4 { log.observe(.download) }
+        XCTAssertEqual(script.remaining, 2, "quatre ticks en 0,4 s : une seule lecture")
+        log.observe(.upload)
+        XCTAssertEqual(script.remaining, 1, "le passage à l'envoi est lu tout de suite")
+    }
+
+    /// À égalité pendant le téléchargement, la génération la plus récente l'emporte.
+    func testTieGoesToTheMostRecentGeneration() {
+        let log = log(Script([.fourG, .fiveGNSA]))
+        log.observe(.download)
+        log.observe(.download)
+        XCTAssertEqual(log.downloadTechnology, .fiveGNSA)
+    }
+
+    /// Wi-Fi, ou aucune lecture (simulateur, pas de SIM) : le résultat reste tel quel et le
+    /// champ n'est pas envoyé.
+    func testWifiOrNoReadingLeavesTheResultAsIs() throws {
+        let wifi = log(Script([.fourG]))
+        wifi.observe(.download)
+        let wifiResult = wifi.applied(to: result(.wifi, start: nil))
+        XCTAssertNil(wifiResult.networkChangedDuringTest)
+        XCTAssertNil(try payloadJSON(wifiResult)["radioTechChangedDuringTest"])
+
+        let silent = log(Script([nil, nil]))
+        silent.observe(.download)
+        silent.observe(.upload)
+        let kept = silent.applied(to: result(.cellular, start: .fiveGNSA))
+        XCTAssertEqual(kept.cellularTechnology, .fiveGNSA)
+        XCTAssertNil(kept.networkChangedDuringTest)
+        XCTAssertNil(try payloadJSON(kept)["radioTechChangedDuringTest"])
+    }
+}

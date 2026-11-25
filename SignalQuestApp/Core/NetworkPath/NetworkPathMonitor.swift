@@ -39,6 +39,20 @@ enum CellularRadioTechnology: String, Codable, Equatable, CaseIterable, Sendable
     }
 }
 
+/// Génération radio du service de données, lue à la demande hors du fil principal (IOS-063) :
+/// même lecture que le moniteur, pour suivre la génération PENDANT un speedtest.
+final class CoreTelephonyRadioReader: @unchecked Sendable {
+    static let shared = CoreTelephonyRadioReader()
+    private let telephony = CTTelephonyNetworkInfo()
+
+    func current() -> CellularRadioTechnology? {
+        NetworkPathMonitor.activeServiceValue(in: telephony.serviceCurrentRadioAccessTechnology,
+                                              dataServiceIdentifier: telephony.dataServiceIdentifier) {
+            CellularRadioTechnology.map($0)
+        }
+    }
+}
+
 struct NetworkPathSnapshot: Equatable, Sendable {
     let usesWiFi: Bool
     let usesCellular: Bool
@@ -356,7 +370,7 @@ final class NetworkPathMonitor: NSObject, ObservableObject, CTTelephonyNetworkIn
         }
     }
 
-    static func activeServiceValue<Raw, Value>(
+    nonisolated static func activeServiceValue<Raw, Value>(
         in services: [String: Raw]?, dataServiceIdentifier: String?,
         transform: (Raw) -> Value?
     ) -> Value? {

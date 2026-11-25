@@ -558,7 +558,8 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
     let pingProtocol: String?
     let durationSeconds: Double
     let connectionType: NetworkConnectionKind
-    let cellularTechnology: CellularRadioTechnology?
+    /// Génération vue pendant le téléchargement (IOS-063), celle du départ à défaut.
+    var cellularTechnology: CellularRadioTechnology?
     let networkOperatorName: String?
     let networkOperatorMcc: Int?
     let networkOperatorMnc: Int?
@@ -569,7 +570,8 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
     let simPlmn: String?
     let isRoaming: Bool?
     let networkIdentitySource: String?
-    let radioEvidence: SpeedtestRadioEvidence?
+    /// Réécrite avec la génération du téléchargement (IOS-063).
+    var radioEvidence: SpeedtestRadioEvidence?
     let marketCode: String?
     let operatorKey: String?
     /// Nom brut de la SIM. Un MVNO reste ici secondaire au réseau hôte porté
@@ -1055,6 +1057,8 @@ struct SpeedtestSubmission: Encodable, Equatable {
     var pingMeasuredOnTestServer: Bool? = nil
     var packetLossPct: Double? = nil
     var pingSampleCount: Int? = nil
+    /// Génération radio changée pendant le téléchargement ou l'envoi (IOS-063). Absent hors cellulaire.
+    var radioTechChangedDuringTest: Bool? = nil
 
     /// Version de la méthodologie de mesure, commune aux deux plateformes.
     ///
@@ -1085,6 +1089,7 @@ struct SpeedtestSubmission: Encodable, Equatable {
         case rsrp, rsrq, snr, cellId, pci, tac, enb, gnb, earfcn, nrarfcn, timingAdvance, timingAdvanceSourceTechnology, timingAdvanceSourceCellId, radioSnapshots
         case pingDl, jitterDl, pingUl, jitterUl
         case wifi, uploadServerName, bufferbloatGrade, bufferbloatDeltaMs, pingMeasuredOnTestServer, packetLossPct, pingSampleCount
+        case radioTechChangedDuringTest
     }
 
     private enum WifiKeys: String, CodingKey { case ssid }
@@ -1213,6 +1218,8 @@ struct SpeedtestSubmission: Encodable, Equatable {
         payload.pingMeasuredOnTestServer = SpeedtestLoadedLatencyGrade.measuredOnTestServer(result)
         payload.packetLossPct = result.packetLossPct
         payload.pingSampleCount = result.pingSampleCount
+        // IOS-063 : changement 4G ↔ 5G vu pendant la mesure ; rien hors cellulaire.
+        payload.radioTechChangedDuringTest = result.connectionType == .cellular ? result.networkChangedDuringTest : nil
         return payload
     }
 
@@ -1322,6 +1329,7 @@ struct SpeedtestSubmission: Encodable, Equatable {
         try c.encodeIfPresent(pingMeasuredOnTestServer, forKey: .pingMeasuredOnTestServer)
         try c.encodeIfPresent(packetLossPct, forKey: .packetLossPct)
         try c.encodeIfPresent(pingSampleCount, forKey: .pingSampleCount)
+        try c.encodeIfPresent(radioTechChangedDuringTest, forKey: .radioTechChangedDuringTest)
     }
 }
 
