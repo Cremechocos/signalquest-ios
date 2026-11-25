@@ -5,6 +5,22 @@ import XCTest
 /// Plan 3, vague 2 : répondre à un message et le marquer comme lu depuis sa
 /// notification, jamais de réponse en clair dans une conversation chiffrée.
 final class MessageNotificationCategoryTests: XCTestCase {
+    /// L'extension lit les UserDefaults de l'App Group (`appGroupDefaults`) : Apple exige
+    /// la raison 1C8F.1 dans le manifeste de CHAQUE bundle qui y touche (ITMS-91053), et
+    /// celui de l'app hôte ne couvre pas l'extension. Le widget, lui aussi lecteur.
+    func testExtensionsReadingTheAppGroupDefaultsDeclareTheReason() throws {
+        let plugIns = try XCTUnwrap(Bundle.main.builtInPlugInsURL)
+        for appex in ["SignalQuestNotificationService.appex", "SignalQuestWidget.appex"] {
+            let url = plugIns.appendingPathComponent(appex).appendingPathComponent("PrivacyInfo.xcprivacy")
+            let manifest = try XCTUnwrap(
+                PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil) as? [String: Any]
+            )
+            let accessed = manifest["NSPrivacyAccessedAPITypes"] as? [[String: Any]] ?? []
+            let defaults = accessed.first { $0["NSPrivacyAccessedAPIType"] as? String == "NSPrivacyAccessedAPICategoryUserDefaults" }
+            XCTAssertEqual(defaults?["NSPrivacyAccessedAPITypeReasons"] as? [String], ["1C8F.1"], appex)
+        }
+    }
+
     func testMessagesGetTheirCategoryAndOtherNotificationsDoNot() {
         XCTAssertEqual(
             MessageNotificationCategory.category(for: ["type": "message_new", "conversationId": "c1"]),

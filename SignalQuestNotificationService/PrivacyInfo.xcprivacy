@@ -3,7 +3,21 @@
 <plist version="1.0">
 <dict>
 	<key>NSPrivacyAccessedAPITypes</key>
-	<array/>
+	<array>
+		<!-- 1C8F.1 = UserDefaults partagés avec les autres membres de l'App
+		     Group : conversations protégées (MessageNotificationCategory) et
+		     contexte E2EE v2 (E2EEV2NotificationContracts), compilés dans
+		     l'extension. Apple exige la déclaration dans le manifeste de
+		     chaque bundle : celui de l'app hôte ne couvre pas l'extension. -->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>1C8F.1</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSPrivacyCollectedDataTypes</key>
 	<array/>
 	<key>NSPrivacyTracking</key>
