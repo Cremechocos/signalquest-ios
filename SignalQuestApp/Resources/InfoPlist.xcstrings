@@ -105,6 +105,23 @@
         }
       }
     },
+    "NSPhotoLibraryAddUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest saves an image shared from the app to your photo library when you ask: a received photo, or a speedtest or trip card."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest ajoute à la photothèque, sur demande, une image partagée depuis l’app : photo reçue, carte d’un speedtest ou d’un trajet."
+          }
+        }
+      }
+    },
     "NSPhotoLibraryUsageDescription" : {
       "extractionState" : "manual",
       "localizations" : {

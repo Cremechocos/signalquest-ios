@@ -43,11 +43,19 @@ final class PluralVariationTests: XCTestCase {
 
     func testEnglishPermissionPromptsAreCompiled() throws {
         let english = try XCTUnwrap(Bundle.main.path(forResource: "en", ofType: "lproj").flatMap(Bundle.init(path:)))
-        for key in ["NSCameraUsageDescription", "NSMicrophoneUsageDescription", "NSLocationWhenInUseUsageDescription", "NSFaceIDUsageDescription", "NSPhotoLibraryUsageDescription"] {
+        for key in ["NSCameraUsageDescription", "NSMicrophoneUsageDescription", "NSLocationWhenInUseUsageDescription", "NSFaceIDUsageDescription", "NSPhotoLibraryUsageDescription", "NSPhotoLibraryAddUsageDescription"] {
             let value = english.localizedString(forKey: key, value: "MISSING", table: "InfoPlist")
             XCTAssertTrue(value.hasPrefix("SignalQuest"), "Traduction anglaise absente : \(key)")
-            XCTAssertFalse(value.contains(" utilise "), "Repli français inattendu : \(key)")
+            XCTAssertFalse(value.contains(" utilise ") || value.contains(" ajoute "), "Repli français inattendu : \(key)")
         }
+    }
+
+    /// IOS-065 : « Enregistrer l'image » depuis une feuille de partage (photo reçue, carte
+    /// d'un speedtest ou d'un trajet) ne demande que l'ajout. Sans cette clé, iOS réclame
+    /// l'accès COMPLET à la photothèque, avec le texte d'import.
+    func testSavingAnImageAsksOnlyToAddToThePhotoLibrary() {
+        let declared = Bundle.main.infoDictionary?["NSPhotoLibraryAddUsageDescription"] as? String
+        XCTAssertEqual(declared?.hasPrefix("SignalQuest"), true, "clé d'ajout seul absente de l'Info.plist")
     }
 
     /// Le cœur du sujet : zéro se comporte différemment dans les deux langues.
