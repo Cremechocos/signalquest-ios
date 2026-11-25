@@ -253,10 +253,7 @@ struct SpeedtestDetailContent: View {
                     triCell("Max réception", value: parts.value, unit: parts.unit)
                 }
                 if let ping = Self.measured(result.primaryPingMs) {
-                    // Depuis la méthodologie v6, la valeur est le minimum : même libellé
-                    // que l'écran de résultat et la carte de partage (IOS-033).
-                    let isMinimum = (result.methodologyVersion ?? 0) >= 6 && result.pingMinMs != nil
-                    triCell(isMinimum ? "Latence min." : "Latence", value: Self.msText(ping), unit: "ms")
+                    triCell(Self.latencyIsMinimum(result) ? "Latence min." : "Latence", value: Self.msText(ping), unit: "ms")
                 }
                 if let jitter = Self.measured(result.jitterMs) {
                     triCell("Gigue", value: Self.jitterText(jitter), unit: "ms")
@@ -875,6 +872,12 @@ struct SpeedtestDetailContent: View {
     private static func msText(_ value: Double?) -> String {
         guard let value, value.isFinite else { return "—" }
         return "\(Int(value.rounded()))"
+    }
+
+    /// Depuis la méthodologie v6, la latence affichée est le minimum : même libellé
+    /// que l'écran de résultat et la carte de partage (IOS-033).
+    static func latencyIsMinimum(_ result: SpeedtestRunResult) -> Bool {
+        (result.methodologyVersion ?? 0) >= 6 && result.pingMinMs != nil
     }
 
     /// Le nombre d'une gigue, selon la règle unique de `SQUnits`.

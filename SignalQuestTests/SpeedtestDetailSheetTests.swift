@@ -13,7 +13,9 @@ final class SpeedtestDetailSheetTests: XCTestCase {
         hasLoadedPings: Bool = true,
         hasCoordinate: Bool = true,
         download: Double = 487,
-        loadedDownloadPing: Double? = 28
+        loadedDownloadPing: Double? = 28,
+        methodology: Int? = nil,
+        pingMin: Double? = 14
     ) -> SpeedtestRunResult {
         var dl: [Double] = []
         var ul: [Double] = []
@@ -33,7 +35,7 @@ final class SpeedtestDetailSheetTests: XCTestCase {
             uploadAverageMbps: hasUpload ? 45 : nil,
             uploadMaxMbps: hasUpload ? 60 : nil,
             uploadP90Mbps: nil, uploadP95Mbps: nil,
-            pingMs: 18, pingMedianMs: 18, pingMinMs: 14, pingMaxMs: 30,
+            pingMs: 18, pingMedianMs: 18, pingMinMs: pingMin, pingMaxMs: 30,
             jitterMs: 3,
             pingDlMs: hasLoadedPings ? loadedDownloadPing : nil,
             jitterDlMs: hasLoadedPings ? 4.1 : nil,
@@ -53,8 +55,22 @@ final class SpeedtestDetailSheetTests: XCTestCase {
             downloadGraceWindowCount: 4,
             uploadGraceWindowCount: hasUpload ? 4 : nil,
             uploadMeasurementSource: nil,
-            deviceModel: "iPhone 17 Pro", osVersion: "iOS 26"
+            deviceModel: "iPhone 17 Pro", osVersion: "iOS 26",
+            methodologyVersion: methodology
         )
+    }
+
+    /// IOS-033 : dès la méthodologie 6, la tuile montre le minimum et le dit, comme
+    /// l'écran de résultat ; avant, ou sans minimum servi, elle reste « Latence ».
+    func testLatencyTileSaysMinimumFromMethodologySix() {
+        XCTAssertTrue(SpeedtestDetailContent.latencyIsMinimum(sample(methodology: 6)))
+        XCTAssertTrue(SpeedtestDetailContent.latencyIsMinimum(sample(methodology: 7)))
+        XCTAssertFalse(SpeedtestDetailContent.latencyIsMinimum(sample(methodology: 5)))
+        XCTAssertFalse(SpeedtestDetailContent.latencyIsMinimum(sample(methodology: nil)))
+        XCTAssertFalse(SpeedtestDetailContent.latencyIsMinimum(sample(methodology: 6, pingMin: nil)))
+        // La valeur affichée suit la même règle : le minimum dès la v6.
+        XCTAssertEqual(sample(methodology: 6).primaryPingMs, 14)
+        XCTAssertEqual(sample(methodology: 5).primaryPingMs, 18)
     }
 
     /// Les formats suivent le lexique (formateur commun `SQUnits`) : virgule
