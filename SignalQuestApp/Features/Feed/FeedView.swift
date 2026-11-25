@@ -2273,7 +2273,8 @@ struct FeedView: View {
                 .sqSurface(SQColor.surface, in: Circle())
                 .sqShadowSoft()
         }
-        .accessibilityLabel("Plus")
+        // Même libellé que le Web et Android (contrôle croisé Fil Communauté, 25/11).
+        .accessibilityLabel("Options du fil")
     }
 
     // MARK: Hashtags — capsules pleines/douces

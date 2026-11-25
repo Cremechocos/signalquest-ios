@@ -68,7 +68,8 @@ final class ProfileReorgQATests: XCTestCase {
         XCTAssertTrue(app.buttons["map.filters.anfr.map"].firstMatch.exists)
         anfrStats.tap()
         // L'écran s'ouvre à la fermeture de la feuille Carte.
-        XCTAssertTrue(app.staticTexts["Statistiques ANFR"].firstMatch.waitForExistence(timeout: 10),
+        // Par l'identifiant du titre : le titre est neutre depuis les marchés (« Statistiques des antennes »).
+        XCTAssertTrue(app.descendants(matching: .any)["anfr.stats.title"].firstMatch.waitForExistence(timeout: 10),
                       "Les statistiques ANFR ne se sont pas ouvertes")
         Thread.sleep(forTimeInterval: 3)
         snap(app, "reorg-03-anfr-stats")
@@ -77,8 +78,8 @@ final class ProfileReorgQATests: XCTestCase {
         // ── Communauté : le menu de débordement ──────────────────────────────
         SignalQuestUITestSupport.tab(named: "Communauté", in: app).tap()
         Thread.sleep(forTimeInterval: 4)
-        let overflow = app.buttons["Plus"].firstMatch
-        XCTAssertTrue(overflow.waitForExistence(timeout: 10), "Le menu « Plus » manque dans Communauté")
+        let overflow = app.buttons["Options du fil"].firstMatch
+        XCTAssertTrue(overflow.waitForExistence(timeout: 10), "Le menu « Options du fil » manque dans Communauté")
         overflow.tap()
         Thread.sleep(forTimeInterval: 1)
         snap(app, "reorg-04-communaute-menu")

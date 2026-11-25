@@ -119543,6 +119543,22 @@
           }
         }
       }
+    },
+    "Options du fil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feed options"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Options du fil"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

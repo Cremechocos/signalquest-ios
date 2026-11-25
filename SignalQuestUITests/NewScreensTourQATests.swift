@@ -121,9 +121,9 @@ final class NewScreensTourQATests: XCTestCase {
         communityTab.tap()
         _ = app.staticTexts.firstMatch.waitForExistence(timeout: 6)
 
-        let overflow = app.buttons["Plus"].firstMatch
+        let overflow = app.buttons["Options du fil"].firstMatch
         guard overflow.waitForExistence(timeout: 6) else {
-            print("SQ_TOUR MANQUANT menu Plus")
+            print("SQ_TOUR MANQUANT menu Options du fil")
             return
         }
         overflow.tap()

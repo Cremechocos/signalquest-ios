@@ -209,8 +209,8 @@ final class Audit2TourQATests: XCTestCase {
         ]
         for (french, english, shot) in menuItems {
             goTab(t("Communauté", "Community"), in: app)
-            guard tapIfExists(app.buttons[t("Plus", "More")].firstMatch, in: app) else {
-                print("SQ_AUDIT2 MANQUANT menu Plus")
+            guard tapIfExists(app.buttons[t("Options du fil", "Feed options")].firstMatch, in: app) else {
+                print("SQ_AUDIT2 MANQUANT menu Options du fil")
                 break
             }
             pause(1)
