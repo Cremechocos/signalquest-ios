@@ -378,7 +378,9 @@ struct ANFRStatsView: View {
             }, onSelectProjected: setProjected, onSelectFilter: { type in
                 withAnimation(reduceMotion ? nil : SQMotion.standard) { model.selectedFilter = type }
             })
-                .presentationDetents([.medium, .large])
+                // Pas de détent moyen : iOS 26 y réduit la feuille à 96 % et les
+                // puces de 44 pt tombent à 42 (IOS-073, comme « Affiner » du Classement).
+                .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showShare) {

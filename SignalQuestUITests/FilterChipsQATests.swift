@@ -32,12 +32,17 @@ final class FilterChipsQATests: XCTestCase {
         let anfrStats = app.buttons["map.filters.anfr.stats"].firstMatch
         XCTAssertTrue(anfrStats.waitForExistence(timeout: 10), "Entrée des statistiques ANFR absente")
         anfrStats.tap()
+        // Les bandes sont rangées dans la feuille « Filtres » de l'écran.
+        let anfrFilters = app.buttons["anfr.stats.filters"].firstMatch
+        XCTAssertTrue(anfrFilters.waitForExistence(timeout: 25), "Bouton Filtres des statistiques absent en \(locale)")
+        anfrFilters.tap()
         let band = app.buttons[fr ? "5G 3,5 GHz" : "5G 3.5 GHz"]
-        XCTAssertTrue(band.waitForExistence(timeout: 25), "Filtre 5G 3,5 GHz absent en \(locale)")
+        XCTAssertTrue(band.waitForExistence(timeout: 10), "Filtre 5G 3,5 GHz absent en \(locale)")
         assertChip(band)
         band.tap()
         XCTAssertTrue(band.isSelected, "Le filtre choisi est annoncé comme sélectionné")
         capture(app, "\(locale)-anfr-filtres")
+        app.buttons["anfr.stats.filters.done"].firstMatch.tap()
         back(app, fr: fr)
 
         // Classements : portée « Mes amis », dans la feuille « Afficher ».
