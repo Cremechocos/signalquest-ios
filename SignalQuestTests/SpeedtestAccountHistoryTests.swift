@@ -300,6 +300,28 @@ final class AccountSpeedtestDetailTests: XCTestCase {
         XCTAssertNil(local(.wifi).displayOperatorName, "jamais en Wi-Fi : l'IP décrit la box")
     }
 
+    /// CONN-KIND v2 (A6) : la génération affichée est celle que le serveur a corrigée par preuve
+    /// radio ; une réponse plus ancienne garde la lecture brute.
+    func testServedGenerationWinsOverTheRawOne() throws {
+        let corrected = try detail(#"{"id":"ck1","timestamp":"2026-11-24T10:00:00.000Z","averageSpeed":208,"connectionType":"4G","connectionKind":"CELLULAR_5G_NSA","networkType":"CELLULAR"}"#)
+        XCTAssertEqual(SpeedtestAccountHistory.runResult(from: corrected).cellularTechnology, .fiveGNSA)
+        XCTAssertEqual(SpeedtestAccountHistory.runResult(from: corrected).connectionType, .cellular)
+        XCTAssertEqual(SpeedtestAccountHistory.servedTechnology(corrected), "5G NSA")
+        let wifi = try detail(#"{"id":"ck2","timestamp":"2026-11-24T10:00:00.000Z","averageSpeed":300,"connectionType":"4G","connectionKind":"WIFI","networkType":"WIFI"}"#)
+        XCTAssertEqual(SpeedtestAccountHistory.runResult(from: wifi).connectionType, .wifi)
+        XCTAssertNil(SpeedtestAccountHistory.runResult(from: wifi).cellularTechnology, "R3 : un test Wi-Fi n'a pas de génération")
+        let older = try detail(#"{"id":"ck3","timestamp":"2026-11-24T10:00:00.000Z","averageSpeed":80,"connectionType":"4G"}"#)
+        XCTAssertEqual(SpeedtestAccountHistory.runResult(from: older).cellularTechnology, .fourG)
+        let vague = try detail(#"{"id":"ck4","timestamp":"2026-11-24T10:00:00.000Z","averageSpeed":80,"connectionType":"5G SA","connectionKind":"CELLULAR_5G"}"#)
+        XCTAssertEqual(SpeedtestAccountHistory.runResult(from: vague).cellularTechnology, .fiveGSA, "« CELLULAR_5G » rend la main au brut")
+        let vagueOverFourG = try detail(#"{"id":"ck5","timestamp":"2026-11-24T10:00:00.000Z","averageSpeed":208,"connectionType":"4G","connectionKind":"CELLULAR_5G"}"#)
+        XCTAssertNil(SpeedtestAccountHistory.runResult(from: vagueOverFourG).cellularTechnology, "R1 sans LTE : jamais la 4G corrigée")
+        XCTAssertEqual(SpeedtestAccountHistory.runResult(from: vagueOverFourG).connectionType, .cellular)
+        let desktop = try detail(#"{"id":"ck6","timestamp":"2026-11-24T10:00:00.000Z","averageSpeed":50,"connectionType":"4G","connectionKind":"UNKNOWN"}"#)
+        XCTAssertNil(SpeedtestAccountHistory.runResult(from: desktop).cellularTechnology, "R4 : aucune génération")
+        XCTAssertEqual(SpeedtestAccountHistory.runResult(from: desktop).connectionType, .other)
+    }
+
     func testNetworkKindIsReadWithoutGuessing() {
         XCTAssertEqual(SpeedtestAccountHistory.cellularTechnology("LTE"), .fourG)
         XCTAssertNil(SpeedtestAccountHistory.cellularTechnology("5G"), "5G alone is neither NSA nor SA")

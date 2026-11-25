@@ -42,8 +42,9 @@ extension SpeedtestAccountHistory {
     static func runResult(from detail: SpeedtestDetail, includesPrivateDetails: Bool = true) -> SpeedtestRunResult {
         let download = detail.averageSpeed ?? detail.downloadAvg ?? detail.downloadSpeed ?? 0
         let upload = detail.uploadAvg ?? detail.uploadSpeed
-        // La technologie est servie dans `connectionType` (voir `servedTechnology`).
-        let technology = cellularTechnology(detail.networkType) ?? cellularTechnology(detail.connectionType)
+        // CONN-KIND v2 (A6) : la génération corrigée par le serveur d'abord, puis la technologie
+        // brute (`connectionType`, voir `servedTechnology`) d'une réponse plus ancienne.
+        let technology = Self.technology(of: detail)
         let coordinate = includesPrivateDetails ? detail.latitude.flatMap { lat in
             detail.longitude.map { Coordinates(latitude: lat, longitude: $0) }
         } : nil
@@ -71,8 +72,9 @@ extension SpeedtestAccountHistory {
             jitterUlMs: detail.jitterUl,
             pingProtocol: detail.pingProtocol,
             durationSeconds: detail.testDuration ?? 0,
-            connectionType: connectionKind(served: detail.connectionKind)
-                ?? connectionKind(detail.connectionType, technology: technology),
+            // `UNKNOWN` (R4) : ni mobile ni Wi-Fi, quoi que dise le brut.
+            connectionType: detail.connectionKind == "UNKNOWN" ? .other
+                : connectionKind(served: detail.connectionKind) ?? connectionKind(detail.connectionType, technology: technology),
             cellularTechnology: technology,
             networkOperatorName: operatorName(of: detail),
             networkOperatorMcc: detail.mcc,
@@ -161,6 +163,34 @@ extension SpeedtestAccountHistory {
         return nil
     }
 
+    /// Génération servie dans `connectionKind` (CONN-KIND v2, A6), corrigée par preuve radio
+    /// quand le téléphone avait mal lu (une « 4G » qui était en 5G NSA). « CELLULAR_5G » ne dit
+    /// pas NSA ou SA, comme « 5G » brut : nil, la lecture brute reprend la main.
+    static func cellularTechnology(served kind: String?) -> CellularRadioTechnology? {
+        switch kind {
+        case "CELLULAR_2G": return .twoG
+        case "CELLULAR_3G": return .threeG
+        case "CELLULAR_4G": return .fourG
+        case "CELLULAR_5G_NSA": return .fiveGNSA
+        case "CELLULAR_5G_SA": return .fiveGSA
+        default: return nil
+        }
+    }
+
+    /// Technologie d'un test servi : le type corrigé du serveur, sinon le brut.
+    /// - Wi-Fi, filaire ou `UNKNOWN` (R4, test fait depuis un ordinateur) : aucune génération,
+    ///   même si le brut en nomme une, comme le Web.
+    /// - `CELLULAR_5G` (5G sans NSA ni SA) : le brut seulement s'il nomme déjà une 5G ; un brut
+    ///   « 4G » est justement ce que le serveur a corrigé (R1 sans LTE), il ne revient pas.
+    static func technology(of detail: SpeedtestDetail) -> CellularRadioTechnology? {
+        let raw = cellularTechnology(detail.networkType) ?? cellularTechnology(detail.connectionType)
+        switch detail.connectionKind {
+        case "WIFI", "ETHERNET", "UNKNOWN": return nil
+        case "CELLULAR_5G": return raw == .fiveGNSA || raw == .fiveGSA ? raw : nil
+        default: return cellularTechnology(served: detail.connectionKind) ?? raw
+        }
+    }
+
     /// Classement du serveur (CONN-KIND v1) : il reconnaît aussi « 5G », « NR » ou
     /// « LTE+ » envoyés par d'anciennes versions. `UNKNOWN` ou une valeur inconnue
     /// rendent la main à la lecture brute.
@@ -228,6 +258,7 @@ extension SpeedtestAccountHistory {
     /// prod le 22/11) ; une forme plus ancienne la mettait dans `networkType`.
     /// Le premier des deux champs qui nomme une 4G ou une 5G l'emporte.
     static func servedTechnology(_ detail: SpeedtestDetail) -> String? {
+        if let corrected = cellularTechnology(served: detail.connectionKind) { return corrected.rawValue }
         let named = [detail.networkType, detail.connectionType].first { raw in
             switch SQQualityScale.Generation(technology: raw) {
             case .fiveG, .fourG: return true
