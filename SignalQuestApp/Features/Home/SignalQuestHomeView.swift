@@ -213,7 +213,25 @@ struct SignalQuestHomeView: View {
 
     // MARK: En-tête
 
+    @ViewBuilder
     private var header: some View {
+        if user != nil, dynamicTypeSize.isAccessibilitySize {
+            // Très grand texte : la cloche passe au-dessus et la salutation prend toute la
+            // largeur ; à côté d'elle, un prénom long se coupait au milieu du mot (IOS-075).
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                HStack {
+                    Spacer(minLength: 0)
+                    notificationsButton
+                }
+                greetingBlock
+            }
+            .padding(.top, SQSpace.xs)
+        } else {
+            inlineHeader
+        }
+    }
+
+    private var inlineHeader: some View {
         HStack(alignment: .bottom, spacing: SQSpace.md) {
             if user == nil {
                 // Invité : le logo, pas un faux avatar « S ».
@@ -224,34 +242,38 @@ struct SignalQuestHomeView: View {
                     .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                     .accessibilityHidden(true)
             }
-            VStack(alignment: .leading, spacing: 2) {
-                if user == nil {
-                    Text("Bienvenue sur").sqKicker()
-                    Text(verbatim: "SignalQuest")
-                        .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
-                        .foregroundStyle(SQColor.label)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.5)
-                } else {
-                    Text(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide))).sqKicker()
-                    greeting
-                        .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
-                        .foregroundStyle(SQColor.label)
-                        // Aux grandes tailles, le prénom rétrécit plutôt que de se couper (UI-16) ;
-                        // aux tailles d'accessibilité, il passe à la ligne à pleine taille : le
-                        // réduire annulerait le réglage qu'on vient de choisir.
-                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
-                        .minimumScaleFactor(dynamicTypeSize.isAccessibilitySize ? 1 : 0.6)
-                        .fixedSize(horizontal: false, vertical: dynamicTypeSize.isAccessibilitySize)
-                }
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(.isHeader)
-            .accessibilityIdentifier("home.greeting")
+            greetingBlock
             Spacer(minLength: 0)
             if user != nil { notificationsButton }
         }
         .padding(.top, SQSpace.xs)
+    }
+
+    private var greetingBlock: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            if user == nil {
+                Text("Bienvenue sur").sqKicker()
+                Text(verbatim: "SignalQuest")
+                    .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
+                    .foregroundStyle(SQColor.label)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+            } else {
+                Text(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide))).sqKicker()
+                greeting
+                    .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
+                    .foregroundStyle(SQColor.label)
+                    // Aux grandes tailles, le prénom rétrécit plutôt que de se couper (UI-16) ;
+                    // aux tailles d'accessibilité, il passe à la ligne à pleine taille : le
+                    // réduire annulerait le réglage qu'on vient de choisir.
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                    .minimumScaleFactor(dynamicTypeSize.isAccessibilitySize ? 1 : 0.6)
+                    .fixedSize(horizontal: false, vertical: dynamicTypeSize.isAccessibilitySize)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityIdentifier("home.greeting")
     }
 
     private var notificationsButton: some View {
