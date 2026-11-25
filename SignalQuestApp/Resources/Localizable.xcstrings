@@ -119559,6 +119559,306 @@
           }
         }
       }
+    },
+    "Classement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leaderboard"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Classement"
+          }
+        }
+      }
+    },
+    "%lld filtre actif" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld active filter"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld filtre actif"
+          }
+        }
+      }
+    },
+    "Points gagnés ces 7 derniers jours ; le total depuis l’inscription est sous chaque score." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Points earned over the last 7 days; the all-time total is under each score."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Points gagnés ces 7 derniers jours ; le total depuis l’inscription est sous chaque score."
+          }
+        }
+      }
+    },
+    "Points gagnés ces 30 derniers jours ; le total depuis l’inscription est sous chaque score." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Points earned over the last 30 days; the all-time total is under each score."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Points gagnés ces 30 derniers jours ; le total depuis l’inscription est sous chaque score."
+          }
+        }
+      }
+    },
+    "Retirer le filtre Mes amis" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove the My friends filter"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer le filtre Mes amis"
+          }
+        }
+      }
+    },
+    "Ma place" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My place"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ma place"
+          }
+        }
+      }
+    },
+    "Remonte à ma place" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scrolls back to my place"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remonte à ma place"
+          }
+        }
+      }
+    },
+    "Comment c’est compté" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How it’s counted"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comment c’est compté"
+          }
+        }
+      }
+    },
+    "Débit moyen du test" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The test’s average speed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Débit moyen du test"
+          }
+        }
+      }
+    },
+    "Le chiffre de l’écran de résultat, pas le pic." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The figure on the result screen, not the peak."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le chiffre de l’écran de résultat, pas le pic."
+          }
+        }
+      }
+    },
+    "Réseau mobile seulement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mobile networks only"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réseau mobile seulement"
+          }
+        }
+      }
+    },
+    "Les tests Wi-Fi et filaires ne concourent pas." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wi-Fi and wired tests don’t compete."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les tests Wi-Fi et filaires ne concourent pas."
+          }
+        }
+      }
+    },
+    "Un rang par membre" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One rank per member"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un rang par membre"
+          }
+        }
+      }
+    },
+    "Ton meilleur test de la période." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your best test of the period."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton meilleur test de la période."
+          }
+        }
+      }
+    },
+    "SQFormal|Ton meilleur test de la période." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre meilleur test de la période."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "À jour à chaque test" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Updated with every test"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À jour à chaque test"
+          }
+        }
+      }
+    },
+    "Sans délai après l’envoi." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Right after it’s sent."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sans délai après l’envoi."
+          }
+        }
+      }
+    },
+    "Afficher le classement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show the leaderboard"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher le classement"
+          }
+        }
+      }
+    },
+    "%@ pts" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ pts"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ pts"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

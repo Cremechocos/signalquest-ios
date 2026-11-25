@@ -53,26 +53,57 @@ final class LeaderboardRequestOrderingTests: XCTestCase {
         XCTAssertFalse(model.isLoadingPoints)
     }
 
-    func testDisplaySettingsDotFollowsDefaultsAndResetReloadsBoth() async throws {
+    /// Planche Classement du 24/11 : la mesure et la période sont à l'écran, seule la
+    /// portée vit dans la feuille « Affiner » ; sa pastille ne compte qu'elle, et
+    /// « Réinitialiser » ne touche qu'elle.
+    func testSheetFilterCountAndResetOnlyTouchTheSheetFilters() async throws {
         let service = OrderedLeaderboardService()
         let model = LeaderboardsViewModel(service: service)
-        XCTAssertFalse(model.hasCustomFilters)
+        XCTAssertEqual(model.sheetFilterCount, 0)
 
+        model.period = "month"
+        model.category = "upload"
+        XCTAssertEqual(model.sheetFilterCount, 0, "la période et la mesure ne sont pas des filtres de la feuille")
         model.scope = "friends"
-        model.category = "sessions"
-        XCTAssertTrue(model.hasCustomFilters)
+        XCTAssertEqual(model.sheetFilterCount, 1)
 
-        model.resetFilters()
-        XCTAssertFalse(model.hasCustomFilters)
-        XCTAssertEqual([model.period, model.scope, model.category], ["week", "global", "download"])
+        model.resetSheetFilters()
+        XCTAssertEqual(model.sheetFilterCount, 0)
+        XCTAssertEqual([model.period, model.scope, model.category], ["month", "global", "upload"])
         try await waitForRequests(service.speed, count: 1)
         try await waitForRequests(service.points, count: 1)
         let speedRequests = await service.speed.signatures
         let pointsRequests = await service.points.signatures
-        XCTAssertEqual(speedRequests, ["week/global/download"])
-        XCTAssertEqual(pointsRequests, ["week/global"])
+        XCTAssertEqual(speedRequests, ["month/global/upload"])
+        XCTAssertEqual(pointsRequests, ["month/global"])
         await service.speed.succeed(0)
         await service.points.succeed(0)
+    }
+
+    /// Le segmenté Points | Download | Upload pilote l'onglet et la catégorie servie ;
+    /// « Sessions » n'en fait plus partie.
+    func testMetricSegmentDrivesTabAndCategory() async throws {
+        let service = OrderedLeaderboardService()
+        let model = LeaderboardsViewModel(service: service)
+        XCTAssertEqual(model.metric, .download)
+        XCTAssertEqual(LeaderboardMetric.allCases, [.points, .download, .upload])
+
+        model.selectMetric(.upload)
+        XCTAssertEqual(model.tab, .speed)
+        XCTAssertEqual(model.category, "upload")
+        XCTAssertEqual(model.metric, .upload)
+        try await waitForRequests(service.speed, count: 1)
+        let speedRequests = await service.speed.signatures
+        XCTAssertEqual(speedRequests, ["week/global/upload"])
+
+        model.selectMetric(.points)
+        XCTAssertEqual(model.tab, .points)
+        XCTAssertEqual(model.metric, .points)
+
+        model.selectMetric(.download)
+        XCTAssertEqual(model.tab, .speed)
+        XCTAssertEqual(model.metric, .download)
+        await service.speed.succeed(0)
     }
 
     func testRankedValuesUseBitsPerSecondAndKeepOtherUnits() {

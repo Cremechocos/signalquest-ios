@@ -677,11 +677,12 @@ final class SignalQuestUITests: XCTestCase {
         app.buttons["photos.back"].tap()
 
         app.staticTexts["Classements"].tap()
-        // La carte « Mon rang » et les colonnes du podium regroupent leurs
-        // enfants (accessibilityElement(children: .combine)) : on matche donc
-        // l'identifiant de la carte et le label combiné du podium.
-        let myRank = app.descendants(matching: .any)["Mon rang"].firstMatch
-        XCTAssertTrue(myRank.waitForExistence(timeout: 5))
+        // La carte « Ma progression » (en tête depuis le 25/11) et les cartes du
+        // podium regroupent leurs enfants : on matche leurs labels combinés.
+        let progress = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH 'Ma progression'"))
+            .firstMatch
+        XCTAssertTrue(progress.waitForExistence(timeout: 5))
         let camille = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label CONTAINS 'Camille'"))
             .firstMatch
