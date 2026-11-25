@@ -24,6 +24,11 @@ enum SyncTrigger: Sendable, Equatable {
     /// `nil` si le corps n'a pas pu être lu (la page récente est alors relue).
     case callEvent(CallThreadEvent?)
 
+    /// Le flux ne rejoue pas ce qui est arrivé pendant une coupure (appels terminés,
+    /// accusés « distribué » et « lu », état d'une demande) : seul le tick de repli,
+    /// qui suit aussi chaque (re)connexion, les relit.
+    var catchesUpMissedEvents: Bool { self == .polling }
+
     /// Événements relayés par le flux de la conversation.
     static let relayedEvents: Set<String> = [
         "update", "message", "read_state", "delivered_state", "feature_sync", "thread_reply",

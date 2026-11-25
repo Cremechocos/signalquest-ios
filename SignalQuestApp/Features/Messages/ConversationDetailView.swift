@@ -1340,6 +1340,8 @@ struct ConversationDetailView: View {
                 Task {
                     if usesV2 { await loadV2() } else { await refreshDelta() }
                     await markReadIfLastIncoming()
+                    // Les accusés reçus en arrière-plan ne reviennent pas par le flux.
+                    await refreshReceipts()
                 }
             } else {
                 stopSync()
@@ -4079,8 +4081,13 @@ struct ConversationDetailView: View {
                 case .serverEvent, .polling:
                     await MainActor.run { if threadTarget != nil { threadRefreshToken &+= 1 } }
                     // Le flux ne rejoue pas les appels terminés pendant une coupure : on relit les plus récents.
-                    if trigger == .polling { await refreshRecentCalls() }
-                    if trigger == .polling { await refreshSenderRequestState() }
+                    if trigger.catchesUpMissedEvents {
+                        await refreshRecentCalls()
+                        await refreshSenderRequestState()
+                        // Ni « distribué » ni « lu » ne sont rejoués : sans cette relecture,
+                        // le dernier message restait « Envoyé » jusqu'à la réouverture.
+                        await refreshReceipts()
+                    }
                     if usesV2 {
                         await loadV2()
                         await markReadIfLastIncoming()

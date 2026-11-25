@@ -14,4 +14,14 @@ final class MessageSyncEngineTests: XCTestCase {
         XCTAssertFalse(MessageSyncEngine.shouldPoll(sinceLastRefresh: .seconds(5), sseConnected: false, interval: .seconds(12)))
         XCTAssertTrue(MessageSyncEngine.shouldPoll(sinceLastRefresh: .seconds(12), sseConnected: false, interval: .seconds(12)))
     }
+
+    /// Signalement du 25/11 : un message restait « Envoyé » au retour au premier plan alors que
+    /// le destinataire l'avait lu. Le rattrapage de (re)connexion relit les accusés, le reste non.
+    func testOnlyTheCatchUpTriggerRereadsWhatTheStreamDoesNotReplay() {
+        XCTAssertTrue(SyncTrigger.polling.catchesUpMissedEvents)
+        for trigger: SyncTrigger in [.serverEvent, .stateEvent, .receiptsEvent(userId: "u"),
+                                     .typingEvent(userIds: ["u"]), .viewingEvent, .callEvent(nil)] {
+            XCTAssertFalse(trigger.catchesUpMissedEvents, "\(trigger)")
+        }
+    }
 }
