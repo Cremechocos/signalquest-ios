@@ -1855,7 +1855,7 @@ final class SpeedtestTests: XCTestCase {
     /// Le runner signale l'étape atteinte, sur de vrais sockets en boucle locale :
     /// port fermé, serveur muet, serveur occupé.
     func testRunnerReportsTheStageItReachedOnLoopback() async throws {
-        func run(port: UInt16) async -> (String, IPerfAttemptProgress.Reached) {
+        func run(port: UInt16) async -> (String, IPerfAttemptProgress.Reached, String) {
             let progress = IPerfAttemptProgress()
             let runner = IPerf3Runner(hostname: "127.0.0.1", port: port, streams: 1, durationSeconds: 1,
                                       omitSeconds: 0, isDownload: true, attemptProgress: progress)
@@ -1864,30 +1864,41 @@ final class SpeedtestTests: XCTestCase {
             let state = progress.snapshot
             let (stage, _, code) = IPerfAttempt.classify(thrown, reached: state.reached, sawBytes: state.sawBytes,
                                                          isDownload: true)
-            return ("\(stage.rawValue)/\(code?.rawValue ?? "ok")", state.reached)
+            return ("\(stage.rawValue)/\(code?.rawValue ?? "ok")", state.reached, String(describing: thrown))
         }
 
         // Port fermé : refus au connect.
-        let closed = try NWListener(using: .tcp, on: .any)
+        let closed = try Self.loopbackListener()
         closed.newConnectionHandler = { $0.cancel() }
         let closedPort = try await Self.start(closed)
         closed.cancel()
         try await Task.sleep(nanoseconds: 200_000_000)
         let refused = await run(port: closedPort)
-        XCTAssertEqual(refused.0, "connect/refused")
+        XCTAssertEqual(refused.0, "connect/refused", "erreur reçue : \(refused.2)")
 
-        // Serveur qui accepte sans jamais répondre : l'échange iPerf3 expire.
-        let mute = try NWListener(using: .tcp, on: .any)
-        mute.newConnectionHandler = { $0.start(queue: .global()) }
+        // Serveur qui accepte sans jamais répondre : l'échange iPerf3 expire. Il garde ses
+        // connexions : une connexion acceptée puis libérée se ferme, et le client, sous
+        // charge, voyait une réinitialisation (« handshake/reset ») au lieu de l'expiration.
+        nonisolated(unsafe) var held: [NWConnection] = []
+        let heldLock = NSLock()
+        let mute = try Self.loopbackListener()
+        mute.newConnectionHandler = { connection in
+            heldLock.withLock { held.append(connection) }
+            connection.start(queue: .global())
+        }
+        defer { heldLock.withLock { held.forEach { $0.cancel() } } }
         let mutePort = try await Self.start(mute)
         defer { mute.cancel() }
         let silent = await run(port: mutePort)
-        XCTAssertEqual(silent.0, "handshake/timeout")
+        XCTAssertEqual(silent.0, "handshake/timeout", "erreur reçue : \(silent.2)")
         XCTAssertEqual(silent.1, .connected)
 
-        // Serveur occupé : ACCESS_DENIED (-1) en premier état.
-        let busy = try NWListener(using: .tcp, on: .any)
+        // Serveur occupé : ACCESS_DENIED (-1) en premier état. Lui aussi garde ses
+        // connexions : relâchée après l'envoi, la connexion pouvait se fermer avant que
+        // le client ait lu l'état.
+        let busy = try Self.loopbackListener()
         busy.newConnectionHandler = { connection in
+            heldLock.withLock { held.append(connection) }
             connection.start(queue: .global())
             connection.receive(minimumIncompleteLength: 37, maximumLength: 37) { _, _, _, _ in
                 connection.send(content: Data([0xFF]), completion: .contentProcessed { _ in })
@@ -1896,7 +1907,17 @@ final class SpeedtestTests: XCTestCase {
         let busyPort = try await Self.start(busy)
         defer { busy.cancel() }
         let occupied = await run(port: busyPort)
-        XCTAssertEqual(occupied.0, "handshake/busy")
+        XCTAssertEqual(occupied.0, "handshake/busy", "erreur reçue : \(occupied.2)")
+    }
+
+    /// Écouteur lié à 127.0.0.1, l'adresse que vise le runner. Ouvert sur toutes les
+    /// adresses, il pouvait recevoir un port déjà tenu sur 127.0.0.1 par un autre
+    /// processus du Mac : le client lisait alors la réponse d'un serveur HTTP
+    /// (`unexpectedState(72)`, « H ») au lieu de celle du test.
+    private static func loopbackListener() throws -> NWListener {
+        let parameters = NWParameters.tcp
+        parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: .any)
+        return try NWListener(using: parameters)
     }
 
     private static func start(_ listener: NWListener) async throws -> UInt16 {
