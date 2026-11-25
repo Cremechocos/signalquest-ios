@@ -24,8 +24,7 @@ final class CarPlayTabBarDelegate: NSObject, CPTabBarTemplateDelegate {
     /// `@MainActor`, le contrôle d'isolation de Swift 6 ferait planter l'app au changement
     /// d'onglet (IOS-004). On repasse sur le fil principal ; le template n'y est que comparé.
     nonisolated func tabBarTemplate(_ tabBarTemplate: CPTabBarTemplate, didSelect selectedTemplate: CPTemplate) {
-        nonisolated(unsafe) let selected = selectedTemplate
-        Task { @MainActor [weak self] in self?.onSelect(selected) }
+        Task { @MainActor [weak self] in self?.onSelect(selectedTemplate) }
     }
 }
 
