@@ -2951,7 +2951,8 @@ struct MapExplorerView: View {
                 .foregroundStyle(SQColor.accentInk)
                 .accessibilityHidden(true)
             Text("Pays déduit : \(name)")
-                .font(SQFont.body(14, .semibold))
+                // Relative au texte système : la taille fixe ignorait le réglage (audit du 25/11).
+                .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
                 .foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)

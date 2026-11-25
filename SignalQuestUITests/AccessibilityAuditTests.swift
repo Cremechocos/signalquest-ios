@@ -60,6 +60,8 @@ final class AccessibilityAuditTests: XCTestCase {
         let customDock = app.descendants(matching: .any)["main.navigation"]
         let customDockTop = customDock.exists ? customDock.frame.minY : nil
         let navigationTop = [tabBarTop, customDockTop].compactMap { $0 }.min()
+        let speedScales = app.descendants(matching: .any).matching(identifier: "feed.speed.scale")
+            .allElementsBoundByIndex.map(\.frame)
         do {
           try app.performAccessibilityAudit(for: types ?? Self.auditedTypes) { issue in
             // `identifier` vaut souvent "" — non-nil, donc un `??` ne basculerait
@@ -95,6 +97,44 @@ final class AccessibilityAuditTests: XCTestCase {
                     ? "centre derrière la navigation ; visibilité vérifiée après défilement"
                     : "nœud non atteignable derrière la navigation"
                 return exclude(reason, name, issue.auditType)
+            }
+            // Audit du 25/11 (audit QA iOS) : signalements relus un par un, à l'écran et
+            // sur les pixels ; choix voulus ou alertes que la mesure infirme.
+            // Titres du menu Profil : plafonnés à AX3 exprès (« Identifications » déborde en AX5).
+            if issue.auditType == .dynamicType, name == "profile.menu.title" {
+                return exclude("plafond AX3 voulu : le titre déborde de la rangée en AX5", name, issue.auditType)
+            }
+            // Graduations de l'échelle de débit : police relative à caption2 et hauteur en
+            // @ScaledMetric ; elles grandissent avec le réglage (vu en très grand texte).
+            if issue.auditType == .dynamicType, let element,
+               speedScales.contains(where: { $0.insetBy(dx: -4, dy: -4).contains(CGPoint(x: element.frame.midX, y: element.frame.midY)) }) {
+                return exclude("graduation d'échelle à police relative", name, issue.auditType)
+            }
+            // « Changer » (pays déduit, Carte) : #A8123A sur blanc, 7,40:1 mesuré sur les
+            // pixels de l'écran ; police SQType.chip relative à footnote.
+            if screen.hasPrefix("Carte"), name == "Changer",
+               issue.auditType == .contrast || issue.auditType == .dynamicType {
+                return exclude("7,40:1 mesuré sur les pixels, police relative", name, issue.auditType)
+            }
+            // « Pays déduit » (Carte) : police relative depuis le 25/11 ; le reste de l'alerte vient
+            // du plafond xxxLarge voulu des contrôles flottants de la carte (libellés superposés en AX).
+            if issue.auditType == .dynamicType, screen.hasPrefix("Carte"), name.hasPrefix("Pays déduit") {
+                return exclude("plafond xxxLarge voulu des contrôles de la carte", name, issue.auditType)
+            }
+            // Légende « Tes tests faits sur un autre appareil… » (Tester) : 6,23:1 mesuré sur les
+            // pixels (labelSecondary sur bg), au-dessus de la cible de 6:1 sous 13 pt ; l'alerte
+            // demeurait même à 8,97:1 en ink2.
+            if issue.auditType == .contrast, screen.hasPrefix("Tester"), name.hasPrefix("Tes tests faits") {
+                return exclude("6,23:1 mesuré sur les pixels", name, issue.auditType)
+            }
+            // Sélecteur Débit | Expérience : une ligne qui rétrécit jusqu'à 70 % sans être coupée.
+            if issue.auditType == .textClipped, screen.hasPrefix("Tester"),
+               name == "Débit" || name == "Expérience" {
+                return exclude("libellé réduit jusqu'à 70 %, jamais coupé", name, issue.auditType)
+            }
+            // Module Pannes de l'Accueil : il passe à la ligne en très grand texte, rien n'est coupé.
+            if issue.auditType == .textClipped, name == "home.module.outages" {
+                return exclude("passe à la ligne en très grand texte (vu à l'écran)", name, issue.auditType)
             }
             // Aux tailles d'accessibilité, une rangée de la boîte de réception
             // descend sous la barre de navigation flottante : l'auditeur prend
@@ -229,15 +269,16 @@ final class AccessibilityAuditTests: XCTestCase {
                 // légendes du détail (`label`/`labelSecondary` sur `surface`).
                 // Mesuré sur les pixels de l'audit le 01/10 : 5,12 à 13,48:1.
                 "anfr.bands.",
-                // Refonte du Fil (13/10) : pastilles d'onglet et initiale d'avatar
-                // (`chipInk` sur `chip`, `testInkTokensAreReadableOnTheirOwnPastille`),
-                // surtitre et ligne du bloc de mesure (`ink2` sur `surfaceMuted`,
-                // `testBodyTextTokensMeetAA`, plus de 9:1).
+                // Refonte du Fil (13/10) : initiale d'avatar (`chipInk` sur `chip`,
+                // `testInkTokensAreReadableOnTheirOwnPastille`), surtitre et ligne du bloc
+                // de mesure (`ink2` sur `surfaceMuted`, `testBodyTextTokensMeetAA`, plus
+                // de 9:1). Onglets soulignés depuis le 25/11 (e5f81e3d) : `chipInk` sur
+                // `bg` quand inactifs, 7,20:1 en clair et 11,50:1 en sombre (calculés sur
+                // les jetons), `label` quand actifs.
                 "feed.tab.", "feed.avatar.initial", "feed.measure.",
-                // Invite « Quoi de neuf ? » et compteurs de la barre d'actions,
-                // `chipInk` : mesurés sur les pixels de l'audit le 13/10, 7,2:1
-                // sur `surfaceMuted` et 8,0:1 sur la carte.
-                "feed.compose.prompt", "feed.action.count",
+                // Compteurs de la barre d'actions, `chipInk` : mesurés sur les pixels de
+                // l'audit le 13/10, 8,0:1 sur la carte.
+                "feed.action.count",
                 // Refonte Halo (14/10) : surtitres et textes secondaires de l'Accueil et
                 // du Profil passés du gris Halo à `ink2` (9:1 nominal). Mesurés sur les
                 // pixels le 14/10, aux cadres que l'auditeur signale : surtitre 7,8:1,
