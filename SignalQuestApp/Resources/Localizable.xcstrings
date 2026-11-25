@@ -120311,6 +120311,138 @@
           }
         }
       }
+    },
+    "Réseau le plus mesuré : %@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Most measured network: %1$@ · %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réseau le plus mesuré : %@ · %@"
+          }
+        }
+      }
+    },
+    "Nouveau sur SignalQuest" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New on SignalQuest"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveau sur SignalQuest"
+          }
+        }
+      }
+    },
+    "Tu suis %@ : ses premières mesures arriveront dans ton fil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You follow %@: their first measurements will show up in your feed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu suis %@ : ses premières mesures arriveront dans ton fil."
+          }
+        }
+      }
+    },
+    "SQFormal|Tu suis %@ : ses premières mesures arriveront dans ton fil." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous suivez %@ : ses premières mesures arriveront dans votre fil."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Suis %@ pour voir ses premières mesures." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Follow %@ to see their first measurements."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suis %@ pour voir ses premières mesures."
+          }
+        }
+      }
+    },
+    "SQFormal|Suis %@ pour voir ses premières mesures." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suivez %@ pour voir ses premières mesures."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Voir moins" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "See less"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir moins"
+          }
+        }
+      }
+    },
+    "Ajoute une bio" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add a bio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoute une bio"
+          }
+        }
+      }
+    },
+    "SQFormal|Ajoute une bio" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoutez une bio"
+          }
+        }
+      },
+      "shouldTranslate" : false
     }
   },
   "version" : "1.0"

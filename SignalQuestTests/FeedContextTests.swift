@@ -704,3 +704,57 @@ final class FlowRowLayoutTests: XCTestCase {
                        "un élément trop large garde sa propre ligne")
     }
 }
+
+/// Profil d'un autre membre, refonte « carte d'identité » du 25/11 : carte d'accueil d'un
+/// nouveau membre, ligne d'abonnés, réseau le plus mesuré et anneau de niveau.
+extension FeedContextTests {
+    private func memberProfile(points: Int? = 0, tests: Int? = 0, followers: Int = 0, following: Int = 0,
+                               isSelf: Bool = false, statsHidden: Bool = false,
+                               photos: [SocialProfilePhoto] = []) -> SocialUserProfile {
+        SocialUserProfile(
+            id: "m1", name: "Francois Costes", handle: "costesf", bio: nil, avatarUrl: nil, createdAt: nil,
+            isSelf: isSelf, isFriend: false, isFollowing: false, followersCount: followers, followingCount: following,
+            canMessage: true,
+            stats: SocialUserProfileStats(points: points, gamificationPoints: points, level: 1, validations: 0,
+                                          photos: 0, speedtests: tests),
+            statsHidden: statsHidden, recentPhotos: photos
+        )
+    }
+
+    func testNewcomerCardReplacesZerosOnlyForAnotherMemberWithNothingYet() {
+        XCTAssertTrue(UserProfileView.isNewcomer(memberProfile(), postCount: 0, isLoadingPosts: false))
+        XCTAssertFalse(UserProfileView.isNewcomer(memberProfile(), postCount: 0, isLoadingPosts: true), "pas pendant le chargement")
+        XCTAssertFalse(UserProfileView.isNewcomer(memberProfile(), postCount: 1, isLoadingPosts: false), "une publication suffit")
+        XCTAssertFalse(UserProfileView.isNewcomer(memberProfile(tests: 3), postCount: 0, isLoadingPosts: false))
+        XCTAssertFalse(UserProfileView.isNewcomer(memberProfile(followers: 1), postCount: 0, isLoadingPosts: false))
+        XCTAssertFalse(UserProfileView.isNewcomer(memberProfile(isSelf: true), postCount: 0, isLoadingPosts: false), "jamais sur son propre profil")
+        XCTAssertFalse(UserProfileView.isNewcomer(memberProfile(statsHidden: true), postCount: 0, isLoadingPosts: false),
+                       "chiffres masqués : on ne sait pas, on ne présume rien")
+        let photo = SocialProfilePhoto(id: "p1", thumbnailUrl: nil, siteId: nil)
+        XCTAssertFalse(UserProfileView.isNewcomer(memberProfile(photos: [photo]), postCount: 0, isLoadingPosts: false))
+
+        XCTAssertFalse(UserProfileView.showsFollowCounters(memberProfile()), "« 0 abonné · 0 abonnement » disparaît")
+        XCTAssertTrue(UserProfileView.showsFollowCounters(memberProfile(following: 2)))
+        XCTAssertTrue(UserProfileView.showsFollowCounters(memberProfile(isSelf: true)))
+    }
+
+    func testMainNetworkLineAndLevelRingReadServedData() throws {
+        let networks = SocialProfileNetworks(countryCode: "FR", countryIsDeclared: false, operators: [
+            SocialProfileOperatorShare(key: "SFR", count: 48, share: 0.48),
+            SocialProfileOperatorShare(key: "ORANGE", count: 52, share: 0.52)
+        ], sampleSize: 100)
+        let line = try XCTUnwrap(UserProfileView.mainNetworkLine(networks))
+        XCTAssertTrue(line.contains("Orange"), line)
+        XCTAssertFalse(line.contains("SFR"), line)
+        XCTAssertNil(UserProfileView.mainNetworkLine(SocialProfileNetworks(countryCode: nil, countryIsDeclared: false, operators: [], sampleSize: 0)))
+
+        // `levelProgress` est un pourcentage, comme partout côté serveur ; l'anneau le ramène à 0…1.
+        let raw = #"{"points":10,"level":2,"missionsLevel":3,"levelProgress":38.7}"#
+        let stats = try JSONDecoder.signalQuest.decode(SocialUserProfileStats.self, from: Data(raw.utf8))
+        XCTAssertEqual(try XCTUnwrap(stats.levelFraction), 0.387, accuracy: 0.0001)
+        let hidden = try JSONDecoder.signalQuest.decode(SocialUserProfileStats.self, from: Data(#"{"levelProgress":null}"#.utf8))
+        XCTAssertNil(hidden.levelFraction)
+        let over = try JSONDecoder.signalQuest.decode(SocialUserProfileStats.self, from: Data(#"{"levelProgress":140}"#.utf8))
+        XCTAssertEqual(over.levelFraction, 1)
+    }
+}

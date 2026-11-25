@@ -449,7 +449,9 @@ struct UserProfileView: View {
                     // « Aucune publication » sous le message d'erreur.
                     let loadFailed = model.profile == nil && model.errorMessage != nil && !model.isPrivate
                     header
-                    if !loadFailed, model.profile?.showsStats != false {
+                    if let profile = model.profile, Self.isNewcomer(profile, postCount: model.items.count, isLoadingPosts: model.isLoading) {
+                        newcomerCard(profile)
+                    } else if !loadFailed, model.profile?.showsStats != false {
                         statsCard
                     }
                     if let networks = model.profile?.networks, !networks.operators.isEmpty {
@@ -472,7 +474,10 @@ struct UserProfileView: View {
                                 Task { await model.load() }
                             }
                         }
-                        if !loadFailed {
+                        // Nouveau membre : la carte d'accueil dit déjà qu'il n'y a rien encore.
+                        if !loadFailed, !(model.profile.map {
+                            Self.isNewcomer($0, postCount: model.items.count, isLoadingPosts: model.isLoading)
+                        } ?? false) {
                             postsBlock
                         }
                     }
@@ -719,12 +724,13 @@ struct UserProfileView: View {
         }
     }
 
-    /// Même en-tête que ton profil : avatar, nom, @ et pays, niveau et
-    /// ancienneté ; la bio dessous, puis « Suivre » et « Message ».
+    /// Carte d'identité centrée (choix d'Alexandre du 25/11) : l'avatar rond dans l'anneau
+    /// de niveau, le nom, @ et pays, niveau et ancienneté, la bio en encadré, le réseau le
+    /// plus mesuré, les abonnés, puis « Suivre » et « Message ».
     @ViewBuilder
     private var header: some View {
         let profile = model.profile
-        VStack(alignment: .leading, spacing: SQSpace.md) {
+        VStack(alignment: .center, spacing: SQSpace.md) {
             // Membre Premium mis en valeur (D13) : sa bannière en tête, décorative.
             if let spotlight = profile?.spotlight, spotlight.banner != .empty {
                 SQSpotlightBanner(spotlight: spotlight)
@@ -732,13 +738,14 @@ struct UserProfileView: View {
                     .clipShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
                     .accessibilityIdentifier("profile.member.spotlightBanner")
             }
-            HStack(spacing: SQSpace.md2) {
+            VStack(spacing: SQSpace.sm) {
                 avatar
-                VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                VStack(spacing: SQSpace.xxs) {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(profile?.displayName ?? model.prefill?.displayName ?? MemberIdentity.someone)
-                            .font(SQFont.display(22, .bold, relativeTo: .title2))
+                            .font(SQFont.display(24, .bold, relativeTo: .title2))
                             .foregroundStyle(SQColor.label)
+                            .multilineTextAlignment(.center)
                             .lineLimit(2)
                             .accessibilityIdentifier("profile.member.name")
                         // Badges sociaux (`accountBadges`), distincts des succès
@@ -747,21 +754,83 @@ struct UserProfileView: View {
                     }
                     identityLine(profile)
                 }
-                Spacer(minLength: 0)
+                if let bio = profile?.bio?.trimmingCharacters(in: .whitespacesAndNewlines), !bio.isEmpty {
+                    ProfileBioBox(bio: bio)
+                }
+                if let line = profile?.networks.flatMap(Self.mainNetworkLine) {
+                    Label {
+                        Text(verbatim: line)
+                    } icon: {
+                        Image(systemName: "antenna.radiowaves.left.and.right")
+                    }
+                    .font(SQType.caption(.semibold))
+                    .foregroundStyle(SQColor.ink2)
+                    .multilineTextAlignment(.center)
+                    .accessibilityIdentifier("profile.member.mainNetwork")
+                }
+                if let profile, Self.showsFollowCounters(profile) {
+                    followCounters(profile)
+                }
             }
-
-            if let bio = profile?.bio, !bio.isEmpty {
-                Text(bio)
-                    .font(SQFont.body(14.5, .regular, relativeTo: .callout))
-                    .lineSpacing(2)
-                    .foregroundStyle(SQColor.label)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            .frame(maxWidth: .infinity)
 
             if let profile, !profile.isSelf {
                 actionRow(profile)
             }
         }
+    }
+
+    /// Nouveau membre vu par un autre : aucun chiffre servi au-dessus de zéro, aucun abonné,
+    /// aucune publication. La carte d'accueil remplace alors les compteurs à zéro et le vide.
+    static func isNewcomer(_ profile: SocialUserProfile, postCount: Int, isLoadingPosts: Bool) -> Bool {
+        guard !profile.isSelf, profile.showsStats, postCount == 0, !isLoadingPosts,
+              profile.followersCount == 0 else { return false }
+        let stats = profile.stats
+        let counts = [stats?.displayedPoints, stats?.speedtests, stats?.validations, stats?.photos, stats?.publicSessions]
+        return counts.allSatisfy { ($0 ?? 0) == 0 } && profile.recentPhotos.isEmpty
+    }
+
+    /// « 0 abonné · 0 abonnement » ne dit rien d'un autre membre : la ligne n'apparaît
+    /// qu'avec au moins un abonné ou un abonnement, ou sur son propre profil.
+    static func showsFollowCounters(_ profile: SocialUserProfile) -> Bool {
+        profile.isSelf || !profile.showsStats || profile.followersCount > 0 || profile.followingCount > 0
+    }
+
+    /// « Réseau le plus mesuré : Orange · 52 % ». Jamais « son opérateur » : la donnée dit
+    /// où la personne mesure, pas son abonnement (voir `measuredNetworks`).
+    static func mainNetworkLine(_ networks: SocialProfileNetworks) -> String? {
+        guard let top = networks.operators.max(by: { $0.share < $1.share }), top.share > 0 else { return nil }
+        return String(localized: "Réseau le plus mesuré : \(operatorLabel(for: top)) · \(top.percentLabel)")
+    }
+
+    /// Carte d'accueil d'un nouveau membre, à la place des compteurs à zéro.
+    private func newcomerCard(_ profile: SocialUserProfile) -> some View {
+        VStack(spacing: SQSpace.xs) {
+            Image(systemName: "hand.wave")
+                .font(SQType.heading)
+                .foregroundStyle(SQColor.accentInk)
+                .frame(width: 40, height: 40)
+                .background(SQColor.accentSoft, in: Circle())
+                .accessibilityHidden(true)
+            Text("Nouveau sur SignalQuest")
+                .font(SQType.heading)
+                .foregroundStyle(SQColor.label)
+            Text(profile.isFollowing
+                 ? String(localized: "Tu suis \(profile.displayName) : ses premières mesures arriveront dans ton fil.")
+                 : String(localized: "Suis \(profile.displayName) pour voir ses premières mesures."))
+                .font(SQType.subhead)
+                .foregroundStyle(SQColor.ink2)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(SQSpace.lg)
+        .frame(maxWidth: .infinity)
+        .overlay {
+            RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
+                .strokeBorder(SQColor.separator, style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("profile.member.newcomer")
     }
 
     /// `@pseudo · France`, puis le niveau et l'ancienneté. Le pays vient des
@@ -772,7 +841,7 @@ struct UserProfileView: View {
         // Pas de drapeau : le pays est DÉDUIT des mesures dans le cas général, et
         // un drapeau donne à cette déduction l'autorité d'une nationalité déclarée.
         let country = profile?.networks?.countryLabel
-        VStack(alignment: .leading, spacing: SQSpace.xxs) {
+        VStack(alignment: .center, spacing: SQSpace.xxs) {
             if handle != nil || country != nil {
                 // Deux textes, pas un seul : le pseudo reste lisible à part.
                 HStack(spacing: SQSpace.xs) {
@@ -790,12 +859,13 @@ struct UserProfileView: View {
             }
             let second = [level, since].compactMap { $0 }.joined(separator: " · ")
             if !second.isEmpty {
-                Text(verbatim: second)
+                // La pastille « Niv. N » de l'avatar montre déjà le niveau : à l'écran, la ligne
+                // ne garde que l'ancienneté ; VoiceOver, qui ne lit pas la pastille, lit les deux.
+                Text(verbatim: since ?? second)
+                    .accessibilityLabel(second)
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
-            }
-            if let profile {
-                followCounters(profile)
+                    .multilineTextAlignment(.center)
             }
         }
     }
@@ -1053,22 +1123,50 @@ struct UserProfileView: View {
         return SQBrand.operatorColor(hostKey).opacity(0.55)
     }
 
+    /// Avatar rond dans son anneau : la story d'abord, puis l'encre d'un membre mis en avant,
+    /// sinon l'anneau de niveau (avancement servi, piste neutre sans lui) et sa pastille.
     private var avatar: some View {
-        SQAvatar(
-            url: model.profile?.avatarUrl ?? model.prefill?.avatarUrl,
-            name: model.profile?.displayName ?? model.prefill?.displayName ?? "?",
-            size: 72
-        )
-        .padding(4)
-        .overlay {
+        let stats = model.profile?.showsStats == false ? nil : model.profile?.stats
+        return ZStack {
             if hasActiveStory {
-                SQStoryRing(lineWidth: 3)
+                Circle().strokeBorder(SQColor.brandRed, lineWidth: 3)
             } else if let spotlight = model.profile?.spotlight {
                 // L'encre du membre Premium, un seul anneau ; la story, elle, s'ouvre au toucher
                 // et garde le sien.
-                SQAvatarShape().strokeBorder(spotlight.accent.ink, lineWidth: 3)
+                Circle().strokeBorder(spotlight.accent.ink, lineWidth: 3)
+            } else {
+                Circle().strokeBorder(SQColor.chip, lineWidth: 4)
+                if let progress = stats?.levelFraction {
+                    Circle()
+                        .inset(by: 2)
+                        .trim(from: 0, to: max(0.015, progress))
+                        .stroke(SQColor.brandRed, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                }
+            }
+            SQAvatar(
+                url: model.profile?.avatarUrl ?? model.prefill?.avatarUrl,
+                name: model.profile?.displayName ?? model.prefill?.displayName ?? "?",
+                size: 82
+            )
+            .clipShape(Circle())
+        }
+        .frame(width: 96, height: 96)
+        .overlay(alignment: .bottom) {
+            if let level = stats?.displayedLevel {
+                Text("Niv. \(level)")
+                    .font(SQType.micro)
+                    .monospacedDigit()
+                    .foregroundStyle(SQColor.onInk)
+                    .padding(.horizontal, SQSpace.sm)
+                    .padding(.vertical, 2)
+                    .background(SQColor.label, in: Capsule(style: .continuous))
+                    .offset(y: 8)
+                    .accessibilityHidden(true)
             }
         }
+        .padding(.bottom, 8)
+        .accessibilityHidden(true)
     }
 
     /// Suivre + Message côte à côte : les deux actions qu'on vient chercher sur
@@ -1746,5 +1844,46 @@ struct MemberFollowListView: View {
                 ? Text(SQElision.apply(String(localized: "Se désabonner de \(person.displayName)"), name: person.displayName))
                 : Text("Suivre \(person.displayName)"))
         .accessibilityIdentifier("followlist.follow.\(person.id)")
+    }
+}
+
+/// Bio d'un membre dans un encadré doux : trois lignes, puis « Voir plus » quand elle est
+/// plus longue.
+private struct ProfileBioBox: View {
+    let bio: String
+    @State private var expanded = false
+
+    /// Au-delà d'environ trois lignes d'un iPhone, ou avec plusieurs paragraphes.
+    private var isLong: Bool { bio.count > 130 || bio.filter(\.isNewline).count >= 2 }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs) {
+            Text(verbatim: bio)
+                .font(SQFont.body(14.5, .regular, relativeTo: .callout))
+                .lineSpacing(2)
+                .foregroundStyle(SQColor.label)
+                .lineLimit(expanded || !isLong ? nil : 3)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if isLong {
+                Button {
+                    Haptics.light()
+                    expanded.toggle()
+                } label: {
+                    Text(expanded ? "Voir moins" : "Voir plus")
+                        .font(SQType.caption(.semibold))
+                        .foregroundStyle(SQColor.accentInk)
+                        .frame(minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("profile.member.bio.more")
+            }
+        }
+        .padding(.horizontal, SQSpace.md)
+        .padding(.top, SQSpace.sm)
+        .padding(.bottom, isLong ? 0 : SQSpace.sm)
+        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .accessibilityIdentifier("profile.member.bio")
     }
 }

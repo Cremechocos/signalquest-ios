@@ -878,6 +878,16 @@ struct SocialUserProfileStats: Codable, Equatable {
     /// Trajets que la personne a rendus publics (IOS-037, comme Android et le Web) ;
     /// `nil` quand elle masque ses chiffres, ou d'un serveur plus ancien : la case n'apparaît pas.
     var publicSessions: Int? = nil
+    /// Avancement dans le niveau des missions, en POURCENTAGE de 0 à 100 comme partout côté
+    /// serveur (`resolveMissionsLevel`, /api/gamification/profile) ; `nil` quand les chiffres
+    /// sont masqués ou d'un serveur qui ne le sert pas encore : l'anneau reste une piste neutre.
+    var levelProgress: Double? = nil
+
+    /// Avancement de 0 à 1 pour l'anneau, borné.
+    var levelFraction: Double? {
+        guard let levelProgress, levelProgress.isFinite else { return nil }
+        return min(1, max(0, levelProgress / 100))
+    }
 
     /// IOS-023 : les points affichés sont ceux de la gamification, comme son propre
     /// profil (/api/user/stats), les classements et Android ; `points` (ancien

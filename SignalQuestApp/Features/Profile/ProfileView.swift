@@ -420,6 +420,22 @@ struct ProfileView: View {
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("profile.chooseHandle")
                 }
+                // Sans bio, l'invitation à en écrire une : elle s'affiche en tête du profil vu
+                // par les autres membres (refonte du profil membre, 25/11).
+                if (user.bio ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Button {
+                        showEdit = true
+                    } label: {
+                        Text("Ajoute une bio")
+                            .font(SQType.callout(.semibold))
+                            .foregroundStyle(SQColor.accentInk)
+                            .multilineTextAlignment(.leading)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("profile.addBio")
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Button {
