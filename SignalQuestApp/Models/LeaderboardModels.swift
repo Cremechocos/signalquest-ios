@@ -249,3 +249,108 @@ struct PointsLeaderboardStats: Decodable, Equatable {
     let badges: Int?
 }
 
+
+// MARK: - Reçu de classement après un test (contrat classements v1)
+
+/// Champ `leaderboard` de la réponse à `POST /api/speedtests` : semaine glissante, portée
+/// globale, sans filtre. `nil` pour un invité ou si le serveur n'a pas pu le calculer ; l'envoi
+/// n'en dépend jamais.
+struct SpeedtestLeaderboardReceipt: Decodable, Equatable {
+    /// Une mesure (download ou upload) du reçu.
+    struct Line: Decodable, Equatable {
+        let rankBefore: Int?
+        let rankAfter: Int?
+        let total: Int?
+        /// Débit moyen classé, en Mbit/s.
+        let rankedValue: Double?
+        let peakValue: Double?
+        /// Mon meilleur classé de la période avant ce test.
+        let previousRecord: Double?
+
+        enum CodingKeys: String, CodingKey { case rankBefore, rankAfter, total, rankedValue, peakValue, previousRecord }
+
+        init(rankBefore: Int?, rankAfter: Int?, total: Int?, rankedValue: Double?, peakValue: Double?, previousRecord: Double?) {
+            self.rankBefore = rankBefore
+            self.rankAfter = rankAfter
+            self.total = total
+            self.rankedValue = rankedValue
+            self.peakValue = peakValue
+            self.previousRecord = previousRecord
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            rankBefore = try? c.decodeIfPresent(Int.self, forKey: .rankBefore)
+            rankAfter = try? c.decodeIfPresent(Int.self, forKey: .rankAfter)
+            total = try? c.decodeIfPresent(Int.self, forKey: .total)
+            rankedValue = try? c.decodeIfPresent(Double.self, forKey: .rankedValue)
+            peakValue = try? c.decodeIfPresent(Double.self, forKey: .peakValue)
+            previousRecord = try? c.decodeIfPresent(Double.self, forKey: .previousRecord)
+        }
+    }
+
+    let period: String?
+    /// `WIFI`, `WIRED`, `PRIVATE` ou `NO_SPEED` : le test ne concourt pas.
+    let exclusionReason: String?
+    let download: Line?
+    let upload: Line?
+
+    enum CodingKeys: String, CodingKey { case period, exclusionReason, download, upload }
+
+    init(period: String?, exclusionReason: String?, download: Line?, upload: Line?) {
+        self.period = period
+        self.exclusionReason = exclusionReason
+        self.download = download
+        self.upload = upload
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        period = try? c.decodeIfPresent(String.self, forKey: .period)
+        exclusionReason = try? c.decodeIfPresent(String.self, forKey: .exclusionReason)
+        download = try? c.decodeIfPresent(Line.self, forKey: .download)
+        upload = try? c.decodeIfPresent(Line.self, forKey: .upload)
+    }
+
+    /// Lu à part de la réponse d'envoi, jamais dans `SpeedtestSaveResponse` : un reçu absent,
+    /// nul ou malformé donne `nil` et ne peut pas faire échouer l'accusé de réception.
+    static func decode(fromSaveResponse data: Data) -> SpeedtestLeaderboardReceipt? {
+        struct Envelope: Decodable { let leaderboard: SpeedtestLeaderboardReceipt? }
+        return (try? JSONDecoder.signalQuest.decode(Envelope.self, from: data))?.leaderboard
+    }
+
+    /// La mesure montrée : le download s'il est classé, sinon l'upload.
+    var shown: (category: LeaderboardMetric, line: Line)? {
+        if let download, download.rankAfter != nil, download.rankedValue != nil { return (.download, download) }
+        if let upload, upload.rankAfter != nil, upload.rankedValue != nil { return (.upload, upload) }
+        return nil
+    }
+
+    /// Quelque chose à dire : un rang, ou la raison d'être hors classement.
+    var isDisplayable: Bool { shown != nil || exclusionReason != nil }
+
+    static let demo = SpeedtestLeaderboardReceipt(
+        period: "week", exclusionReason: nil,
+        download: Line(rankBefore: 12, rankAfter: 2, total: 214, rankedValue: 1_046.4, peakValue: 1_099.7, previousRecord: 642),
+        upload: Line(rankBefore: 9, rankAfter: 7, total: 214, rankedValue: 118, peakValue: 131, previousRecord: 96)
+    )
+
+    static let demoWiFi = SpeedtestLeaderboardReceipt(period: "week", exclusionReason: "WIFI", download: nil, upload: nil)
+}
+
+/// Reçus arrivés avec l'accusé de réception d'un envoi, gardés en mémoire par identifiant
+/// client du test, le temps que l'écran de résultat les lise une fois.
+enum SpeedtestLeaderboardReceiptStore {
+    private static let lock = NSLock()
+    // Accès exclusivement sous `lock`.
+    nonisolated(unsafe) private static var receipts: [String: SpeedtestLeaderboardReceipt] = [:]
+
+    static func put(_ receipt: SpeedtestLeaderboardReceipt, forClientId clientId: String) {
+        lock.withLock { receipts[clientId] = receipt }
+    }
+
+    /// Le reçu de ce test, retiré à la lecture.
+    static func take(forClientId clientId: String) -> SpeedtestLeaderboardReceipt? {
+        lock.withLock { receipts.removeValue(forKey: clientId) }
+    }
+}

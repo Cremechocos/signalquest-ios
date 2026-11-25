@@ -3006,6 +3006,10 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         }
         guard pending.ownerScopeId == LocalAccountScope.currentOwnerScopeId else { throw CancellationError() }
         await pendingCache.remove(retryKey)
+        // Classements v1 : reçu lu à part, après l'accusé de réception, sans effet sur l'envoi.
+        if let receipt = SpeedtestLeaderboardReceipt.decode(fromSaveResponse: data) {
+            SpeedtestLeaderboardReceiptStore.put(receipt, forClientId: pending.id)
+        }
         if let association = response.physicalSiteAssociation {
             try await rememberPhysicalSiteAssociation(
                 association,

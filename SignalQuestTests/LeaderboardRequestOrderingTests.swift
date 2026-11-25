@@ -201,6 +201,49 @@ final class LeaderboardRequestOrderingTests: XCTestCase {
         XCTAssertFalse(LeaderboardsViewModel.isDepartmentMissing(APIError.transport("offline")))
     }
 
+    /// Reçu de `POST /api/speedtests` (contrat v1) : lu à part, il ne peut jamais faire échouer
+    /// l'accusé de réception ; absent, nul ou malformé, il n'existe simplement pas.
+    func testSpeedtestReceiptNeverBreaksTheAcknowledgement() throws {
+        func body(_ leaderboard: String?) -> Data {
+            let extra = leaderboard.map { #","leaderboard":\#($0)"# } ?? ""
+            return Data(#"{"success":true,"id":"st-9"\#(extra)}"#.utf8)
+        }
+        let cases: [(String?, Bool)] = [
+            (nil, false), ("null", false), (#""oops""#, false), ("[1,2]", false),
+            (#"{"period":"week","exclusionReason":null,"download":{"rankBefore":7,"rankAfter":3,"total":14,"rankedValue":300,"peakValue":320,"previousRecord":30},"upload":null}"#, true)
+        ]
+        for (leaderboard, present) in cases {
+            let data = body(leaderboard)
+            let ack = try JSONDecoder.signalQuest.decode(SpeedtestSaveResponse.self, from: data)
+            XCTAssertTrue(ack.success, "l'accusé se décode quel que soit le reçu : \(leaderboard ?? "absent")")
+            XCTAssertEqual(ack.resolvedID, "st-9")
+            XCTAssertEqual(SpeedtestLeaderboardReceipt.decode(fromSaveResponse: data) != nil, present, leaderboard ?? "absent")
+        }
+
+        let valid = try XCTUnwrap(SpeedtestLeaderboardReceipt.decode(fromSaveResponse: body(cases[4].0)))
+        XCTAssertEqual(valid.shown?.category, .download)
+        XCTAssertEqual(valid.shown?.line.rankAfter, 3)
+        XCTAssertTrue(valid.isDisplayable)
+
+        // Un champ malformé ne fait tomber que lui ; l'upload sert quand le download n'est pas classé.
+        let partial = try XCTUnwrap(SpeedtestLeaderboardReceipt.decode(fromSaveResponse: body(
+            #"{"period":"week","download":{"rankBefore":"x","rankAfter":null,"rankedValue":12},"upload":{"rankBefore":"y","rankAfter":5,"total":14,"rankedValue":40,"peakValue":55}}"#)))
+        XCTAssertNil(partial.download?.rankBefore)
+        XCTAssertEqual(partial.shown?.category, .upload)
+        XCTAssertNil(partial.shown?.line.rankBefore, "entrée au classement")
+
+        let wifi = try XCTUnwrap(SpeedtestLeaderboardReceipt.decode(fromSaveResponse: body(
+            #"{"period":"week","exclusionReason":"WIFI","download":null,"upload":null}"#)))
+        XCTAssertNil(wifi.shown)
+        XCTAssertTrue(wifi.isDisplayable, "hors classement : la feuille dit pourquoi")
+        let empty = SpeedtestLeaderboardReceipt(period: "week", exclusionReason: nil, download: nil, upload: nil)
+        XCTAssertFalse(empty.isDisplayable, "rien à dire : pas de feuille")
+
+        SpeedtestLeaderboardReceiptStore.put(valid, forClientId: "client-1")
+        XCTAssertEqual(SpeedtestLeaderboardReceiptStore.take(forClientId: "client-1"), valid)
+        XCTAssertNil(SpeedtestLeaderboardReceiptStore.take(forClientId: "client-1"), "lu une seule fois")
+    }
+
     func testRankedValuesUseBitsPerSecondAndKeepOtherUnits() {
         let speed = LeaderboardsView.valueText(712, unit: "Mbps")
         XCTAssertTrue(speed.hasPrefix("712"), speed)

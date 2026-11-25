@@ -7,6 +7,8 @@ private let speedtestQALogger = Logger(subsystem: "fr.signalquest.ios", category
 
 struct SpeedtestView: View {
     private let guestMode: Bool
+    /// Membre connecté : le reçu de classement ouvre son Classement (« Voir ma place »).
+    private let user: AuthUser?
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var router: AppRouter
     @Environment(\.scenePhase) private var scenePhase
@@ -84,6 +86,9 @@ struct SpeedtestView: View {
     @State private var runErrorKind: RunErrorKind = .failure
     /// Test de l'historique ouvert en fiche détaillée.
     @State private var detailResult: SpeedtestRunResult?
+    /// Reçu de classement joint à l'accusé de réception du test qui vient de finir.
+    @State private var leaderboardReceipt: PresentedLeaderboardReceipt?
+    @State private var showLeaderboard = false
     /// Débit habituel de l'opérateur autour du dernier test (carte verdict).
     @State private var typicalNearby: SpeedtestVerdictCard.Typical?
     /// Tracé de la phase de débit en cours, sous l'anneau.
@@ -126,8 +131,9 @@ struct SpeedtestView: View {
     // système ne sont créés qu'après confirmation des métadonnées publiées.
     @State private var sharePreviewResult: SpeedtestRunResult?
 
-    init(guestMode: Bool = false) {
+    init(guestMode: Bool = false, user: AuthUser? = nil) {
         self.guestMode = guestMode
+        self.user = user
     }
 
     /// Fournisseur affiché dans le bandeau, lié au chemin réellement mesuré.
@@ -176,6 +182,16 @@ struct SpeedtestView: View {
             DriveTestView(services: services)
         }
         .navigationDestination(isPresented: $showServerPage) { serverPage }
+        .navigationDestination(isPresented: $showLeaderboard) {
+            LeaderboardsView(service: services.leaderboards, gamification: services.gamification, user: user)
+        }
+        .sheet(item: $leaderboardReceipt) { presented in
+            LeaderboardReceiptSheet(
+                receipt: presented.receipt,
+                countedAt: presented.countedAt,
+                onShowLeaderboard: user == nil ? nil : { showLeaderboard = true }
+            )
+        }
         // F4 : « Lance un Drive Test » (Siri/Raccourcis) → présente Drive Test
         // une fois l'onglet Speed actif.
         .onReceive(router.$pendingDriveTest) { pending in
@@ -262,6 +278,7 @@ struct SpeedtestView: View {
             // Ancienne option « Trajet » (0) : un test simple désormais.
             if burstCount < 1 { burstCount = 1 }
             if await presentSpeedtestSharePreviewQAIfNeeded() { return }
+            presentLeaderboardReceiptQAIfNeeded()
             // L'historique est local : l'afficher tout de suite, avant les appels
             // réseau ci-dessous qui peuvent traîner hors couverture (MES-04).
             history = await services.speedtest.history()
@@ -1530,6 +1547,13 @@ struct SpeedtestView: View {
         pendingHistoryIds = await services.speedtest.pendingClientIds()
         try ensureActiveRunSession(sessionID)
         phase = .finished
+        // Classements v1 : la feuille ne paraît qu'avec un reçu joint à l'accusé de réception ;
+        // sans lui, l'écran de résultat ne change pas.
+        // Toujours retiré du magasin ; pas de feuille au milieu d'une rafale.
+        if let receipt = SpeedtestLeaderboardReceiptStore.take(forClientId: measured.id.uuidString),
+           receipt.isDisplayable, burstCount <= 1 {
+            leaderboardReceipt = PresentedLeaderboardReceipt(receipt: receipt)
+        }
         liveProgress = SpeedtestLiveProgress(
             phase: .finished,
             currentMbps: measured.downloadAverageMbps,
@@ -1792,6 +1816,19 @@ struct SpeedtestView: View {
         start()
     }
 
+    /// Recette de la feuille de reçu sans speedtest réel (`--qa-leaderboard-receipt`, et
+    /// `--qa-leaderboard-receipt-wifi` pour un test hors classement). Debug seulement.
+    @MainActor
+    private func presentLeaderboardReceiptQAIfNeeded() {
+        #if DEBUG
+        if AppEnvironment.hasQAFlag("leaderboard-receipt-wifi") {
+            leaderboardReceipt = PresentedLeaderboardReceipt(receipt: .demoWiFi)
+        } else if AppEnvironment.hasQAFlag("leaderboard-receipt") {
+            leaderboardReceipt = PresentedLeaderboardReceipt(receipt: .demo)
+        }
+        #endif
+    }
+
     @MainActor
     private func presentSpeedtestSharePreviewQAIfNeeded() async -> Bool {
         #if DEBUG
@@ -1992,4 +2029,11 @@ private struct SpeedtestModePicker: View {
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
+}
+
+/// Reçu présenté par `.sheet(item:)`, avec l'heure de l'accusé de réception.
+private struct PresentedLeaderboardReceipt: Identifiable {
+    let id = UUID()
+    let receipt: SpeedtestLeaderboardReceipt
+    var countedAt = Date()
 }

@@ -1332,7 +1332,7 @@ struct MainTabView: View {
 
     private var speedtestTab: some View {
         NavigationStack {
-            SpeedtestView(guestMode: user == nil)
+            SpeedtestView(guestMode: user == nil, user: user)
                 .toolbar {
                     if user == nil {
                         ToolbarItem(placement: .topBarTrailing) {

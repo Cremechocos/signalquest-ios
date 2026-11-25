@@ -1648,3 +1648,160 @@ extension GamificationProfile {
         )
     }
 }
+
+// MARK: - Reçu après un test
+
+/// Feuille « Test enregistré » de l'écran de résultat (planche Classement du 24/11) :
+/// le passage de rang sur 7 jours, le chiffre classé (la moyenne, pas le pic), l'ancien
+/// record, ou la raison d'être hors classement. Ne paraît que quand le serveur a joint
+/// un reçu à l'accusé de réception.
+struct LeaderboardReceiptSheet: View {
+    let receipt: SpeedtestLeaderboardReceipt
+    /// Heure de l'accusé de réception.
+    var countedAt = Date()
+    /// Ouvre le classement ; `nil` quand l'écran ne peut pas le montrer.
+    var onShowLeaderboard: (() -> Void)?
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                header
+                if let shown = receipt.shown {
+                    ranked(shown.category, shown.line)
+                } else {
+                    Text(exclusionText)
+                        .font(SQType.body)
+                        .foregroundStyle(SQColor.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                VStack(spacing: SQSpace.sm) {
+                    if receipt.shown != nil, let onShowLeaderboard {
+                        GradientButton("Voir ma place") {
+                            dismiss()
+                            onShowLeaderboard()
+                        }
+                        .accessibilityIdentifier("speedtest.receipt.showPlace")
+                    }
+                    GradientButton("Fermer", style: .secondary) { dismiss() }
+                        .accessibilityIdentifier("speedtest.receipt.close")
+                }
+            }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.xl)
+            .padding(.bottom, SQSpace.xl)
+            .sqReadableWidth()
+        }
+        .background(SQColor.surface.ignoresSafeArea())
+        // Le reçu tient dans les deux tiers de l'écran ; la grande hauteur reste pour le très grand texte.
+        .presentationDetents(receipt.shown == nil ? [.fraction(0.4), .large] : [.fraction(0.66), .large])
+        .presentationDragIndicator(.visible)
+        .accessibilityIdentifier("speedtest.receipt")
+    }
+
+    private var header: some View {
+        HStack(spacing: SQSpace.md) {
+            Image(systemName: receipt.shown != nil ? "checkmark" : "minus")
+                .font(SQType.callout(.bold))
+                .foregroundStyle(receipt.shown != nil ? SQColor.success : SQColor.labelSecondary)
+                .frame(width: 40, height: 40)
+                .background(receipt.shown != nil ? SQColor.successSoft : SQColor.chip, in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Test enregistré")
+                    .font(SQType.heading)
+                    .foregroundStyle(SQColor.label)
+                    .accessibilityAddTraits(.isHeader)
+                Text(receipt.shown != nil
+                     ? String(localized: "Compté dans le classement à \(countedAt.formatted(date: .omitted, time: .shortened))")
+                     : String(localized: "Hors classement"))
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func ranked(_ category: LeaderboardMetric, _ line: SpeedtestLeaderboardReceipt.Line) -> some View {
+        let value = line.rankedValue ?? 0
+        HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs) {
+            Text(SQUnits.throughputValue(mbps: value))
+                .font(SQFont.display(40, .bold, relativeTo: .largeTitle))
+                .monospacedDigit()
+                .foregroundStyle(SQColor.label)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            Text("\(SQUnits.throughputUnit(mbps: value)) moyen")
+                .font(SQType.subhead(.semibold))
+                .foregroundStyle(SQColor.labelSecondary)
+        }
+        .accessibilityElement(children: .combine)
+        if let after = line.rankAfter {
+            rankMove(before: line.rankBefore, after: after, category: category)
+        }
+        VStack(spacing: SQSpace.sm) {
+            row("Chiffre classé", String(localized: "Moyenne · \(SQUnits.throughput(mbps: value))"))
+            if let peak = line.peakValue { row("Pic", SQUnits.throughput(mbps: peak)) }
+            if let total = line.total { row("Membres classés", total.formatted()) }
+            if let record = line.previousRecord { row("Ton ancien record", SQUnits.throughput(mbps: record)) }
+        }
+    }
+
+    private func rankMove(before: Int?, after: Int, category: LeaderboardMetric) -> some View {
+        let label = String(localized: "7 jours · \(String(localized: String.LocalizationValue(category.title)))")
+        return HStack(spacing: SQSpace.md) {
+            if let before, before != after {
+                Text(LeaderboardsView.ordinal(before))
+                    .font(SQFont.display(26, .bold))
+                    .monospacedDigit()
+                    .strikethrough()
+                    .foregroundStyle(SQColor.labelSecondary)
+                VStack(spacing: 2) {
+                    Image(systemName: "arrow.right").font(SQType.callout(.bold)).foregroundStyle(SQColor.label)
+                    Text(label).font(SQType.caption).foregroundStyle(SQColor.ink2).multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+            } else {
+                Text(before == nil ? String(localized: "Entrée au classement") : String(localized: "Rang inchangé"))
+                    .font(SQType.subhead(.semibold))
+                    .foregroundStyle(SQColor.ink2)
+                Text(label).font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
+                Spacer(minLength: SQSpace.sm)
+            }
+            Text(LeaderboardsView.ordinal(after))
+                .font(SQFont.display(26, .bold))
+                .monospacedDigit()
+                .foregroundStyle(SQColor.label)
+        }
+        .padding(SQSpace.md)
+        .frame(maxWidth: .infinity)
+        .background(SQColor.chip, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(rankMoveSpoken(before: before, after: after, label: label))
+    }
+
+    private func rankMoveSpoken(before: Int?, after: Int, label: String) -> Text {
+        if let before, before != after {
+            return Text("\(label) : de \(LeaderboardsView.ordinal(before)) à \(LeaderboardsView.ordinal(after))")
+        }
+        return Text("\(label) : \(LeaderboardsView.ordinal(after))")
+    }
+
+    private func row(_ label: LocalizedStringKey, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
+            Text(label).font(SQType.subhead).foregroundStyle(SQColor.ink2)
+            Spacer(minLength: SQSpace.sm)
+            Text(verbatim: value).font(SQType.subhead(.bold)).monospacedDigit().foregroundStyle(SQColor.label)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var exclusionText: String {
+        switch receipt.exclusionReason {
+        case "WIFI", "WIRED": return String(localized: "Seuls les tests en réseau mobile comptent au classement.")
+        case "PRIVATE": return String(localized: "Un test privé ne compte pas au classement.")
+        case "NO_SPEED": return String(localized: "Ce test n’a pas de débit mesuré : il ne compte pas au classement.")
+        default: return String(localized: "Ce test ne compte pas au classement.")
+        }
+    }
+}
