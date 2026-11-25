@@ -636,3 +636,19 @@ private final class FeedFixtureStreams {
     }
     func emit(_ index: Int, _ data: String) { outputs[index].yield((event: "snapshot", data: data)) }
 }
+
+/// IOS-064 : les pastilles d'une photo (commune, prise de vue) restent sur leur ligne quand la
+/// largeur de placement est arrondie au pixel ; la seconde passait à la ligne, sous l'image.
+final class FlowRowLayoutTests: XCTestCase {
+    func testPixelRoundingDoesNotWrapTheLastChip() {
+        // « Paris 1er » et « à 2 097,0 km, vers l’ouest » : 246 pt annoncés, 245,67 pt au placement.
+        XCTAssertEqual(FlowRow.rows(widths: [70, 170], available: 245.67, spacing: 6), [[0, 1]])
+    }
+
+    func testARealLackOfRoomStillWraps() {
+        XCTAssertEqual(FlowRow.rows(widths: [70, 170], available: 200, spacing: 6), [[0], [1]])
+        XCTAssertEqual(FlowRow.rows(widths: [], available: 200, spacing: 6), [])
+        XCTAssertEqual(FlowRow.rows(widths: [300, 20], available: 200, spacing: 6), [[0], [1]],
+                       "un élément trop large garde sa propre ligne")
+    }
+}

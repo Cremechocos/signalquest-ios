@@ -231,7 +231,10 @@ struct FlowRow: Layout {
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         var y = bounds.minY
-        for row in arrange(width: bounds.width, subviews: subviews) {
+        // Les mêmes lignes que `sizeThatFits` : recalculées sur `bounds.width` (la largeur
+        // annoncée, arrondie au pixel), la dernière étiquette pouvait passer à la ligne et
+        // sortir du cadre, sous la photo d'une carte (IOS-064).
+        for row in arrange(width: proposal.width ?? .infinity, subviews: subviews) {
             var x = bounds.minX
             for index in row.indices {
                 let size = subviews[index].sizeThatFits(.init(width: bounds.width, height: nil))
@@ -246,20 +249,33 @@ struct FlowRow: Layout {
     private struct Row { var indices: [Int] = []; var width: CGFloat = 0; var height: CGFloat = 0 }
 
     private func arrange(width: CGFloat, subviews: Subviews) -> [Row] {
-        var rows: [Row] = []
-        var current = Row()
-        for index in subviews.indices {
-            let size = subviews[index].sizeThatFits(.init(width: width, height: nil))
-            let needed = current.indices.isEmpty ? size.width : current.width + spacing + size.width
-            if !current.indices.isEmpty, needed > width {
-                rows.append(current)
-                current = Row()
-            }
-            current.width = current.indices.isEmpty ? min(size.width, width) : current.width + spacing + size.width
-            current.height = max(current.height, size.height)
-            current.indices.append(index)
+        let sizes = subviews.map { $0.sizeThatFits(.init(width: width, height: nil)) }
+        return Self.rows(widths: sizes.map(\.width), available: width, spacing: spacing).map { indices in
+            Row(indices: indices,
+                width: indices.enumerated().reduce(0) { total, item in
+                    total + (item.offset == 0 ? min(sizes[item.element].width, width) : spacing + sizes[item.element].width)
+                },
+                height: indices.map { sizes[$0].height }.max() ?? 0)
         }
-        if !current.indices.isEmpty { rows.append(current) }
+    }
+
+    /// Marge d'arrondi : une largeur ramenée au pixel ne fait pas passer à la ligne (IOS-064).
+    static let roundingTolerance: CGFloat = 1
+
+    /// Indices des éléments de chaque ligne, d'après leurs largeurs.
+    static func rows(widths: [CGFloat], available: CGFloat, spacing: CGFloat) -> [[Int]] {
+        var rows: [[Int]] = []
+        var current: [Int] = []
+        var used: CGFloat = 0
+        for (index, width) in widths.enumerated() {
+            if !current.isEmpty, used + spacing + width > available + roundingTolerance {
+                rows.append(current)
+                current = []
+            }
+            used = current.isEmpty ? min(width, available) : used + spacing + width
+            current.append(index)
+        }
+        if !current.isEmpty { rows.append(current) }
         return rows
     }
 }
