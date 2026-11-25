@@ -1132,18 +1132,26 @@ private struct PodiumCard: View {
 ///
 /// Les éléments se retirent au lieu d'être tronqués : la ville part d'abord, puis la date,
 /// puis la génération. L'opérateur reste.
+/// Date relative d'une rangée du Classement. `.short` et non `.abbreviated`, qui
+/// donne « -16 s » en français, lu « moins 16 secondes » par VoiceOver (IOS-076,
+/// même piège que les appareils E2EE).
+enum LeaderboardRowDate {
+    static func makeFormatter(locale: Locale = .autoupdatingCurrent) -> RelativeDateTimeFormatter {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.dateTimeStyle = .named
+        formatter.unitsStyle = .short
+        formatter.locale = locale
+        return formatter
+    }
+}
+
 private struct SpeedRowMeta: View {
     let operatorName: String?
     let tech: String?
     let city: String?
     let capturedAt: Date?
 
-    nonisolated(unsafe) private static let relativeFormatter: RelativeDateTimeFormatter = {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.dateTimeStyle = .named
-        formatter.unitsStyle = .abbreviated
-        return formatter
-    }()
+    nonisolated(unsafe) private static let relativeFormatter = LeaderboardRowDate.makeFormatter()
 
     private var operatorLabel: String? {
         guard let raw = operatorName?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else { return nil }

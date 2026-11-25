@@ -106,6 +106,23 @@ final class LeaderboardRequestOrderingTests: XCTestCase {
         await service.speed.succeed(0)
     }
 
+    /// IOS-076 : la date d'une rangée se lit « il y a 16 s », jamais « -16 s ».
+    func testRowDateReadsAsAgoInBothLanguages() {
+        let now = Date(timeIntervalSince1970: 1_790_000_000)
+        func text(_ locale: String, _ seconds: TimeInterval) -> String {
+            LeaderboardRowDate.makeFormatter(locale: Locale(identifier: locale))
+                .localizedString(for: now.addingTimeInterval(-seconds), relativeTo: now)
+                .replacingOccurrences(of: "\u{00A0}", with: " ")
+                .replacingOccurrences(of: "\u{202F}", with: " ")
+        }
+        XCTAssertEqual(text("fr_FR", 16), "il y a 16 s")
+        XCTAssertEqual(text("fr_FR", 3 * 86_400), "il y a 3 j")
+        XCTAssertEqual(text("en_US", 16), "16 sec. ago")
+        for seconds: TimeInterval in [16, 5 * 3_600, 3 * 86_400] {
+            XCTAssertFalse(text("fr_FR", seconds).hasPrefix("-"), "Pas de signe moins en français")
+        }
+    }
+
     func testRankedValuesUseBitsPerSecondAndKeepOtherUnits() {
         let speed = LeaderboardsView.valueText(712, unit: "Mbps")
         XCTAssertTrue(speed.hasPrefix("712"), speed)
