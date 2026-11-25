@@ -752,11 +752,14 @@ private struct LeaderboardHeroCard: View {
     }
 
     private var avatarWithRing: some View {
+        // L'avatar remplit tout l'intérieur de l'anneau, rond comme lui (demande d'Alexandre
+        // du 25/11) : anneau de 72 pt, trait de 4,5 pt, intérieur de 63 pt.
         ZStack {
             XPRing(progress: ringProgress)
-            SQAvatar(url: user?.avatarUrl, name: user?.name ?? user?.handle ?? String(localized: "Moi"), size: 46)
+            SQAvatar(url: user?.avatarUrl, name: user?.name ?? user?.handle ?? String(localized: "Moi"), size: 62)
+                .clipShape(Circle())
         }
-        .frame(width: 64, height: 64)
+        .frame(width: 72, height: 72)
         .accessibilityHidden(true)
     }
 
