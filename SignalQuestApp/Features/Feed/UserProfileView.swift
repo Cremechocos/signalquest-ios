@@ -404,6 +404,8 @@ struct UserProfileView: View {
     @EnvironmentObject private var inAppNotifications: SQInAppNotificationCenter
     @EnvironmentObject private var router: AppRouter
     @Environment(\.dismiss) private var dismiss
+    /// Colonne des noms de « Réseaux mesurés » : elle grandit avec le texte.
+    @ScaledMetric(relativeTo: .subheadline) private var networkNameWidth: CGFloat = 72
 
     /// Ouverture de la conversation en cours : évite qu'un double appui crée
     /// deux requêtes concurrentes.
@@ -1064,11 +1066,14 @@ struct UserProfileView: View {
                 // sous 5 % et n'en garde que quatre — la combler serait mentir.
                 ForEach(networks.operators) { entry in
                     HStack(spacing: SQSpace.sm2) {
-                        Text(verbatim: Self.operatorLabel(for: entry))
+                        // Nom court dans la colonne étroite (« Free », « Bouygues ») : le nom complet
+                        // y était tronqué (« Free Mo… ») ; VoiceOver lit toujours le nom complet.
+                        Text(verbatim: Self.shortOperatorLabel(for: entry))
                             .font(SQType.subhead(.bold))
                             .foregroundStyle(SQColor.label)
                             .lineLimit(1)
-                            .frame(width: 72, alignment: .leading)
+                            .minimumScaleFactor(0.8)
+                            .frame(width: networkNameWidth, alignment: .leading)
                         GeometryReader { proxy in
                             Capsule()
                                 .fill(SQColor.segTrack)
@@ -1123,6 +1128,14 @@ struct UserProfileView: View {
         // Les noms d'opérateurs sont des sigles : `entry.label` (`capitalized`)
         // donnait « Sfr ». Le registre de marque rend « SFR » ou « TELUS ».
         return SQBrand.operatorName(entry.key) ?? entry.label
+    }
+
+    /// Libellé de la colonne étroite des barres : le nom court du registre de marque
+    /// quand il existe, sinon le libellé complet.
+    private static func shortOperatorLabel(for entry: SocialProfileOperatorShare) -> String {
+        if let brand = entry.brandLabel, !brand.isEmpty { return brand }
+        if unresolvedOperatorKeys.contains(entry.key.uppercased()) { return operatorLabel(for: entry) }
+        return SQBrand.operatorShortName(entry.key) ?? operatorLabel(for: entry)
     }
 
     /// Libellé lu par VoiceOver. Il porte, lui, le réseau hôte : « Lebara, sur le

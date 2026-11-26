@@ -5,14 +5,14 @@ import XCTest
 @MainActor
 final class DriveShareQATests: XCTestCase {
     func testSharingTheLastTripShowsACardWithPrivacyOptions() {
-        run(locale: "fr", tab: "Tester", entry: "Mode Drive Test", acknowledge: "J'ai compris", share: "Partager le trajet")
+        run(locale: "fr", tab: "Tester", acknowledge: "J'ai compris", share: "Partager le trajet")
     }
 
     func testEnglishSharingTheLastTripShowsACardWithPrivacyOptions() {
-        run(locale: "en", tab: "Test", entry: "Drive Test mode", acknowledge: "Got it", share: "Share the trip")
+        run(locale: "en", tab: "Test", acknowledge: "Got it", share: "Share the trip")
     }
 
-    private func run(locale: String, tab: String, entry: String, acknowledge: String, share: String) {
+    private func run(locale: String, tab: String, acknowledge: String, share: String) {
         continueAfterFailure = false
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"], locale: locale)
@@ -21,8 +21,12 @@ final class DriveShareQATests: XCTestCase {
         let speed = SignalQuestUITestSupport.tab(named: tab, in: app)
         XCTAssertTrue(speed.waitForExistence(timeout: 20))
         speed.tap()
-        let open = app.buttons[entry].firstMatch
-        XCTAssertTrue(open.waitForExistence(timeout: 10), "Entrée « \(entry) » introuvable")
+        // Le Drive Test vit dans le menu « ⋯ » de l'en-tête depuis la refonte d'octobre (0bf1fd26).
+        let more = app.buttons["speedtest.more"].firstMatch
+        XCTAssertTrue(more.waitForExistence(timeout: 10), "Menu « Plus » du Speedtest absent")
+        more.tap()
+        let open = app.buttons["speedtest.driveTest"].firstMatch
+        XCTAssertTrue(open.waitForExistence(timeout: 5), "Entrée Drive Test du menu introuvable")
         open.tap()
         let understood = app.buttons[acknowledge].firstMatch
         if understood.waitForExistence(timeout: 5) { understood.tap() }

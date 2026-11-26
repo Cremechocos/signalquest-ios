@@ -36,6 +36,13 @@ final class MessageMentionsQATests: XCTestCase {
             let unlockCancel = app.buttons["Annuler"].firstMatch
             if unlockCancel.waitForExistence(timeout: 3) { unlockCancel.tap() }
             let row = app.staticTexts["Équipe terrain"]
+            // Sous les dossiers, les demandes et les archivées, le groupe est sous le pli ou sous
+            // le dock : on fait défiler jusqu'à lui (26/11).
+            _ = row.waitForExistence(timeout: 5)
+            for _ in 0..<6 where !row.exists { app.swipeUp() }
+            // En bas de l'écran, son centre tombait sous le dock flottant, et le toucher changeait
+            // d'onglet : on la fait remonter au-dessus avant de la toucher.
+            for _ in 0..<3 where row.exists && row.frame.maxY > app.frame.maxY - 140 { app.swipeUp() }
             XCTAssertTrue(row.waitForExistence(timeout: 10))
             row.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
             _ = field.waitForExistence(timeout: 10)
@@ -67,6 +74,13 @@ final class MessageMentionsQATests: XCTestCase {
             let unlockCancel = app.buttons[cancel].firstMatch
             if unlockCancel.waitForExistence(timeout: 3) { unlockCancel.tap() }
             let row = app.staticTexts["Équipe terrain"]
+            // Sous les dossiers, les demandes et les archivées, le groupe est sous le pli ou sous
+            // le dock : on fait défiler jusqu'à lui (26/11).
+            _ = row.waitForExistence(timeout: 5)
+            for _ in 0..<6 where !row.exists { app.swipeUp() }
+            // En bas de l'écran, son centre tombait sous le dock flottant, et le toucher changeait
+            // d'onglet : on la fait remonter au-dessus avant de la toucher.
+            for _ in 0..<3 where row.exists && row.frame.maxY > app.frame.maxY - 140 { app.swipeUp() }
             XCTAssertTrue(row.waitForExistence(timeout: 10), "Groupe de démo introuvable")
             row.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
             opened = field.waitForExistence(timeout: 10)

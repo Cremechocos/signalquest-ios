@@ -29,7 +29,9 @@ final class ProfileCardQATests: XCTestCase {
         XCTAssertTrue(app.staticTexts["@camille"].waitForExistence(timeout: 10), "Pseudo absent")
         // Abonnés / abonnements n'ont pas disparu : ils suivent l'identité,
         // en haut de l'écran — vérifiés avant de faire défiler.
-        XCTAssertTrue(app.staticTexts["128 abonnés"].exists, "« abonnés » manque — la refonte ne doit rien retirer")
+        // Refonte « carte d'identité » (bdf7bc45) : « 128 abonnés · 87 abonnements » sur une ligne.
+        let followers = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "128 abonnés")).firstMatch
+        XCTAssertTrue(followers.exists, "« abonnés » manque — la refonte ne doit rien retirer")
 
         // Réseaux mesurés : le libellé de section et la légende chiffrée.
         // ⚠️ Le libellé ne doit JAMAIS dire « opérateur » : la répartition des
@@ -56,15 +58,14 @@ final class ProfileCardQATests: XCTestCase {
         //
         // « Free 4 % » est là exprès : l'ancien plancher à 5 % masquait des
         // réseaux réellement mesurés sans le dire.
-        // ⚠️ Les noms attendus sont ceux de `SQBrand` (« Bouygues », « Free »),
-        // PAS ceux du registre backend (« Bouygues Telecom », « Free Mobile ») :
-        // iOS affiche les noms courts. Deux sources de libellés, ne pas les
-        // confondre en écrivant un test.
+        // Depuis les noms complets d'opérateurs, VoiceOver lit « Free Mobile » ; la colonne
+        // étroite des barres affiche, elle, le nom court (« Free »), le nom complet y était
+        // tronqué en « Free Mo… » (audit du 26/11).
         for legend in [
             "Orange : 52 % des mesures",
             "SFR : 30 % des mesures",
             "Lebara, sur le réseau SFR : 8 % des mesures",
-            "Free : 4 % des mesures"
+            "Free Mobile : 4 % des mesures"
         ] {
             XCTAssertTrue(
                 app.otherElements[legend].exists || app.staticTexts[legend].exists,
