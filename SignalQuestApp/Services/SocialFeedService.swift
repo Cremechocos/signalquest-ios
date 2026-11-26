@@ -32,6 +32,8 @@ protocol SocialFeedServicing: Sendable {
         poll: CreatePostPoll?
     ) async throws -> UnifiedSocialFeedItem?
     func uploadImage(data: Data, mimeType: String) async throws -> CreatePostAttachment
+    /// `locationPrecision` : lieu montré aux autres, `city` ou `none` (contrat
+    /// social-post-author-options §B-2) ; nil laisse le serveur appliquer son défaut.
     func publishPost(
         text: String,
         visibility: String,
@@ -40,7 +42,8 @@ protocol SocialFeedServicing: Sendable {
         targetType: String?,
         targetId: String?,
         extraMetadata: [String: JSONValue]?,
-        poll: CreatePostPoll?
+        poll: CreatePostPoll?,
+        locationPrecision: String?
     ) async throws -> UnifiedSocialFeedItem?
     func retryPendingPosts() async
     func react(postId: String, emoji: String) async throws -> ReactionResponse
@@ -52,6 +55,9 @@ protocol SocialFeedServicing: Sendable {
     func editPost(postId: String, text: String, visibility: String?) async throws -> UnifiedSocialFeedItem?
     /// Change seulement la visibilité : seul champ qu'un post automatique accepte (#694).
     func setVisibility(postId: String, visibility: String) async throws -> UnifiedSocialFeedItem?
+    /// Lieu montré aux autres en haut du post, `city` ou `none` (contrat
+    /// social-post-author-options §B-2) ; accepté aussi sur un post automatique.
+    func setLocationPrecision(postId: String, precision: String) async throws
     /// Suppression définitive. Irréversible côté serveur.
     func deletePost(postId: String) async throws
     /// Épingle ou détache un post sur son profil. Le serveur ne garde qu'un seul
@@ -151,6 +157,7 @@ extension SocialFeedServicing {
 
     func experienceTest(id: String) async throws -> ExperienceTestDetail? { nil }
 
+    /// Sans choix de lieu : le serveur applique son défaut.
     func publishPost(
         text: String,
         visibility: String,
@@ -160,6 +167,22 @@ extension SocialFeedServicing {
         targetId: String?,
         extraMetadata: [String: JSONValue]?,
         poll: CreatePostPoll?
+    ) async throws -> UnifiedSocialFeedItem? {
+        try await publishPost(text: text, visibility: visibility, imageData: imageData, imageMimeType: imageMimeType,
+                              targetType: targetType, targetId: targetId, extraMetadata: extraMetadata,
+                              poll: poll, locationPrecision: nil)
+    }
+
+    func publishPost(
+        text: String,
+        visibility: String,
+        imageData: Data?,
+        imageMimeType: String,
+        targetType: String?,
+        targetId: String?,
+        extraMetadata: [String: JSONValue]?,
+        poll: CreatePostPoll?,
+        locationPrecision: String?
     ) async throws -> UnifiedSocialFeedItem? {
         var attachments: [CreatePostAttachment] = []
         if let imageData {
@@ -393,7 +416,8 @@ final class SocialFeedService: SocialFeedServicing {
         targetType: String?,
         targetId: String?,
         extraMetadata: [String: JSONValue]?,
-        poll: CreatePostPoll?
+        poll: CreatePostPoll?,
+        locationPrecision: String?
     ) async throws -> UnifiedSocialFeedItem? {
         guard let session = LocalAccountScope.sessionSnapshot() else {
             throw CancellationError()
@@ -421,6 +445,7 @@ final class SocialFeedService: SocialFeedServicing {
                 && staged.request.targetType == targetType
                 && staged.request.targetId == targetId
                 && staged.request.poll == poll
+                && staged.request.locationPrecision == locationPrecision
                 && staged.imageSha256 == imageSha256
         }) {
             return try await submitPreparedPost(existing, session: session)
@@ -442,7 +467,8 @@ final class SocialFeedService: SocialFeedServicing {
             attachments: nil,
             attachRadio: false,
             poll: poll,
-            clientRequestId: requestId
+            clientRequestId: requestId,
+            locationPrecision: locationPrecision
         )
         let record = SocialPostOutboxRecord(
             ownerScopeId: session.ownerScopeId,
@@ -645,6 +671,20 @@ final class SocialFeedService: SocialFeedServicing {
             as: Response.self
         )
         return response.item
+    }
+
+    func setLocationPrecision(postId: String, precision: String) async throws {
+        // Seul champ envoyé : sur un post automatique, toute clé hors visibilité et lieu vaut un 403.
+        struct Patch: Encodable { let locationPrecision: String }
+        _ = try await api.request(
+            APIEndpoint(
+                path: "/api/social/posts/\(normalizedPostId(postId))",
+                method: .patch,
+                headers: ["Content-Type": "application/json"],
+                body: try JSONEncoder.signalQuest.encode(Patch(locationPrecision: precision))
+            ),
+            as: JSONValue.self
+        )
     }
 
     func setVisibility(postId: String, visibility: String) async throws -> UnifiedSocialFeedItem? {

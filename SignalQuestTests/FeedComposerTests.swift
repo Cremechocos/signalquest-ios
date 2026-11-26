@@ -720,7 +720,8 @@ private final class ComposerFeedFixture: SocialFeedServicing, @unchecked Sendabl
         targetType: String?,
         targetId: String?,
         extraMetadata: [String: JSONValue]?,
-        poll: CreatePostPoll?
+        poll: CreatePostPoll?,
+        locationPrecision: String?
     ) async throws -> UnifiedSocialFeedItem? { throw ComposerFixtureError.unused }
     func retryPendingPosts() async {  }
     func react(postId: String, emoji: String) async throws -> ReactionResponse { throw ComposerFixtureError.unused }
@@ -729,6 +730,7 @@ private final class ComposerFeedFixture: SocialFeedServicing, @unchecked Sendabl
     func muteNotifications(postId: String) async throws -> SuccessResponse { throw ComposerFixtureError.unused }
     func editPost(postId: String, text: String, visibility: String?) async throws -> UnifiedSocialFeedItem? { throw ComposerFixtureError.unused }
     func setVisibility(postId: String, visibility: String) async throws -> UnifiedSocialFeedItem? { throw ComposerFixtureError.unused }
+    func setLocationPrecision(postId: String, precision: String) async throws {}
     func deletePost(postId: String) async throws { throw ComposerFixtureError.unused }
     func setPinned(postId: String, pinned: Bool) async throws { throw ComposerFixtureError.unused }
     func votePoll(postId: String, optionId: String?, removing: Bool) async throws -> FeedPoll? { throw ComposerFixtureError.unused }

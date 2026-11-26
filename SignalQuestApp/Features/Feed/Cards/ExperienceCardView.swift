@@ -27,7 +27,9 @@ struct ExperienceCardView: View {
                     kindBadge: nil,
                     kindColor: SQColor.brandRed,
                     onAuthorTap: onAuthorTap,
-                    isPinned: item.isPinned
+                    isPinned: item.isPinned,
+                    isEdited: item.editedAt != nil,
+                    placeOnlyForMe: item.placeOnlyForMe
                 )
 
                 FeedKindLine(symbol: "play.rectangle", title: String(localized: "Test d’expérience"), points: item.earnedPoints)

@@ -723,7 +723,8 @@ private final class FeedContextFixture: SocialFeedServicing, @unchecked Sendable
         targetType: String?,
         targetId: String?,
         extraMetadata: [String: JSONValue]?,
-        poll: CreatePostPoll?
+        poll: CreatePostPoll?,
+        locationPrecision: String?
     ) async throws -> UnifiedSocialFeedItem? { throw FeedFixtureError.unused }
     func retryPendingPosts() async {  }
     func react(postId: String, emoji: String) async throws -> ReactionResponse { throw FeedFixtureError.unused }
@@ -732,6 +733,7 @@ private final class FeedContextFixture: SocialFeedServicing, @unchecked Sendable
     func muteNotifications(postId: String) async throws -> SuccessResponse { throw FeedFixtureError.unused }
     func editPost(postId: String, text: String, visibility: String?) async throws -> UnifiedSocialFeedItem? { throw FeedFixtureError.unused }
     func setVisibility(postId: String, visibility: String) async throws -> UnifiedSocialFeedItem? { throw FeedFixtureError.unused }
+    func setLocationPrecision(postId: String, precision: String) async throws {}
     var onDelete: (@Sendable (String) async throws -> Void)?
     func deletePost(postId: String) async throws {
         guard let onDelete else { throw FeedFixtureError.unused }

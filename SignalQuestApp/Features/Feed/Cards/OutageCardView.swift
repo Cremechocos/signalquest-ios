@@ -128,7 +128,9 @@ struct OutageCardView: View {
                     kindBadge: nil,
                     kindColor: ink,
                     onAuthorTap: onAuthorTap,
-                    isPinned: item.isPinned
+                    isPinned: item.isPinned,
+                    isEdited: item.editedAt != nil,
+                    placeOnlyForMe: item.placeOnlyForMe
                 )
 
                 hero

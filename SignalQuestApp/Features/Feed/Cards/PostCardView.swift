@@ -35,7 +35,9 @@ struct PostCardView: View {
                     kindBadge: nil,
                     kindColor: SQColor.label,
                     onAuthorTap: onAuthorTap,
-                    isPinned: item.isPinned
+                    isPinned: item.isPinned,
+                    isEdited: item.editedAt != nil,
+                    placeOnlyForMe: item.placeOnlyForMe
                 )
 
                 if !item.displayText.isEmpty {

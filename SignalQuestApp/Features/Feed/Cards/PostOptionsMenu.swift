@@ -9,14 +9,17 @@ import SwiftUI
 /// ── · Supprimer. Un autre membre : Couper les notifications · ── · Sourdine · Bloquer · Signaler.
 /// Pas de Citer sur iOS.
 ///
-/// Une entrée n'apparaît que si l'écran fournit son action : la règle vit ici, pas dans chaque
-/// écran. La condition d'auteur reste `canManage` ; le serveur revérifie (403 sinon).
+/// Une entrée n'apparaît que si l'écran fournit son action ET que le serveur la permet
+/// (`permissions`, contrat social-post-author-options §A, servi le 26/11 ; la règle locale
+/// `canManage` en repli). Le serveur revérifie (403 sinon).
 struct PostOptionsMenu: View {
     let item: UnifiedSocialFeedItem
     var onViewProfile: (() -> Void)? = nil
     var onShare: (() -> Void)? = nil
     var onEdit: (() -> Void)? = nil
     var onSetVisibility: ((SocialVisibility) -> Void)? = nil
+    /// Lieu montré aux autres : `city` ou `none` (§B-2).
+    var onSetLocation: ((String) -> Void)? = nil
     var onTogglePin: (() -> Void)? = nil
     var onMute: (() -> Void)? = nil
     var onDelete: (() -> Void)? = nil
@@ -27,13 +30,13 @@ struct PostOptionsMenu: View {
     var identifierPrefix = "post"
 
     enum Entry: Equatable {
-        case profile, copyLink, share, edit, visibility, pin, mute, delete, muteAuthor, blockAuthor, report
+        case profile, copyLink, share, edit, visibility, location, pin, mute, delete, muteAuthor, blockAuthor, report
 
         /// Groupe du menu : un séparateur entre deux groupes.
         var section: Int {
             switch self {
             case .profile, .copyLink, .share: return 0
-            case .edit, .visibility, .pin, .mute: return 1
+            case .edit, .visibility, .location, .pin, .mute: return 1
             case .delete, .muteAuthor, .blockAuthor, .report: return 2
             }
         }
@@ -43,7 +46,7 @@ struct PostOptionsMenu: View {
     static func entries(
         for item: UnifiedSocialFeedItem,
         canViewProfile: Bool = false, canShare: Bool = false,
-        canEdit: Bool, canSetVisibility: Bool, canPin: Bool,
+        canEdit: Bool, canSetVisibility: Bool, canSetLocation: Bool = false, canPin: Bool,
         canMute: Bool, canDelete: Bool,
         canMuteAuthor: Bool = false, canBlockAuthor: Bool = false,
         canReport: Bool
@@ -51,22 +54,23 @@ struct PostOptionsMenu: View {
         var entries: [Entry] = []
         if canViewProfile { entries.append(.profile) }
         if item.publicWebLink != nil { entries.append(.copyLink) }
-        // Un post en zone privée ne se partage à personne (feed-text-keys v4, §4).
-        if canShare, item.isShareable { entries.append(.share) }
+        // Un post en zone privée ou « Moi seul » ne se partage à personne (`canShare`).
+        if canShare, item.allowsShare { entries.append(.share) }
         if item.canManage {
             // Un post automatique ne se modifie pas (403 GENERATED_POST_READ_ONLY, #694) ;
-            // sa visibilité, si.
-            if item.canEdit, canEdit { entries.append(.edit) }
-            if canSetVisibility { entries.append(.visibility) }
-            if canPin { entries.append(.pin) }
-            if canMute { entries.append(.mute) }
-            if canDelete { entries.append(.delete) }
+            // sa visibilité et son lieu, si.
+            if canEdit, item.allowsEdit { entries.append(.edit) }
+            if canSetVisibility, item.allowsVisibilityChange { entries.append(.visibility) }
+            if canSetLocation, item.allowsLocationChange { entries.append(.location) }
+            if canPin, item.allowsPin { entries.append(.pin) }
+            if canMute, item.allowsMuteNotifications { entries.append(.mute) }
+            if canDelete, item.allowsDelete { entries.append(.delete) }
         } else {
-            if canMute { entries.append(.mute) }
+            if canMute, item.allowsMuteNotifications { entries.append(.mute) }
             if canMuteAuthor { entries.append(.muteAuthor) }
             if canBlockAuthor { entries.append(.blockAuthor) }
             // On ne signale pas sa propre publication.
-            if canReport { entries.append(.report) }
+            if canReport, item.allowsReport { entries.append(.report) }
         }
         return entries
     }
@@ -75,7 +79,8 @@ struct PostOptionsMenu: View {
         Self.entries(
             for: item,
             canViewProfile: onViewProfile != nil, canShare: onShare != nil,
-            canEdit: onEdit != nil, canSetVisibility: onSetVisibility != nil, canPin: onTogglePin != nil,
+            canEdit: onEdit != nil, canSetVisibility: onSetVisibility != nil,
+            canSetLocation: onSetLocation != nil, canPin: onTogglePin != nil,
             canMute: onMute != nil, canDelete: onDelete != nil,
             canMuteAuthor: onMuteAuthor != nil, canBlockAuthor: onBlockAuthor != nil,
             canReport: onReport != nil
@@ -130,6 +135,9 @@ struct PostOptionsMenu: View {
         case .visibility:
             PostVisibilityPicker(current: item.visibility) { onSetVisibility?($0) }
                 .accessibilityIdentifier("\(identifierPrefix).visibility")
+        case .location:
+            PostLocationPicker(item: item) { onSetLocation?($0) }
+                .accessibilityIdentifier("\(identifierPrefix).location")
         case .pin:
             Button { onTogglePin?() } label: {
                 if item.isPinned {
@@ -201,7 +209,7 @@ extension UnifiedSocialFeedItem {
     /// pour un post public et partageable : réservé aux amis, le lien mènerait les autres sur un
     /// refus ; en zone privée, il ne se partage à personne (règle commune aux trois apps, 25/11).
     var publicWebLink: URL? {
-        guard isShareable, visibility == nil || visibility == "public",
+        guard allowsShare, visibility == nil || visibility == "public",
               sourceType == nil || sourceType == "post" else { return nil }
         return AppConfig.current.appBaseURL
             .appendingPathComponent("posts")
@@ -289,5 +297,41 @@ extension View {
         notifications: SQInAppNotificationCenter
     ) -> some View {
         modifier(BlockAuthorAlert(author: author, friends: friends, notifications: notifications))
+    }
+}
+
+// MARK: - Lieu affiché
+
+/// Sous-menu « Lieu affiché » de l'auteur : Commune ou Aucun lieu (planche commune du 25/11,
+/// contrat §B-2). Le point exact d'un test n'est jamais montré aux autres, quel que soit ce choix.
+struct PostLocationPicker: View {
+    let item: UnifiedSocialFeedItem
+    let onSelect: (String) -> Void
+
+    var body: some View {
+        Picker(selection: Binding(get: { item.effectiveLocationPrecision }, set: { onSelect($0) })) {
+            if let place = item.cardPlace {
+                Label(place, systemImage: "mappin.and.ellipse").tag("city")
+            } else {
+                Label("Commune", systemImage: "mappin.and.ellipse").tag("city")
+            }
+            Label("Aucun lieu", systemImage: "location.slash").tag("none")
+        } label: {
+            Label("Lieu affiché", systemImage: "mappin")
+        }
+        .pickerStyle(.menu)
+    }
+
+    /// Ce que dit le bandeau après le choix : qu'un test public reste sur la carte des débits
+    /// (encart de la planche), sinon rien.
+    @MainActor
+    static func announce(_ item: UnifiedSocialFeedItem, precision: String, in center: SQInAppNotificationCenter) {
+        guard let text = confirmation(for: item, precision: precision) else { return }
+        center.show(SQInAppNotificationItem(body: text, duration: .seconds(5)))
+    }
+
+    static func confirmation(for item: UnifiedSocialFeedItem, precision: String) -> String? {
+        guard precision == "none", item.signal?.testPublicOnMap == true else { return nil }
+        return String(localized: "Lieu masqué. Ton test public reste visible sur la carte des débits.")
     }
 }

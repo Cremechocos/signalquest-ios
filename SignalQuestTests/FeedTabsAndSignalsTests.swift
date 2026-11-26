@@ -302,6 +302,73 @@ final class FeedItemOwnershipTests: XCTestCase {
                        "Supprimer et Signaler ferment le menu, après un séparateur")
     }
 
+    /// Contrat social-post-author-options (servi le 26/11) : droits, « modifié » et lieu se
+    /// décodent chacun à part ; une valeur mal formée ne coûte que son champ, jamais le post.
+    func testAuthorOptionsContractDecodesAndDegrades() throws {
+        let served = try decode(payload(isMine: "true", pinnedAt: "null")
+            .replacingOccurrences(of: "\"text\":\"bonjour\",", with: """
+            "text":"bonjour","editedAt":"2026-11-26T01:00:00Z","locationPrecision":"none",
+            "permissions":{"canEdit":true,"canPin":false,"canChangeLocation":true,"canShare":true},
+            "placeLabel":"Lyon 3e",
+            """))
+        XCTAssertNotNil(served.editedAt)
+        XCTAssertEqual(served.locationPrecision, "none")
+        XCTAssertEqual(served.permissions?.canPin, false)
+        XCTAssertTrue(served.placeOnlyForMe, "mon post au lieu masqué : « Lyon 3e, visible de toi seul »")
+
+        let broken = try decode(payload(isMine: "true", pinnedAt: "null")
+            .replacingOccurrences(of: "\"text\":\"bonjour\",", with: """
+            "text":"bonjour","editedAt":"hier","locationPrecision":"exact","permissions":"tout",
+            """))
+        XCTAssertNil(broken.editedAt)
+        XCTAssertNil(broken.locationPrecision, "valeur hors contrat : ignorée")
+        XCTAssertNil(broken.permissions)
+        XCTAssertTrue(broken.allowsPin, "sans droits servis, la règle locale reste")
+    }
+
+    /// Le menu suit les droits servis : un droit à false retire l'entrée, et « Lieu affiché »
+    /// n'apparaît que servi et sur un post qui porte un lieu.
+    func testPostMenuFollowsServedPermissions() throws {
+        func entries(_ json: String) throws -> [PostOptionsMenu.Entry] {
+            PostOptionsMenu.entries(
+                for: try decode(json), canViewProfile: true, canShare: true,
+                canEdit: true, canSetVisibility: true, canSetLocation: true, canPin: true,
+                canMute: true, canDelete: true, canMuteAuthor: true, canBlockAuthor: true, canReport: true
+            )
+        }
+        func with(_ json: String, _ field: String) -> String {
+            json.replacingOccurrences(of: "\"text\":\"bonjour\",", with: "\"text\":\"bonjour\",\(field),")
+        }
+        let mine = payload(isMine: "true", pinnedAt: "null")
+        let theirs = payload(isMine: "false", pinnedAt: "null")
+        XCTAssertEqual(try entries(with(mine, """
+            "placeLabel":"Lyon 3e","permissions":{"canEdit":true,"canChangeVisibility":true,"canChangeLocation":true,"canPin":false,"canMuteNotifications":true,"canDelete":true,"canShare":true}
+            """)), [.profile, .copyLink, .share, .edit, .visibility, .location, .mute, .delete],
+            "Épingler refusé par le serveur ; Lieu affiché proposé")
+        XCTAssertFalse(try entries(with(mine, "\"permissions\":{\"canChangeLocation\":true}")).contains(.location),
+                       "sans lieu sur le post, rien à régler")
+        XCTAssertEqual(try entries(with(theirs, "\"permissions\":{\"canReport\":false,\"canShare\":false,\"canMuteNotifications\":true}")),
+                       [.profile, .mute, .muteAuthor, .blockAuthor],
+                       "ni lien, ni partage, ni signalement quand le serveur les refuse")
+    }
+
+    /// Composeur : un test privé ou hors carte part sans lieu par défaut (D-1), un test public
+    /// sur la carte avec sa commune ; sans commune servie, aucun choix n'est envoyé.
+    @MainActor
+    func testComposerLocationDefaultsFollowTheTest() throws {
+        func test(_ extra: String) throws -> SocialShareableSpeedtest {
+            try JSONDecoder.signalQuest.decode(SocialShareableSpeedtest.self, from: Data("""
+            {"id":"st1","downloadSpeed":100\(extra)}
+            """.utf8))
+        }
+        let privateTest = try test(",\"city\":\"Lyon 3e\",\"isSharedOnMap\":false")
+        let publicTest = try test(",\"city\":\"Lyon 3e\",\"isSharedOnMap\":true")
+        XCTAssertEqual(privateTest.city, "Lyon 3e")
+        XCTAssertEqual(ComposerViewModel.defaultLocationPrecision(for: privateTest), "none")
+        XCTAssertEqual(ComposerViewModel.defaultLocationPrecision(for: publicTest), "city")
+        XCTAssertEqual(ComposerViewModel.defaultLocationPrecision(for: try test("")), "none", "serveur muet : prudence")
+    }
+
     /// Champs absents : le décodage ne doit pas échouer, et l'app doit se
     /// comporter comme si le post n'était PAS gérable — masquer une action est
     /// bénin, l'offrir à tort renvoie un 403 à l'utilisateur.

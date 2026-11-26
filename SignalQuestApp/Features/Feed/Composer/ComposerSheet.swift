@@ -124,6 +124,9 @@ final class ComposerViewModel: ObservableObject {
 
     // Speedtest joint au post (targetType=speedtest côté backend).
     @Published var attachedSpeedtest: SocialShareableSpeedtest?
+    /// Lieu que montrera le post joint à un speedtest : `city` ou `none` (planche commune du
+    /// 25/11). Par défaut, aucun lieu pour un test privé ou hors carte, la commune sinon (D-1).
+    @Published var locationPrecision = "city"
     @Published var isLoadingSpeedtest = false
 
     // Current user profile loaded for live preview
@@ -352,7 +355,7 @@ final class ComposerViewModel: ObservableObject {
     func attachLatestSpeedtest() async {
         guard attachedSpeedtest == nil, !isLoadingSpeedtest else { return }
         if AppEnvironment.usesDemoData {
-            attachedSpeedtest = SocialShareableSpeedtest(
+            var demo = SocialShareableSpeedtest(
                 id: "demo-speedtest",
                 downloadSpeed: 412,
                 uploadSpeed: 64,
@@ -361,6 +364,11 @@ final class ComposerViewModel: ObservableObject {
                 mobileOperator: "SignalQuest",
                 timestamp: Date()
             )
+            // Commune et carte servies comme en vrai : le choix du lieu se voit en démo.
+            demo.city = "Paris"
+            demo.isSharedOnMap = true
+            attachedSpeedtest = demo
+            locationPrecision = Self.defaultLocationPrecision(for: demo)
             return
         }
         isLoadingSpeedtest = true
@@ -368,6 +376,7 @@ final class ComposerViewModel: ObservableObject {
         do {
             if let latest = try await service.myLatestSpeedtest() {
                 attachedSpeedtest = latest
+                locationPrecision = Self.defaultLocationPrecision(for: latest)
                 Haptics.light()
             } else {
                 errorMessage = String(localized: "Aucun speedtest enregistré pour le moment.")
@@ -375,6 +384,16 @@ final class ComposerViewModel: ObservableObject {
         } catch {
             errorMessage = error.userFacingMessage
         }
+    }
+
+    /// D-1 : un test privé ou hors carte ne montre pas de lieu tant que l'auteur ne le décide pas.
+    static func defaultLocationPrecision(for speedtest: SocialShareableSpeedtest) -> String {
+        speedtest.isSharedOnMap == true ? "city" : "none"
+    }
+
+    /// Le choix ne part que s'il a été proposé (commune connue) ; sinon le serveur applique D-1.
+    var locationPrecisionToSend: String? {
+        attachedSpeedtest?.city == nil ? nil : locationPrecision
     }
 
     func detachSpeedtest() {
@@ -493,7 +512,8 @@ final class ComposerViewModel: ObservableObject {
                 targetType: attachedSpeedtest != nil ? "speedtest" : nil,
                 targetId: attachedSpeedtest?.id,
                 extraMetadata: attachedSpeedtest.map { ["speedtestId": .string($0.id)] },
-                poll: preparedPoll
+                poll: preparedPoll,
+                locationPrecision: locationPrecisionToSend
             )
             didPublish = true
             clearDraft()
@@ -727,6 +747,9 @@ struct ComposerSheet: View {
                                         .foregroundStyle(SQColor.labelSecondary)
                                 }
                             }
+                            if let city = speedtest.city {
+                                locationChoice(city: city, speedtest: speedtest)
+                            }
                         }
 
                         quickHashtagsBar
@@ -950,6 +973,36 @@ struct ComposerSheet: View {
     }
 
     /// Croix ronde posée sur une pièce jointe (cible de 44 pt).
+    /// « Lieu affiché » d'un post joint à un speedtest : la commune ou aucun lieu, choisi avant
+    /// de publier (signalement du 25/11 : le lieu s'affichait sans que le membre le décide).
+    private func locationChoice(city: String, speedtest: SocialShareableSpeedtest) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs) {
+            Text("Lieu affiché")
+                .font(SQType.caption(.semibold))
+                .foregroundStyle(SQColor.label)
+                .accessibilityHidden(true)
+            Picker("Lieu affiché", selection: $model.locationPrecision) {
+                Text(verbatim: city).tag("city")
+                Text("Aucun lieu").tag("none")
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("composer.location")
+            Group {
+                if model.locationPrecision == "none" {
+                    Text(speedtest.isSharedOnMap == true
+                         ? "Ton test public reste visible sur la carte des débits."
+                         : "Aucun lieu pour les autres. La publication n’apparaît pas dans « Autour ».")
+                } else {
+                    Text("Le point exact du test n’est jamais montré aux autres.")
+                }
+            }
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.labelSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.top, SQSpace.xs)
+    }
+
     private func removeButton(label: LocalizedStringKey, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: "xmark")

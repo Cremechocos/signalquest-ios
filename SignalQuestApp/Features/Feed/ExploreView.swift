@@ -131,6 +131,19 @@ final class ExploreViewModel: ObservableObject {
         }
     }
 
+    /// Lieu montré aux autres (`city` ou `none`) : appliqué tout de suite, remis si le serveur refuse.
+    func setLocationPrecision(_ item: UnifiedSocialFeedItem, to precision: String) {
+        let previous = item.locationPrecision
+        update(item.id) { var copy = $0; copy.locationPrecision = precision; return copy }
+        Task {
+            do { try await service.setLocationPrecision(postId: item.id, precision: precision) }
+            catch {
+                update(item.id) { var copy = $0; copy.locationPrecision = previous; return copy }
+                if !error.isCancellation { actionError = error.userFacingMessage }
+            }
+        }
+    }
+
     /// Appliquée tout de suite, remise en place si le serveur refuse.
     func setVisibility(_ item: UnifiedSocialFeedItem, to visibility: SocialVisibility) {
         let previous = item.visibility
@@ -625,6 +638,7 @@ struct ExploreView: View {
                     // Mêmes options d'auteur que le ⋯ de la carte.
                     onEdit: { presentedSheet = .edit(item) },
                     onSetVisibility: { model.setVisibility(item, to: $0) },
+                    onSetLocation: { setLocation(item, to: $0) },
                     onTogglePin: { model.togglePin(item) },
                     onDelete: {
                         presentedSheet = nil
@@ -1091,6 +1105,11 @@ struct ExploreView: View {
         .environment(\.feedCardMenu, AnyView(exploreMenu(for: item)))
     }
 
+    private func setLocation(_ item: UnifiedSocialFeedItem, to precision: String) {
+        model.setLocationPrecision(item, to: precision)
+        PostLocationPicker.announce(item, precision: precision, in: inAppNotifications)
+    }
+
     /// Sourdine depuis le ⋯ ; « Annuler » la retire, la recherche suivante rend ses publications.
     private func muteAuthor(_ author: SocialFeedAuthor) {
         AuthorModeration.mute(author, friends: services.friends, notifications: inAppNotifications) {}
@@ -1118,6 +1137,7 @@ struct ExploreView: View {
             onShare: { presentedSheet = .share(item) },
             onEdit: { presentedSheet = .edit(item) },
             onSetVisibility: { model.setVisibility(item, to: $0) },
+            onSetLocation: { setLocation(item, to: $0) },
             onTogglePin: { model.togglePin(item) },
             onMute: { model.muteNotifications(item) },
             onDelete: { deleteWithUndo(item) },

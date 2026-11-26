@@ -33,7 +33,9 @@ struct SpeedtestCardView: View {
                     kindBadge: nil,
                     kindColor: SQColor.brandRed,
                     onAuthorTap: onAuthorTap,
-                    isPinned: item.isPinned
+                    isPinned: item.isPinned,
+                    isEdited: item.editedAt != nil,
+                    placeOnlyForMe: item.placeOnlyForMe
                 )
 
                 if isMemberPost {

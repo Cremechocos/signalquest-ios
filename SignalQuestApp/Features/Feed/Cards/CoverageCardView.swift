@@ -83,7 +83,9 @@ struct CoverageCardView: View {
                 kindBadge: nil,
                 kindColor: SQColor.brandRed,
                 onAuthorTap: onAuthorTap,
-                isPinned: item.isPinned
+                isPinned: item.isPinned,
+                isEdited: item.editedAt != nil,
+                placeOnlyForMe: item.placeOnlyForMe
             )
             FeedKindLine(symbol: block.source == .driveTest ? "car" : "point.topleft.down.curvedto.point.bottomright.up",
                          title: SessionPostText.title(block.source), points: item.earnedPoints)
@@ -125,7 +127,9 @@ struct CoverageCardView: View {
                     kindBadge: nil,
                     kindColor: SQColor.brandRed,
                     onAuthorTap: onAuthorTap,
-                    isPinned: item.isPinned
+                    isPinned: item.isPinned,
+                    isEdited: item.editedAt != nil,
+                    placeOnlyForMe: item.placeOnlyForMe
                 )
 
                 if let trace, !trace.isEmpty {

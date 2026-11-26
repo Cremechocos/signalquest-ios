@@ -237,6 +237,19 @@ final class UserProfileViewModel: ObservableObject {
         }
     }
 
+    /// Lieu montré aux autres (`city` ou `none`) : appliqué tout de suite, remis si le serveur refuse.
+    func setLocationPrecision(_ item: UnifiedSocialFeedItem, to precision: String) {
+        let previous = item.locationPrecision
+        updateItem(id: item.id) { var copy = $0; copy.locationPrecision = precision; return copy }
+        Task {
+            do { try await service.setLocationPrecision(postId: item.id, precision: precision) }
+            catch {
+                updateItem(id: item.id) { var copy = $0; copy.locationPrecision = previous; return copy }
+                if !error.isCancellation { actionError = error.userFacingMessage }
+            }
+        }
+    }
+
     /// Visibilité seule (post automatique) : remise en place si le serveur refuse.
     func setVisibility(_ item: UnifiedSocialFeedItem, to visibility: SocialVisibility) {
         items = items.map { current in
@@ -581,6 +594,7 @@ struct UserProfileView: View {
                     // la fiche se ferme d'abord, la confirmation de suppression suit.
                     onEdit: { afterDetailDismiss { editingPost = item } },
                     onSetVisibility: { model.setVisibility(item, to: $0) },
+                    onSetLocation: { setLocation(item, to: $0) },
                     onTogglePin: { model.togglePin(item) },
                     onDelete: {
                         presentedSheet = nil
@@ -1428,6 +1442,11 @@ struct UserProfileView: View {
         }
     }
 
+    private func setLocation(_ item: UnifiedSocialFeedItem, to precision: String) {
+        model.setLocationPrecision(item, to: precision)
+        PostLocationPicker.announce(item, precision: precision, in: inAppNotifications)
+    }
+
     /// Supprime une de tes publications : elle disparaît, « Annuler » reste le temps du délai,
     /// comme dans le fil.
     private func deleteWithUndo(_ item: UnifiedSocialFeedItem) {
@@ -1510,6 +1529,7 @@ struct UserProfileView: View {
             onShare: { presentedSheet = .share(item) },
             onEdit: { editingPost = item },
             onSetVisibility: { model.setVisibility(item, to: $0) },
+            onSetLocation: { setLocation(item, to: $0) },
             onTogglePin: { model.togglePin(item) },
             onMute: { model.muteNotifications(item) },
             onDelete: { deleteWithUndo(item) },

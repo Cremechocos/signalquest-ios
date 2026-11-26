@@ -276,6 +276,10 @@ struct CardHeader: View {
     var onAuthorTap: (() -> Void)? = nil
     /// Publication épinglée sur le profil de son auteur : une pastille le dit.
     var isPinned: Bool = false
+    /// Texte modifié par l'auteur (`editedAt`, D-5) : « modifié » à côté de l'heure.
+    var isEdited: Bool = false
+    /// Lieu masqué aux autres (`locationPrecision: none`) : l'auteur le voit, avec la précision.
+    var placeOnlyForMe: Bool = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.feedCardMenu) private var menu
     @Environment(\.feedCardShowsAuthor) private var showsAuthor
@@ -433,7 +437,10 @@ struct CardHeader: View {
     }
 
     private var spokenAuthorLine: String {
-        [author.displayName, place, createdAt.map(Self.timeLabel(exact: exactTime))]
+        [author.displayName,
+         place.map { placeOnlyForMe ? String(localized: "\($0), visible de toi seul") : $0 },
+         createdAt.map(Self.timeLabel(exact: exactTime)),
+         isEdited ? String(localized: "modifié") : nil]
             .compactMap { $0 }
             .joined(separator: ", ")
     }
@@ -483,9 +490,15 @@ struct CardHeader: View {
     @ViewBuilder
     private func metadataItems(includeSeparator: Bool = false) -> some View {
         if let place {
-            Text(place)
-                .sqSingleLine()
-                .accessibilityIdentifier("feed.metadata.place")
+            Group {
+                if placeOnlyForMe {
+                    Text("\(place), visible de toi seul")
+                } else {
+                    Text(place)
+                }
+            }
+            .sqSingleLine()
+            .accessibilityIdentifier("feed.metadata.place")
         }
         if let createdAt {
             if includeSeparator, place != nil {
@@ -496,6 +509,14 @@ struct CardHeader: View {
             Text(verbatim: Self.timeLabel(exact: exactTime)(createdAt))
                 .sqSingleLine()
                 .accessibilityIdentifier("feed.metadata.date")
+            if isEdited {
+                if includeSeparator {
+                    Text("·").accessibilityHidden(true)
+                }
+                Text("modifié")
+                    .sqSingleLine()
+                    .accessibilityIdentifier("feed.metadata.edited")
+            }
         }
     }
 }

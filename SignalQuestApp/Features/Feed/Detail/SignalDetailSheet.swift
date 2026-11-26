@@ -22,6 +22,7 @@ struct SignalDetailSheet: View {
     /// (signalement du 25/11). `nil` là où l'écran parent ne les propose pas.
     var onEdit: (() -> Void)? = nil
     var onSetVisibility: ((SocialVisibility) -> Void)? = nil
+    var onSetLocation: ((String) -> Void)? = nil
     var onTogglePin: (() -> Void)? = nil
     var onDelete: (() -> Void)? = nil
     /// Sourdine et blocage de l'auteur (post d'un autre), planche commune du 25/11.
@@ -71,7 +72,9 @@ struct SignalDetailSheet: View {
                     kindBadge: kindTag,
                     kindColor: kindColor,
                     onAuthorTap: onAuthorTap.map { tap in { dismiss(); tap() } },
-                    isPinned: item.isPinned
+                    isPinned: item.isPinned,
+                    isEdited: item.editedAt != nil,
+                    placeOnlyForMe: item.placeOnlyForMe
                 )
                 if let actionError {
                     SQInlineError(message: actionError)
@@ -197,7 +200,8 @@ struct SignalDetailSheet: View {
                 // Pas de `dismiss()` ici : le parent remplace la fiche par
                 // le signalement ; fermer en plus annulait cette présentation (AF-FIL-02).
                 PostOptionsMenu(
-                    item: item, onViewProfile: onAuthorTap, onShare: onShare, onEdit: onEdit, onSetVisibility: onSetVisibility, onTogglePin: onTogglePin,
+                    item: item, onViewProfile: onAuthorTap, onShare: onShare, onEdit: onEdit, onSetVisibility: onSetVisibility,
+                    onSetLocation: onSetLocation, onTogglePin: onTogglePin,
                     onMute: onMute, onDelete: onDelete, onMuteAuthor: onMuteAuthor, onBlockAuthor: onBlockAuthor,
                     onReport: onReport, identifierPrefix: "signal.detail"
                 )

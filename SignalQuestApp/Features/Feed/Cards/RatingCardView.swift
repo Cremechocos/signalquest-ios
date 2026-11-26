@@ -29,7 +29,9 @@ struct RatingCardView: View {
                     kindBadge: nil,
                     kindColor: SQColor.warning,
                     onAuthorTap: onAuthorTap,
-                    isPinned: item.isPinned
+                    isPinned: item.isPinned,
+                    isEdited: item.editedAt != nil,
+                    placeOnlyForMe: item.placeOnlyForMe
                 )
 
                 FeedKindLine(symbol: "star.fill", title: String(localized: "A noté son réseau"), tint: .warning,

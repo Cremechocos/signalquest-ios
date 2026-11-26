@@ -17,6 +17,34 @@
         }
       }
     },
+    "SQFormal|%@, visible de toi seul" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, visible de vous seul"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "%@, visible de toi seul" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, only visible to you"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, visible de toi seul"
+          }
+        }
+      }
+    },
     "5G : seulement quand le téléphone l’utilisait." : {
       "localizations" : {
         "en" : {
@@ -45,6 +73,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Annulable quelques secondes"
+          }
+        }
+      }
+    },
+    "Aucun lieu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No location"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun lieu"
+          }
+        }
+      }
+    },
+    "Aucun lieu pour les autres. La publication n’apparaît pas dans « Autour »." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No location for others. The post does not appear in “Nearby”."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun lieu pour les autres. La publication n’apparaît pas dans « Autour »."
           }
         }
       }
@@ -161,6 +221,22 @@
         }
       }
     },
+    "Le point exact du test n’est jamais montré aux autres." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The exact point of the test is never shown to others."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le point exact du test n’est jamais montré aux autres."
+          }
+        }
+      }
+    },
     "Lien copié" : {
       "localizations" : {
         "en" : {
@@ -173,6 +249,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lien copié"
+          }
+        }
+      }
+    },
+    "Lieu affiché" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location shown"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lieu affiché"
+          }
+        }
+      }
+    },
+    "SQFormal|Lieu masqué. Ton test public reste visible sur la carte des débits." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lieu masqué. Votre test public reste visible sur la carte des débits."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Lieu masqué. Ton test public reste visible sur la carte des débits." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location hidden. Your public test stays visible on the speed map."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lieu masqué. Ton test public reste visible sur la carte des débits."
           }
         }
       }
@@ -325,6 +445,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Choose the measurement that colours the coverage"
+          }
+        }
+      }
+    },
+    "SQFormal|Ton test public reste visible sur la carte des débits." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre test public reste visible sur la carte des débits."
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Ton test public reste visible sur la carte des débits." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your public test stays visible on the speed map."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton test public reste visible sur la carte des débits."
           }
         }
       }

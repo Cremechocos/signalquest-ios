@@ -30,7 +30,9 @@ struct PhotoCardView: View {
                     kindBadge: nil,
                     kindColor: SQColor.success,
                     onAuthorTap: onAuthorTap,
-                    isPinned: item.isPinned
+                    isPinned: item.isPinned,
+                    isEdited: item.editedAt != nil,
+                    placeOnlyForMe: item.placeOnlyForMe
                 )
 
                 FeedKindLine(symbol: "camera", title: String(localized: "Photo d’un support"), points: item.earnedPoints)

@@ -104,6 +104,7 @@ struct PostDetailView: View {
                         onShare: { showShareSheet = true },
                         onEdit: { editingPost = actions.item },
                         onSetVisibility: { value in Task { await setVisibility(value) } },
+                        onSetLocation: { value in setLocation(value) },
                         onTogglePin: { Task { await togglePin() } },
                         onMute: { Task { await toggleMute() } },
                         onDelete: { deleteWithUndo() },
@@ -154,6 +155,7 @@ struct PostDetailView: View {
                               // attend la fermeture de la fiche (AF-FIL-02).
                               onEdit: { afterSignalSheetDismiss { editingPost = actions.item } },
                               onSetVisibility: { value in Task { await setVisibility(value) } },
+                              onSetLocation: { value in setLocation(value) },
                               onTogglePin: { Task { await togglePin() } },
                               onDelete: { afterSignalSheetDismiss { deleteWithUndo() } },
                               onMuteAuthor: { afterSignalSheetDismiss { muteAuthor() } },
@@ -240,6 +242,20 @@ struct PostDetailView: View {
             actions.update { $0.pinnedAt = willPin ? Date() : nil }
         } catch {
             if !error.isCancellation { actions.fail(error) }
+        }
+    }
+
+    /// Lieu montré aux autres : appliqué tout de suite, remis si le serveur refuse.
+    private func setLocation(_ precision: String) {
+        let previous = actions.item.locationPrecision
+        actions.update { $0.locationPrecision = precision }
+        PostLocationPicker.announce(actions.item, precision: precision, in: inAppNotifications)
+        Task {
+            do { try await feedService.setLocationPrecision(postId: actions.item.id, precision: precision) }
+            catch {
+                actions.update { $0.locationPrecision = previous }
+                if !error.isCancellation { actions.fail(error) }
+            }
         }
     }
 

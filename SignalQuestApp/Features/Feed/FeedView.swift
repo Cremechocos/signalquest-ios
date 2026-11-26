@@ -769,6 +769,19 @@ final class FeedViewModel: ObservableObject {
         }
     }
 
+    /// Lieu montré aux autres (`city` ou `none`) : appliqué tout de suite, remis si le serveur refuse.
+    func setLocationPrecision(_ item: UnifiedSocialFeedItem, to precision: String) {
+        let previous = item.locationPrecision
+        Task {
+            await applyLocalToggle(itemId: item.id) { var copy = $0; copy.locationPrecision = precision; return copy }
+            do { try await service.setLocationPrecision(postId: item.id, precision: precision) }
+            catch {
+                await applyLocalToggle(itemId: item.id) { var copy = $0; copy.locationPrecision = previous; return copy }
+                if !error.isCancellation { actionError = error.userFacingMessage }
+            }
+        }
+    }
+
     /// Suppressions en attente : la publication a quitté le fil tout de suite, le serveur
     /// ne la reçoit qu'au bout du délai d'annulation (plan Fil Communauté, C5, comme
     /// Android). Un rechargement pendant ce délai ne la fait pas revenir. Le délai lui-même
@@ -1543,6 +1556,7 @@ struct FeedView: View {
                         }
                     },
                     onSetVisibility: { model.setVisibility(item, to: $0) },
+                    onSetLocation: { setLocation(item, to: $0) },
                     onTogglePin: { model.togglePin(item) },
                     onDelete: {
                         presentedSheet = nil
@@ -1663,6 +1677,13 @@ struct FeedView: View {
             HiddenStoryAuthorsStore.unhide(authorId: author.id)
             hiddenStoryAuthorIds.remove(author.id)
         }
+    }
+
+    // MARK: Lieu affiché
+
+    private func setLocation(_ item: UnifiedSocialFeedItem, to precision: String) {
+        model.setLocationPrecision(item, to: precision)
+        PostLocationPicker.announce(item, precision: precision, in: inAppNotifications)
     }
 
     // MARK: Sourdine d'un membre
@@ -2494,6 +2515,7 @@ struct FeedView: View {
             onShare: { presentedSheet = .share(item) },
             onEdit: { editingPost = item },
             onSetVisibility: { model.setVisibility(item, to: $0) },
+            onSetLocation: { setLocation(item, to: $0) },
             onTogglePin: { model.togglePin(item) },
             onMute: { model.muteNotifications(item) },
             onDelete: { deleteWithUndo(item) },

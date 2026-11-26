@@ -426,12 +426,14 @@ struct SocialSignalSummary: Codable, Equatable {
     let longitude: Double?
     /// Speedtest fait dans une zone privée : position et identifiants réservés à l'auteur.
     let detailsHidden: Bool?
+    /// Servi à l'auteur seul sur le résumé d'un speedtest (§B-2) : false = test privé ou hors carte.
+    var testPublicOnMap: Bool? = nil
     let detailsHiddenReason: String?
     /// Tracé d'une session (au plus 64 points, dans l'ordre du trajet) ; vide sinon.
     let mapPoints: [SocialMapPoint]
 
     enum CodingKeys: String, CodingKey {
-        case detailsHidden, detailsHiddenReason, mapPoints
+        case detailsHidden, detailsHiddenReason, mapPoints, testPublicOnMap
         case type, technology, rsrp, rsrq, sinr, band, cellId, pci, city, capturedAt, downloadMbps, uploadMbps, pingMs, jitterMs, maxDownloadMbps, distanceMeters, durationSeconds, detectedTechs, averageSignalDbm, minSignalDbm, maxSignalDbm, pointsCount, siteLabel, siteName, identifierType, identifierValue, identifierSource, validationCount, ratingStars, ratingTrend, frequency, earfcn, arfcn, sectors, deviceModel, serverName, latitude, longitude, servingOperator, simOperator, isRoaming, observedPlmn, simPlmn
         case `operator` = "operator"
     }
@@ -483,6 +485,7 @@ struct SocialSignalSummary: Codable, Equatable {
         latitude = try c.decodeIfPresent(Double.self, forKey: .latitude)
         longitude = try c.decodeIfPresent(Double.self, forKey: .longitude)
         detailsHidden = try? c.decodeIfPresent(Bool.self, forKey: .detailsHidden)
+        testPublicOnMap = (try? c.decodeIfPresent(Bool.self, forKey: .testPublicOnMap)) ?? nil
         detailsHiddenReason = try? c.decodeIfPresent(String.self, forKey: .detailsHiddenReason)
         mapPoints = c.decodeLossyArray([SocialMapPoint].self, forKey: .mapPoints)
     }
@@ -496,6 +499,39 @@ struct SocialMapPoint: Codable, Equatable {
     /// sessions (contrat session-signal-trace v1, #957) ; absents ailleurs.
     var signalStrength: Double? = nil
     var technology: String? = nil
+}
+
+/// Droits servis pour le lecteur (contrat social-post-author-options §A). Ils disent quoi
+/// AFFICHER ; le serveur reste l'arbitre (403 malgré `true` traité comme avant). Une clé
+/// absente ou mal formée retombe sur la règle locale.
+struct SocialPostPermissions: Codable, Equatable {
+    var canDelete: Bool?
+    var canEdit: Bool?
+    var canChangeVisibility: Bool?
+    var canPin: Bool?
+    var canMuteNotifications: Bool?
+    var canChangeLocation: Bool?
+    var canReport: Bool?
+    var canShare: Bool?
+
+    private enum CodingKeys: String, CodingKey {
+        case canDelete, canEdit, canChangeVisibility, canPin, canMuteNotifications, canChangeLocation, canReport, canShare
+    }
+
+    init(canDelete: Bool? = nil, canEdit: Bool? = nil, canChangeVisibility: Bool? = nil, canPin: Bool? = nil,
+         canMuteNotifications: Bool? = nil, canChangeLocation: Bool? = nil, canReport: Bool? = nil, canShare: Bool? = nil) {
+        self.canDelete = canDelete; self.canEdit = canEdit; self.canChangeVisibility = canChangeVisibility
+        self.canPin = canPin; self.canMuteNotifications = canMuteNotifications
+        self.canChangeLocation = canChangeLocation; self.canReport = canReport; self.canShare = canShare
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        func flag(_ key: CodingKeys) -> Bool? { (try? c.decodeIfPresent(Bool.self, forKey: key)) ?? nil }
+        self.init(canDelete: flag(.canDelete), canEdit: flag(.canEdit), canChangeVisibility: flag(.canChangeVisibility),
+                  canPin: flag(.canPin), canMuteNotifications: flag(.canMuteNotifications),
+                  canChangeLocation: flag(.canChangeLocation), canReport: flag(.canReport), canShare: flag(.canShare))
+    }
 }
 
 struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
@@ -543,6 +579,13 @@ struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
     /// Post de fin de trajet (DT-POST-1 r2) : résumé lu par le fil dans l'analyse figée, au
     /// moment de servir. Absent sur un autre post et sur un serveur antérieur au 12/11.
     let session: SocialSessionPostBlock?
+    /// Droits du lecteur sur ce post (contrat social-post-author-options §A, servi le 26/11).
+    /// Absent d'un serveur antérieur : la règle locale (`canManage`) reste le repli.
+    var permissions: SocialPostPermissions?
+    /// Dernière modification du TEXTE par l'auteur (D-5) ; nil tant qu'il n'a pas changé.
+    var editedAt: Date?
+    /// Lieu montré aux autres en haut du post (§B-2) : `city` ou `none`, valeur effective.
+    var locationPrecision: String?
 
     /// Texte du serveur dans la langue de l'app, quand sa clé est connue (F8).
     var feedText: String? { FeedTextKey(key: textKey, args: textArgs)?.text }
@@ -568,6 +611,30 @@ struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
     /// Modifier : seulement un post écrit à la main (le serveur répond 403
     /// GENERATED_POST_READ_ONLY sur un post automatique).
     var canEdit: Bool { canManage && generated != true }
+
+    // Droits servis d'abord (§A), règle locale en repli tant qu'un ancien serveur répond.
+    var allowsEdit: Bool { permissions?.canEdit ?? canEdit }
+    var allowsVisibilityChange: Bool { permissions?.canChangeVisibility ?? canManage }
+    var allowsPin: Bool { permissions?.canPin ?? canManage }
+    var allowsDelete: Bool { permissions?.canDelete ?? canManage }
+    var allowsReport: Bool { permissions?.canReport ?? !canManage }
+    var allowsShare: Bool { permissions?.canShare ?? isShareable }
+    var allowsMuteNotifications: Bool { permissions?.canMuteNotifications ?? true }
+    /// Le réglage du lieu n'existe que servi (§B) et seulement si le post porte un lieu.
+    var allowsLocationChange: Bool { permissions?.canChangeLocation == true && hasLocation }
+
+    /// Le post porte un lieu que les autres pourraient voir : commune, point ou tracé.
+    var hasLocation: Bool {
+        cardPlace != nil || latitude != nil || signal?.latitude != nil || !(signal?.mapPoints.isEmpty ?? true)
+    }
+
+    /// Mon post dont le lieu est masqué aux autres : l'en-tête le dit (« Lyon 3e, visible de toi seul »).
+    var placeOnlyForMe: Bool { canManage && effectiveLocationPrecision == "none" && cardPlace != nil }
+
+    /// Lieu montré aux autres, valeur effective (servie, sinon le défaut D-1).
+    var effectiveLocationPrecision: String {
+        locationPrecision ?? (signal?.type == "speedtest" && signal?.testPublicOnMap == false ? "none" : "city")
+    }
 
     /// Lieu à afficher : jamais un identifiant de site. Avant #694, le serveur
     /// mettait le code du site (« ANFR-0381234 ») dans `placeLabel` des photos (F-02).
@@ -610,6 +677,7 @@ struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case id, kind, sourceType, sourceId, createdAt, score, author, text, visibility, status, targetType, targetId, placeLabel, latitude, longitude, metadata, attachments, signal, hashtags, reactions, commentsCount, repostsCount, favoritesCount, likedByMe, favoritedByMe, repostedByMe, notificationsMutedByMe, isMine, pinnedAt, poll, generated, textKey, textArgs
+        case permissions, editedAt, locationPrecision
     }
 
     init(from decoder: Decoder) throws {
@@ -649,6 +717,11 @@ struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
         // Une clé mal formée ne coûte que la traduction : `text` reste.
         textKey = (try? c.decodeIfPresent(String.self, forKey: .textKey)) ?? nil
         textArgs = (try? c.decodeIfPresent([String: JSONValue].self, forKey: .textArgs)) ?? nil
+        // Champs du contrat social-post-author-options : chacun se perd seul s'il est mal formé.
+        permissions = (try? c.decodeIfPresent(SocialPostPermissions.self, forKey: .permissions)) ?? nil
+        editedAt = (try? c.decodeIfPresent(Date.self, forKey: .editedAt)) ?? nil
+        locationPrecision = ((try? c.decodeIfPresent(String.self, forKey: .locationPrecision)) ?? nil)
+            .flatMap { ["city", "none"].contains($0) ? $0 : nil }
         // Un bloc illisible ou d'une source inconnue ne coûte que le résumé : la carte générique reste.
         let extra = try decoder.container(keyedBy: SessionKeys.self)
         session = (try? extra.decodeIfPresent(SocialSessionPostBlock.self, forKey: .session)) ?? nil
@@ -826,6 +899,9 @@ struct CreatePostRequest: Codable, Equatable, Sendable {
     /// caractères, et une question facultative de 160 au plus.
     let poll: CreatePostPoll?
     var clientRequestId: String? = nil
+    /// Lieu montré aux autres, `city` ou `none` (§B-2) ; absent d'un envoi gardé en file
+    /// avant le 26/11, le serveur applique alors son défaut.
+    var locationPrecision: String? = nil
 }
 
 struct CreatePostResponse: Codable {
@@ -1411,9 +1487,15 @@ struct SocialShareableSpeedtest: Codable, Identifiable, Equatable {
     var measuredAt: Date? = nil
     /// MVNO-1 r3 (servi depuis le 10/11) : l'opérateur en parties ; absent d'un serveur antérieur.
     var operatorDisplay: SpeedtestServedOperatorDisplay? = nil
+    /// Commune du test, servie à son auteur (contrat social-post-author-options §B-2, 26/11) :
+    /// le composeur dit ce qu'un post montrera avant de publier.
+    var city: String? = nil
+    /// Test public ET sur la carte des débits : il y reste même si le post masque son lieu.
+    var isSharedOnMap: Bool? = nil
 
     enum CodingKeys: String, CodingKey {
         case id, downloadSpeed, averageSpeed, uploadSpeed, ping, networkType, mobileOperator, timestamp, measuredAt, operatorDisplay
+        case city, isSharedOnMap
     }
 
     /// La réception à afficher : la moyenne quand le serveur la donne.
@@ -1449,6 +1531,9 @@ struct SocialShareableSpeedtest: Codable, Identifiable, Equatable {
         networkType = c.decodeFlexibleString(forKey: .networkType)
         mobileOperator = c.decodeFlexibleString(forKey: .mobileOperator)
         operatorDisplay = (try? c.decodeIfPresent(SpeedtestServedOperatorDisplay.self, forKey: .operatorDisplay)) ?? nil
+        city = ((try? c.decodeIfPresent(String.self, forKey: .city)) ?? nil)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.flatMap { $0.isEmpty ? nil : $0 }
+        isSharedOnMap = (try? c.decodeIfPresent(Bool.self, forKey: .isSharedOnMap)) ?? nil
         // Heure de Paris sans fuseau : voir `SQDateParsing.parseParisWallClock`.
         if let raw = try? c.decodeIfPresent(String.self, forKey: .timestamp) {
             timestamp = SQDateParsing.parseParisWallClock(raw)

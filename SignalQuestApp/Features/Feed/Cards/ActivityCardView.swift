@@ -253,7 +253,9 @@ struct ActivityCardView: View {
                     kindBadge: activity.family == .officialRecap ? String(localized: "Officiel") : nil,
                     kindColor: SQColor.accentInk,
                     onAuthorTap: onAuthorTap,
-                    isPinned: item.isPinned
+                    isPinned: item.isPinned,
+                    isEdited: item.editedAt != nil,
+                    placeOnlyForMe: item.placeOnlyForMe
                 )
 
                 switch activity.family {
