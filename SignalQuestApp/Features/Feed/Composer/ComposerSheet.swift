@@ -747,8 +747,11 @@ struct ComposerSheet: View {
                                         .foregroundStyle(SQColor.labelSecondary)
                                 }
                             }
-                            if let city = speedtest.city {
-                                locationChoice(city: city, speedtest: speedtest)
+                            if speedtest.city != nil, model.locationPrecision == "none", speedtest.isSharedOnMap == true {
+                                Text("Ton test public reste visible sur la carte des débits.")
+                                    .font(SQType.caption)
+                                    .foregroundStyle(SQColor.labelSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                         }
 
@@ -973,36 +976,6 @@ struct ComposerSheet: View {
     }
 
     /// Croix ronde posée sur une pièce jointe (cible de 44 pt).
-    /// « Lieu affiché » d'un post joint à un speedtest : la commune ou aucun lieu, choisi avant
-    /// de publier (signalement du 25/11 : le lieu s'affichait sans que le membre le décide).
-    private func locationChoice(city: String, speedtest: SocialShareableSpeedtest) -> some View {
-        VStack(alignment: .leading, spacing: SQSpace.xs) {
-            Text("Lieu affiché")
-                .font(SQType.caption(.semibold))
-                .foregroundStyle(SQColor.label)
-                .accessibilityHidden(true)
-            Picker("Lieu affiché", selection: $model.locationPrecision) {
-                Text(verbatim: city).tag("city")
-                Text("Aucun lieu").tag("none")
-            }
-            .pickerStyle(.segmented)
-            .accessibilityIdentifier("composer.location")
-            Group {
-                if model.locationPrecision == "none" {
-                    Text(speedtest.isSharedOnMap == true
-                         ? "Ton test public reste visible sur la carte des débits."
-                         : "Aucun lieu pour les autres. La publication n’apparaît pas dans « Autour ».")
-                } else {
-                    Text("Le point exact du test n’est jamais montré aux autres.")
-                }
-            }
-            .font(SQType.caption)
-            .foregroundStyle(SQColor.labelSecondary)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.top, SQSpace.xs)
-    }
-
     private func removeButton(label: LocalizedStringKey, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: "xmark")
@@ -1073,6 +1046,26 @@ struct ComposerSheet: View {
             .buttonStyle(.plain)
             .accessibilityLabel(model.attachedSpeedtest == nil ? "Joindre un speedtest" : "Retirer le speedtest")
             .disabled(model.isLoadingSpeedtest)
+
+            // Le lieu du test, à côté du speedtest : un toucher l'affiche ou le masque
+            // (Alexandre, 26/11 : un bouton discret plutôt qu'un choix « Paris / Aucun lieu »).
+            if let city = model.attachedSpeedtest?.city {
+                let shown = model.locationPrecision == "city"
+                Button {
+                    Haptics.selection()
+                    model.locationPrecision = shown ? "none" : "city"
+                } label: {
+                    ComposerToolChip(title: shown ? LocalizedStringKey(city) : "Sans lieu",
+                                     systemImage: shown ? "mappin.and.ellipse" : "mappin.slash",
+                                     isOn: shown, showsLabel: showsLabels)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Lieu affiché")
+                .accessibilityValue(shown ? Text(verbatim: city) : Text("Aucun lieu"))
+                .accessibilityHint(shown ? "Masque le lieu aux autres" : "Affiche la commune aux autres")
+                .accessibilityAddTraits(shown ? [.isButton, .isSelected] : .isButton)
+                .accessibilityIdentifier("composer.location")
+            }
 
             Button {
                 Haptics.selection()

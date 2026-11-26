@@ -17,6 +17,86 @@
         }
       }
     },
+    "Affiche la commune aux autres" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows the town to others"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affiche la commune aux autres"
+          }
+        }
+      }
+    },
+    "Afficher le lieu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show location"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher le lieu"
+          }
+        }
+      }
+    },
+    "Masque le lieu aux autres" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hides the location from others"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masque le lieu aux autres"
+          }
+        }
+      }
+    },
+    "Masquer le lieu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide location"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masquer le lieu"
+          }
+        }
+      }
+    },
+    "Sans lieu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No location"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sans lieu"
+          }
+        }
+      }
+    },
     "SQFormal|%@, visible de toi seul" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -89,22 +169,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucun lieu"
-          }
-        }
-      }
-    },
-    "Aucun lieu pour les autres. La publication n’apparaît pas dans « Autour »." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No location for others. The post does not appear in “Nearby”."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucun lieu pour les autres. La publication n’apparaît pas dans « Autour »."
           }
         }
       }
@@ -217,22 +281,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "J’aime le commentaire de %@"
-          }
-        }
-      }
-    },
-    "Le point exact du test n’est jamais montré aux autres." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The exact point of the test is never shown to others."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le point exact du test n’est jamais montré aux autres."
           }
         }
       }

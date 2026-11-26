@@ -302,24 +302,26 @@ extension View {
 
 // MARK: - Lieu affiché
 
-/// Sous-menu « Lieu affiché » de l'auteur : Commune ou Aucun lieu (planche commune du 25/11,
+/// Entrée « Masquer le lieu » / « Afficher le lieu » de l'auteur : un seul toucher bascule
+/// entre la commune et aucun lieu (Alexandre, 26/11 : plus discret qu'un choix à deux options ;
 /// contrat §B-2). Le point exact d'un test n'est jamais montré aux autres, quel que soit ce choix.
 struct PostLocationPicker: View {
     let item: UnifiedSocialFeedItem
     let onSelect: (String) -> Void
 
     var body: some View {
-        Picker(selection: Binding(get: { item.effectiveLocationPrecision }, set: { onSelect($0) })) {
-            if let place = item.cardPlace {
-                Label(place, systemImage: "mappin.and.ellipse").tag("city")
+        let shown = item.effectiveLocationPrecision == "city"
+        Button { onSelect(shown ? "none" : "city") } label: {
+            if shown {
+                Text("Masquer le lieu")
+                if let place = item.cardPlace { Text(verbatim: place) }
+                Image(systemName: "mappin.slash")
             } else {
-                Label("Commune", systemImage: "mappin.and.ellipse").tag("city")
+                Text("Afficher le lieu")
+                if let place = item.cardPlace { Text(verbatim: place) }
+                Image(systemName: "mappin.and.ellipse")
             }
-            Label("Aucun lieu", systemImage: "location.slash").tag("none")
-        } label: {
-            Label("Lieu affiché", systemImage: "mappin")
         }
-        .pickerStyle(.menu)
     }
 
     /// Ce que dit le bandeau après le choix : qu'un test public reste sur la carte des débits
