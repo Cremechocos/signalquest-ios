@@ -744,13 +744,17 @@ struct CardActionsBar: View {
             label: "Commenter",
             action: onComment
         )
+        // « arrow.2.squarepath.circle.fill » n'existe pas dans SF Symbols : repartagé, l'icône
+        // disparaissait et seul le compteur vert restait. Même glyphe, en gras et en vert, pour
+        // que l'état ne se lise pas qu'à la couleur.
         actionButton(
             count: item.repostsCount,
-            systemImage: item.repostedByMe ? "arrow.2.squarepath.circle.fill" : "arrow.2.squarepath",
+            systemImage: "arrow.2.squarepath",
             tint: item.repostedByMe ? SQColor.success : SQColor.chipInk,
             label: "Repartager",
             action: onRepost
         )
+        .fontWeight(item.repostedByMe ? .bold : nil)
         .accessibilityAddTraits(item.repostedByMe ? .isSelected : [])
     }
 
