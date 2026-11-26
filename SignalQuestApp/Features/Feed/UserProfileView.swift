@@ -406,6 +406,7 @@ struct UserProfileView: View {
     @Environment(\.dismiss) private var dismiss
     /// Colonne des noms de « Réseaux mesurés » : elle grandit avec le texte.
     @ScaledMetric(relativeTo: .subheadline) private var networkNameWidth: CGFloat = 72
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     /// Ouverture de la conversation en cours : évite qu'un double appui crée
     /// deux requêtes concurrentes.
@@ -834,6 +835,37 @@ struct UserProfileView: View {
         profile.isSelf || !profile.showsStats || profile.followersCount > 0 || profile.followingCount > 0
     }
 
+    /// Nom court dans la colonne étroite (« Free », « Bouygues ») : le nom complet y était
+    /// tronqué (« Free Mo… ») ; VoiceOver lit toujours le nom complet.
+    private func networkName(_ entry: SocialProfileOperatorShare) -> some View {
+        Text(verbatim: Self.shortOperatorLabel(for: entry))
+            .font(SQType.subhead(.bold))
+            .foregroundStyle(SQColor.label)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+    }
+
+    private func networkBar(_ entry: SocialProfileOperatorShare) -> some View {
+        GeometryReader { proxy in
+            Capsule()
+                .fill(SQColor.segTrack)
+                .overlay(alignment: .leading) {
+                    Capsule()
+                        .fill(Self.tint(for: entry))
+                        .frame(width: max(4, proxy.size.width * entry.share))
+                }
+        }
+        .frame(height: 8)
+    }
+
+    private func networkPercent(_ entry: SocialProfileOperatorShare) -> some View {
+        Text(verbatim: entry.percentLabel)
+            .font(SQType.subhead(.medium))
+            .monospacedDigit()
+            .foregroundStyle(SQColor.labelSecondary)
+            .fixedSize()
+    }
+
     /// « Réseau le plus mesuré : Orange · 52 % ». Jamais « son opérateur » : la donnée dit
     /// où la personne mesure, pas son abonnement (voir `measuredNetworks`).
     static func mainNetworkLine(_ networks: SocialProfileNetworks) -> String? {
@@ -919,9 +951,13 @@ struct UserProfileView: View {
         let following = profile.showsStats
             ? followingLabel(profile.followingCount)
             : String(localized: "followlist.segment.following")
-        return HStack(spacing: SQSpace.xs) {
+        // Très grand texte : les deux compteurs s'empilent ; côte à côte, « abonnement » se
+        // coupait au milieu du mot en AX5 (26/11).
+        let stacked = dynamicTypeSize.isAccessibilitySize
+        let layout = stacked ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: SQSpace.xs))
+        return layout {
             followCounter(followers, kind: .followers, profile: profile, locked: locked)
-            Text(verbatim: "·").accessibilityHidden(true)
+            if !stacked { Text(verbatim: "·").accessibilityHidden(true) }
             followCounter(following, kind: .following, profile: profile, locked: locked)
         }
         .font(SQType.caption(.semibold))
@@ -966,8 +1002,13 @@ struct UserProfileView: View {
         if let trips = stats?.publicSessions {
             cells.append((trips, "Trajets publics"))
         }
+        // Très grand texte : une rangée par chiffre ; sur cinq colonnes, « Points » et
+        // « Validations » se coupaient au milieu du mot en AX5 (26/11).
+        if dynamicTypeSize.isAccessibilitySize {
+            return AnyView(statsList(cells))
+        }
         // Alignées en haut : un libellé sur deux lignes ne décale pas les nombres.
-        return HStack(alignment: .top, spacing: 0) {
+        return AnyView(HStack(alignment: .top, spacing: 0) {
             ForEach(Array(cells.enumerated()), id: \.offset) { index, cell in
                 if index > 0 {
                     Rectangle().fill(SQColor.separator).frame(width: 1).padding(.vertical, SQSpace.xs)
@@ -990,6 +1031,34 @@ struct UserProfileView: View {
         }
         .padding(.vertical, SQSpace.md)
         .padding(.horizontal, SQSpace.xs)
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .accessibilityIdentifier("profile.member.stats"))
+    }
+
+    private func statsList(_ cells: [(Int?, LocalizedStringKey)]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(cells.enumerated()), id: \.offset) { index, cell in
+                if index > 0 {
+                    Rectangle().fill(SQColor.separator).frame(height: 1)
+                }
+                HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
+                    Text(cell.1)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: SQSpace.sm)
+                    Text(verbatim: SignalFormatters.count(cell.0))
+                        .font(SQFont.display(20, .heavy, relativeTo: .title3))
+                        .monospacedDigit()
+                        .foregroundStyle(SQColor.label)
+                        .fixedSize()
+                }
+                .padding(.vertical, SQSpace.xs)
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.sm)
         .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
         .accessibilityIdentifier("profile.member.stats")
     }
@@ -1065,30 +1134,27 @@ struct UserProfileView: View {
                 // La somme peut rester sous 100 % : le serveur écarte les parts
                 // sous 5 % et n'en garde que quatre — la combler serait mentir.
                 ForEach(networks.operators) { entry in
-                    HStack(spacing: SQSpace.sm2) {
-                        // Nom court dans la colonne étroite (« Free », « Bouygues ») : le nom complet
-                        // y était tronqué (« Free Mo… ») ; VoiceOver lit toujours le nom complet.
-                        Text(verbatim: Self.shortOperatorLabel(for: entry))
-                            .font(SQType.subhead(.bold))
-                            .foregroundStyle(SQColor.label)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                            .frame(width: networkNameWidth, alignment: .leading)
-                        GeometryReader { proxy in
-                            Capsule()
-                                .fill(SQColor.segTrack)
-                                .overlay(alignment: .leading) {
-                                    Capsule()
-                                        .fill(Self.tint(for: entry))
-                                        .frame(width: max(4, proxy.size.width * entry.share))
+                    Group {
+                        if dynamicTypeSize.isAccessibilitySize {
+                            // Très grand texte : nom et part sur une ligne, la barre dessous ; sur la
+                            // ligne unique, « 100 % » se coupait en trois en AX5 (26/11).
+                            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                                HStack(alignment: .firstTextBaseline) {
+                                    networkName(entry)
+                                    Spacer(minLength: SQSpace.sm)
+                                    networkPercent(entry)
                                 }
+                                networkBar(entry)
+                            }
+                        } else {
+                            HStack(spacing: SQSpace.sm2) {
+                                networkName(entry)
+                                    .frame(width: networkNameWidth, alignment: .leading)
+                                networkBar(entry)
+                                networkPercent(entry)
+                                    .frame(minWidth: 40, alignment: .trailing)
+                            }
                         }
-                        .frame(height: 8)
-                        Text(verbatim: entry.percentLabel)
-                            .font(SQType.subhead(.medium))
-                            .monospacedDigit()
-                            .foregroundStyle(SQColor.labelSecondary)
-                            .frame(minWidth: 40, alignment: .trailing)
                     }
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(Self.accessibilityLabel(for: entry))
@@ -1210,6 +1276,10 @@ struct UserProfileView: View {
                     .padding(.horizontal, SQSpace.sm)
                     .padding(.vertical, 2)
                     .background(SQColor.label, in: Capsule(style: .continuous))
+                    // Posée sur un avatar de taille fixe : plafonnée et jamais tronquée. En AX5 elle
+                    // devenait « N… » et couvrait l'initiale ; VoiceOver lit le niveau ailleurs.
+                    .fixedSize()
+                    .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                     .offset(y: 8)
                     .accessibilityHidden(true)
             }
@@ -1223,23 +1293,45 @@ struct UserProfileView: View {
     /// (`canMessage`) — le masquer vaut mieux qu'un bouton qui échoue.
     @ViewBuilder
     private func actionRow(_ profile: SocialUserProfile) -> some View {
-        HStack(spacing: SQSpace.sm) {
-            followButton(profile)
-            // Cloche seulement pour un abonné, et seulement si le serveur la sert (SOCIAL-BELL-1).
-            if profile.isFollowing, !profile.isSelf, let level = profile.postNotifications {
-                postNotificationsBell(profile, level: level)
-            }
-            if profile.canMessage == true {
-                GradientButton(
-                    "Message",
-                    systemImage: "bubble.left",
-                    isBusy: isOpeningConversation,
-                    style: .secondary
-                ) {
-                    Task { await openConversation() }
+        if dynamicTypeSize.isAccessibilitySize {
+            // Très grand texte : « Message » passe sous « Suivre » ; côte à côte, les libellés
+            // se coupaient au milieu du mot (« Su/ivi », « es/sa/ge » en AX5, 26/11).
+            VStack(spacing: SQSpace.sm) {
+                HStack(spacing: SQSpace.sm) {
+                    followButton(profile)
+                    postNotificationsBellIfServed(profile)
                 }
-                .accessibilityLabel("Envoyer un message à \(profile.displayName)")
+                messageButton(profile)
             }
+        } else {
+            HStack(spacing: SQSpace.sm) {
+                followButton(profile)
+                postNotificationsBellIfServed(profile)
+                messageButton(profile)
+            }
+        }
+    }
+
+    /// Cloche seulement pour un abonné, et seulement si le serveur la sert (SOCIAL-BELL-1).
+    @ViewBuilder
+    private func postNotificationsBellIfServed(_ profile: SocialUserProfile) -> some View {
+        if profile.isFollowing, !profile.isSelf, let level = profile.postNotifications {
+            postNotificationsBell(profile, level: level)
+        }
+    }
+
+    @ViewBuilder
+    private func messageButton(_ profile: SocialUserProfile) -> some View {
+        if profile.canMessage == true {
+            GradientButton(
+                "Message",
+                systemImage: "bubble.left",
+                isBusy: isOpeningConversation,
+                style: .secondary
+            ) {
+                Task { await openConversation() }
+            }
+            .accessibilityLabel("Envoyer un message à \(profile.displayName)")
         }
     }
 
