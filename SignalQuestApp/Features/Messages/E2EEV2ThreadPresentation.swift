@@ -13,6 +13,9 @@ struct E2EEV2ThreadPresentation: Equatable {
         case equivocation(count: Int)
         /// Des messages d'un membre n'ont pas été reçus (§4.3).
         case missing(senderName: String?, count: Int)
+        /// Les trous sont ceux d'un autre appareil de ce compte (ancien téléphone) :
+        /// l'avis ne cite pas son propre nom.
+        case missingFromOwnDevices(count: Int)
         /// Messages d'une version plus récente de l'app (§5.2).
         case unsupported(count: Int)
         /// L'appareil n'a pas encore la clé de l'époque courante (§3.2).
@@ -41,6 +44,8 @@ struct E2EEV2ThreadPresentation: Equatable {
                 return String(localized: "Des messages envoyés par \(name) n’ont pas été reçus.")
             case .missing(nil, _):
                 return String(localized: "Des messages n’ont pas été reçus.")
+            case .missingFromOwnDevices:
+                return String(localized: "Des messages envoyés depuis un autre de tes appareils n’ont pas été reçus.")
             case .unsupported:
                 return String(localized: "Un message demande une version plus récente de SignalQuest.")
             case .waitingForEpoch:
@@ -262,7 +267,11 @@ enum E2EEV2ThreadPresenter {
             missingByUser[deviceOwners[deviceId], default: 0] += count
         }
         for (userId, count) in missingByUser.sorted(by: { ($0.key ?? "") < ($1.key ?? "") }) {
-            notices.append(.missing(senderName: userId.flatMap { members[$0]?.displayName }, count: count))
+            if let userId, userId == ownUserId {
+                notices.append(.missingFromOwnDevices(count: count))
+            } else {
+                notices.append(.missing(senderName: userId.flatMap { members[$0]?.displayName }, count: count))
+            }
         }
         if !result.unsupported.isEmpty { notices.append(.unsupported(count: result.unsupported.count)) }
         // Un import ne déplace aucun marqueur (E2EE-AUTO §8) : il n'est pas accusé « distribué ».

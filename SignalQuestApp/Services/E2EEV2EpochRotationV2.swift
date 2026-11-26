@@ -218,15 +218,22 @@ enum E2EEV2EpochVerifierV2 {
         unwrap: (E2EEV2EpochDelivery) throws -> Data
     ) -> Outcome {
         let fields = served.manifest.canonical.components(separatedBy: "\n")
+        guard genesis.conversationId == conversationId, fields.count == 13 else { return .invalid }
         // Époque marquée : son créateur a pu être révoqué depuis, le journal garde
         // sa clé de signature et le contrôle du §7.1 juge la date. Non marquée :
         // un créateur absent du journal se lit dans ses certificats v2 (§12).
-        guard genesis.conversationId == conversationId,
-              fields.count == 13,
-              let creatorKey = served.accepted.e2eeAuto
-                ? devices.signingKey(userId: fields[4], deviceId: fields[5])
-                    ?? logSigningKey(devices, userId: fields[4], deviceId: fields[5])
-                : devices.priorSigningKey(userId: fields[4], deviceId: fields[5]),
+        let creatorKey = served.accepted.e2eeAuto
+            ? devices.signingKey(userId: fields[4], deviceId: fields[5])
+                ?? logSigningKey(devices, userId: fields[4], deviceId: fields[5])
+            : devices.priorSigningKey(userId: fields[4], deviceId: fields[5])
+        // IOS-086 (26/11) : le créateur est souvent l'appareil neuf d'un membre, qui tourne
+        // juste après son inscription (§7) ; l'ensemble gardé ici ne le connaît pas encore.
+        // Son journal est relu une fois avant de juger, sinon l'époque était refusée et
+        // l'envoi restait bloqué jusqu'à une autre relecture des appareils.
+        if creatorKey == nil, E2EEV2Canonical.isOpaque(fields[4]), !devices.logRereadUserIds.contains(fields[4]) {
+            return .logBehind([fields[4]])
+        }
+        guard let creatorKey,
               let manifest = try? E2EEV2EpochManifest.verify(
                   served.manifest, recipients: served.recipients, creatorSigningKey: creatorKey
               ),

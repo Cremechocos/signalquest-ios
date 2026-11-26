@@ -184,6 +184,45 @@ final class E2EEAutoEpochAdoptionTests: XCTestCase {
 
     // MARK: Outils
 
+    // MARK: Créateur inconnu (IOS-086)
+
+    /// IOS-086 (26/11) : juste après que le correspondant a changé de téléphone, son appareil
+    /// neuf tourne la conversation (§7) ; l'ensemble gardé ici ne le connaît pas encore. Son
+    /// journal se relit une fois avant de juger, au lieu d'un refus qui bloquait l'envoi.
+    func testAnEpochFromAnUnknownCreatorRereadsItsLogOnceBeforeBeingRefused() {
+        let creator = (userId: "user_creator_0000000008", deviceId: "device_creator_0008")
+        let canonical = ["epoch-manifest-v1", "conv_vectors_00000001", "5", "2", creator.userId, creator.deviceId,
+                         "", "0", "", "0", "1", "", "1790036000000"].joined(separator: "\n")
+        let genesis = E2EEV2ConversationStateStore.Genesis(
+            conversationId: "conv_vectors_00000001", creatorUserId: Self.own.userId, creatorDeviceId: Self.own.deviceId,
+            manifestDigest: "", membershipChangeNumber: 1, membershipDigest: "", recordedAtMs: 0
+        )
+        for marked in [true, false] {
+            let served = E2EEV2EpochContractV2.Current(
+                accepted: .init(epochId: "epoch_vectors_0000005", epochNumber: 5, createdAt: "2026-11-26T00:45:01.000Z", e2eeAuto: marked),
+                manifest: E2EEV2SignedString(canonical: canonical, signatureB64: ""), recipients: [], envelope: nil
+            )
+            func open(_ devices: E2EEV2CertifiedDeviceSet) -> E2EEV2EpochVerifierV2.Outcome {
+                E2EEV2EpochVerifierV2.open(
+                    served, conversationId: "conv_vectors_00000001", ownUserId: Self.own.userId, ownDeviceId: Self.own.deviceId,
+                    genesis: genesis, previousMembershipChangeNumber: nil, devices: devices,
+                    membershipAt: { _ in nil }, autoActive: true, nowMs: 1_790_036_000_000, unwrap: { _ in Data() }
+                )
+            }
+            var devices = E2EEV2CertifiedDeviceSet(devicesByUser: [:], refusals: [:])
+            guard case .logBehind(let userIds) = open(devices) else {
+                return XCTFail("Créateur inconnu, journal pas encore relu : relecture attendue (marquée : \(marked))")
+            }
+            XCTAssertEqual(userIds, [creator.userId])
+            XCTAssertEqual(E2EEV2EpochVerifierV2.logBehindFailure(userIds, devices: devices).code, "E2EE_DEVICE_LIST_STALE",
+                           "La messagerie relit ce compte puis recommence une fois")
+            devices.logRereadUserIds = [creator.userId]
+            guard case .invalid = open(devices) else {
+                return XCTFail("Toujours inconnu après relecture : refusée (marquée : \(marked))")
+            }
+        }
+    }
+
     private static let own = (userId: "user_own_000000000009", deviceId: "device_own_00000009")
 
     private func manifest(epochNumber: Int, createdAtMs: Int64, excludesWeb: Bool, own: Bool) -> E2EEV2EpochManifest {

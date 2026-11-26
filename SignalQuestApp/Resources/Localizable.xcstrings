@@ -120891,6 +120891,35 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "Des messages envoyés depuis un autre de tes appareils n’ont pas été reçus." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some messages sent from another of your devices were not received."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Des messages envoyés depuis un autre de tes appareils n’ont pas été reçus."
+          }
+        }
+      }
+    },
+    "SQFormal|Des messages envoyés depuis un autre de tes appareils n’ont pas été reçus." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Des messages envoyés depuis un autre de vos appareils n’ont pas été reçus."
+          }
+        }
+      },
+      "shouldTranslate" : false
     }
   },
   "version" : "1.0"

@@ -180,4 +180,20 @@ final class E2EEV2ThreadPresentationTests: XCTestCase {
         ])
         XCTAssertTrue(thread.notices[0].text.contains("Bruno"))
     }
+
+    /// IOS-086, secondaire : les trous d'un autre appareil du compte (ancien téléphone)
+    /// ne citent pas son propre nom.
+    func testMissingMessagesFromOwnOtherDeviceDoNotNameTheReader() {
+        let result = E2EEV2MessagesV2(
+            snapshot: .init(cursor: 3, messages: [], equivocalRefs: []), unsupported: [],
+            missingByDevice: ["device_own_old_phone": 2, "device_bruno_phone": 1], waitingForEpoch: false
+        )
+        let thread = E2EEV2ThreadPresenter.present(
+            result, conversationId: conversationId, members: [bruno.id: bruno, carla.id: carla],
+            deviceOwners: ["device_own_old_phone": carla.id, "device_bruno_phone": bruno.id], ownUserId: carla.id
+        )
+        XCTAssertEqual(thread.notices, [.missing(senderName: "Bruno", count: 1), .missingFromOwnDevices(count: 2)])
+        XCTAssertFalse(thread.notices[1].text.contains(carla.displayName))
+    }
 }
+
