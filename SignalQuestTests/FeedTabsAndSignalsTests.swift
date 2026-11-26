@@ -265,6 +265,43 @@ final class FeedItemOwnershipTests: XCTestCase {
         XCTAssertFalse(item.isPinned)
     }
 
+    /// Options d'une publication (25/11) : une seule règle et un seul ordre pour le fil, la
+    /// fiche, le profil, le détail et Explorer. La fiche et Explorer n'offraient à l'auteur que
+    /// la sourdine ; les actions de lecture passent en tête, comme sur le web et Android.
+    func testPostOptionsFollowOneOrderOnEverySurface() throws {
+        func entries(_ json: String, all: Bool = true, onlyDelete: Bool = false) throws -> [PostOptionsMenu.Entry] {
+            PostOptionsMenu.entries(
+                for: try decode(json),
+                canViewProfile: all, canShare: all,
+                canEdit: all, canSetVisibility: all, canPin: all,
+                canMute: all, canDelete: all || onlyDelete,
+                canMuteAuthor: all, canBlockAuthor: all, canReport: all
+            )
+        }
+        func with(_ json: String, _ field: String) -> String {
+            json.replacingOccurrences(of: "\"text\":\"bonjour\",", with: "\"text\":\"bonjour\",\(field),")
+        }
+        let mine = payload(isMine: "true", pinnedAt: "null")
+        let theirs = payload(isMine: "false", pinnedAt: "null")
+
+        XCTAssertEqual(try entries(mine), [.profile, .copyLink, .share, .edit, .visibility, .pin, .mute, .delete],
+                       "Post public écrit à la main : lecture, puis Modifier, Visibilité, Épingler, sourdine, Supprimer")
+        XCTAssertEqual(try entries(with(mine, "\"generated\":true")), [.profile, .copyLink, .share, .visibility, .pin, .mute, .delete],
+                       "Post automatique : pas de Modifier (403 GENERATED_POST_READ_ONLY)")
+        XCTAssertEqual(try entries(theirs), [.profile, .copyLink, .share, .mute, .muteAuthor, .blockAuthor, .report],
+                       "Post d'un autre : sourdine, blocage et signalement, ni action d'auteur")
+        XCTAssertEqual(try entries(with(theirs, "\"visibility\":\"friends\"")),
+                       [.profile, .share, .mute, .muteAuthor, .blockAuthor, .report],
+                       "Réservé aux amis : pas de lien, il mènerait les autres sur un refus")
+        XCTAssertEqual(try entries(with(mine, "\"metadata\":{\"authorOnlyReason\":\"private_zone\"}")),
+                       [.profile, .edit, .visibility, .pin, .mute, .delete],
+                       "Zone privée : ni lien ni partage")
+        XCTAssertEqual(try entries(with(mine, "\"visibility\":\"friends\""), all: false, onlyDelete: true), [.delete],
+                       "Seules les actions fournies par l'écran apparaissent")
+        XCTAssertEqual(PostOptionsMenu.Entry.delete.section, PostOptionsMenu.Entry.report.section,
+                       "Supprimer et Signaler ferment le menu, après un séparateur")
+    }
+
     /// Champs absents : le décodage ne doit pas échouer, et l'app doit se
     /// comporter comme si le post n'était PAS gérable — masquer une action est
     /// bénin, l'offrir à tort renvoie un 403 à l'utilisateur.

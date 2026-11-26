@@ -355,6 +355,7 @@ final class LocalizationBundleTests: XCTestCase {
             "Un appareil de %@ ne figure pas tel quel dans le journal des appareils : la conversation passe à une nouvelle clé sans lui.",
             "Les appareils de %@ ont changé.", "Le journal des appareils de %@ ne correspond pas : rien ne lui est envoyé.",
             "Notifications des posts de %@", "Activer les notifications des posts de %@", "Notifications des posts de %@ : %@",
+            "Options du commentaire de %@", "J’aime le commentaire de %@", "Je n’aime plus le commentaire de %@",
         ]
         // Nombres, distances, plages, dates, lieux et libellés libres : jamais élidés.
         let excluded = found.subtracting(elided).filter { key in

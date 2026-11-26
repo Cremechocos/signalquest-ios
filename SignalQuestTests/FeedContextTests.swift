@@ -212,6 +212,53 @@ final class FeedContextTests: XCTestCase {
         XCTAssertEqual(model.pendingCount, 0)
     }
 
+    /// COM-04 : la suite du fil qui échoue, ou qui ne ramène que des pages vides, laisse un bouton
+    /// pour réessayer ; avant, rien ne la relançait si les dernières cartes étaient déjà à l'écran.
+    func testFailedOrEmptyContinuationOffersARetry() async throws {
+        let failing = FeedViewModel(service: FeedContextFixture { cursor, _, _ in
+            if cursor == nil { return Self.page("first", cursor: "next", items: [Self.item("a")]) }
+            throw URLError(.notConnectedToInternet)
+        })
+        await failing.load()
+        XCTAssertFalse(failing.loadMoreStalled)
+        await failing.loadMore()
+        XCTAssertTrue(failing.loadMoreStalled, "échec : « Charger plus de publications »")
+        XCTAssertEqual(failing.page?.items.map(\.id), ["a"], "la page lue reste")
+
+        let empty = FeedViewModel(service: FeedContextFixture { cursor, _, _ in
+            if cursor == nil { return Self.page("first", cursor: "next", items: [Self.item("a")]) }
+            return Self.page("empty", cursor: "next", items: [])
+        })
+        await empty.load()
+        await empty.loadMore()
+        XCTAssertTrue(empty.loadMoreStalled, "pages vides à la file : on le dit")
+        await empty.load()
+        XCTAssertFalse(empty.loadMoreStalled, "un rechargement efface l'état")
+    }
+
+    /// COM-02 : bloquer un membre, ou supprimer une publication, vide aussi ce qui attend derrière
+    /// la pastille « N nouvelles » ; la toucher réinsérait le post du membre bloqué.
+    func testPendingPostsLeaveWithABlockedAuthorOrADeletedPost() async throws {
+        for removal in ["author", "post"] {
+            let streams = FeedFixtureStreams(), calls = FeedCallCount()
+            let current = Self.item("current"), fresh = Self.item("fresh")
+            let model = FeedViewModel(service: FeedContextFixture { _, _, _ in
+                let count = await calls.next()
+                return Self.page("page", items: count == 1 ? [current] : [current, fresh])
+            })
+            // Onglet chronologique : la page lue sert de référence, sans relecture qui
+            // absorberait déjà la nouveauté (même montage que le test du flux ci-dessus).
+            await model.select(.following)
+            model.startStream { streams.make() }
+            let raw = String(decoding: try JSONEncoder.signalQuest.encode(Self.page("global", items: [Self.item("x")])), as: UTF8.self)
+            streams.emit(0, raw)
+            await eventually { model.pendingCount == 1 }
+            if removal == "author" { model.removeAuthor("qa-author") } else { model.removeItem("fresh") }
+            XCTAssertEqual(model.pendingCount, 0, "pastille vidée (\(removal))")
+            model.stopStream()
+        }
+    }
+
     /// Audit perf, E2 : deux instantanés reçus dans l'intervalle ne font qu'une relecture,
     /// à l'échéance ; aucun n'est perdu. Chaque relecture rend un post de plus.
     func testStreamRechecksAtMostOncePerIntervalWithoutLosingALateSnapshot() async throws {
@@ -467,6 +514,7 @@ final class FeedContextTests: XCTestCase {
         let service = FeedContextFixture { _, _, _ in Self.page("page", items: items) }
         service.onDelete = { await deletions.record($0) }
         let model = FeedViewModel(service: service)
+        model.deletions = Self.isolatedDeletions()
         await model.load()
 
         model.deletePost(items[1], after: .milliseconds(150))
@@ -495,12 +543,69 @@ final class FeedContextTests: XCTestCase {
         let service = FeedContextFixture { _, _, _ in Self.page("page", items: items) }
         service.onDelete = { _ in throw APIError.http(status: 500, code: nil, message: "", requestId: nil, retryAfter: nil) }
         let model = FeedViewModel(service: service)
+        model.deletions = Self.isolatedDeletions()
         await model.load()
         model.deletePost(items[0], after: .milliseconds(50))
         XCTAssertEqual(model.page?.items.map(\.id), ["b", "c"])
         try await Task.sleep(for: .milliseconds(400))
         XCTAssertEqual(model.page?.items.map(\.id), ["a", "b", "c"])
         XCTAssertNotNil(model.actionError)
+    }
+
+    /// COM-01 : app tuée pendant le délai « Annuler ». Avant, la suppression ne vivait que
+    /// dans une tâche du fil et ne partait jamais, alors que l'écran l'avait annoncée. Elle est
+    /// inscrite sur l'appareil, et le passage suivant (lancement, retour du réseau) l'envoie.
+    func testDeletionAnnouncedBeforeTheAppIsKilledStillReachesTheServer() async throws {
+        let suite = "PendingPostDeletionsTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let deletions = FeedDeletions()
+        let service = FeedContextFixture { _, _, _ in Self.page("page") }
+        service.onDelete = { await deletions.record($0) }
+
+        let beforeKill = PendingPostDeletions(defaults: defaults)
+        beforeKill.schedule(postId: "c", after: .seconds(60), service: service) { _ in }
+        // Relance : une autre instance relit l'inscription, sans la tâche du délai.
+        let relaunched = PendingPostDeletions(defaults: defaults)
+        XCTAssertTrue(relaunched.isPending("c"), "un rechargement ne rend pas la publication")
+        await relaunched.flush(using: service)
+        let tooEarly = await deletions.ids
+        XCTAssertEqual(tooEarly, [], "rien ne part avant la fin du délai : il reprend à l'échéance restante")
+        // Relance après l'échéance : la suppression part au premier passage.
+        let late = PendingPostDeletions(defaults: defaults)
+        await late.flush(using: service, now: Date().addingTimeInterval(120))
+        let sent = await deletions.ids
+        XCTAssertEqual(sent, ["c"])
+        XCTAssertFalse(late.isPending("c"))
+        relaunched.cancel("c")
+        beforeKill.cancel("c")
+    }
+
+    /// Au passage suivant, une panne passagère garde la suppression ; un refus définitif
+    /// (publication déjà supprimée, 404) l'abandonne.
+    func testFlushKeepsTransientFailuresAndDropsRefusals() async throws {
+        let suite = "PendingPostDeletionsTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let service = FeedContextFixture { _, _, _ in Self.page("page") }
+        service.onDelete = { id in
+            if id == "offline" { throw URLError(.notConnectedToInternet) }
+            throw APIError.http(status: 404, code: nil, message: "", requestId: nil, retryAfter: nil)
+        }
+        let beforeKill = PendingPostDeletions(defaults: defaults)
+        beforeKill.schedule(postId: "offline", after: .seconds(60), service: service) { _ in }
+        beforeKill.schedule(postId: "gone", after: .seconds(60), service: service) { _ in }
+        let relaunched = PendingPostDeletions(defaults: defaults)
+        await relaunched.flush(using: service, now: Date().addingTimeInterval(120))
+        XCTAssertTrue(relaunched.isPending("offline"), "réessayée au prochain passage")
+        XCTAssertFalse(relaunched.isPending("gone"))
+        beforeKill.cancel("offline")
+        beforeKill.cancel("gone")
+    }
+
+    /// File de suppressions propre à un test, hors des préférences de l'app.
+    private static func isolatedDeletions() -> PendingPostDeletions {
+        PendingPostDeletions(defaults: UserDefaults(suiteName: "PendingPostDeletionsTests.\(UUID().uuidString)")!)
     }
 
     /// Plan Fil Communauté, C1 : le dernier onglet ouvert revient au lancement suivant,

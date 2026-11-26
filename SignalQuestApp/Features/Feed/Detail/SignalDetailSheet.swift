@@ -17,6 +17,16 @@ struct SignalDetailSheet: View {
     var onPollVote: ((FeedPoll.Option) -> Void)? = nil
     /// Tap sur l'auteur — le parent ferme le sheet et pousse le profil.
     var onAuthorTap: (() -> Void)? = nil
+    /// Actions de l'auteur, les mêmes que le ⋯ de la carte et sous la même condition
+    /// (`canManage`) : sans elles, son propre post ouvert n'offrait ni Modifier ni Supprimer
+    /// (signalement du 25/11). `nil` là où l'écran parent ne les propose pas.
+    var onEdit: (() -> Void)? = nil
+    var onSetVisibility: ((SocialVisibility) -> Void)? = nil
+    var onTogglePin: (() -> Void)? = nil
+    var onDelete: (() -> Void)? = nil
+    /// Sourdine et blocage de l'auteur (post d'un autre), planche commune du 25/11.
+    var onMuteAuthor: (() -> Void)? = nil
+    var onBlockAuthor: (() -> Void)? = nil
     var actionError: String? = nil
     var actionBusy = false
 
@@ -186,18 +196,11 @@ struct SignalDetailSheet: View {
             Menu {
                 // Pas de `dismiss()` ici : le parent remplace la fiche par
                 // le signalement ; fermer en plus annulait cette présentation (AF-FIL-02).
-                // On ne signale pas sa propre publication.
-                if !item.canManage {
-                    Button(role: .destructive) { onReport() } label: {
-                        Label("Signaler", systemImage: "flag")
-                    }
-                }
-                Button { onMute() } label: {
-                    Label(
-                        item.notificationsMutedByMe == true ? "Réactiver les notifications" : "Couper les notifications",
-                        systemImage: item.notificationsMutedByMe == true ? "bell" : "bell.slash"
-                    )
-                }
+                PostOptionsMenu(
+                    item: item, onViewProfile: onAuthorTap, onShare: onShare, onEdit: onEdit, onSetVisibility: onSetVisibility, onTogglePin: onTogglePin,
+                    onMute: onMute, onDelete: onDelete, onMuteAuthor: onMuteAuthor, onBlockAuthor: onBlockAuthor,
+                    onReport: onReport, identifierPrefix: "signal.detail"
+                )
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 15, weight: .semibold))

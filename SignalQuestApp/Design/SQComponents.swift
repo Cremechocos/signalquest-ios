@@ -1015,12 +1015,13 @@ final class SQInAppNotificationCenter: ObservableObject {
         show(SQInAppNotificationItem(title: title, body: body, variant: .error, duration: .seconds(4)))
     }
 
-    func showUndo(body: String, actionLabel: String, action: @escaping @MainActor () -> Void) {
+    func showUndo(body: String, actionLabel: String, duration: Duration = .seconds(5),
+                  action: @escaping @MainActor () -> Void) {
         show(
             SQInAppNotificationItem(
                 body: body,
                 variant: .info,
-                duration: .seconds(5),
+                duration: duration,
                 actionLabel: actionLabel,
                 action: action,
                 priority: .high,

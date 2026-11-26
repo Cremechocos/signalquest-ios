@@ -12,7 +12,19 @@ final class CommentsViewModel: ObservableObject {
     /// Échec d'une action (envoi, suppression, j'aime), distinct de
     /// `errorMessage` qui ne concerne que le chargement : un envoi raté ne doit
     /// ni effacer ni remplacer l'erreur de chargement.
-    @Published var actionErrorMessage: String?
+    /// Échec d'un envoi, d'un j'aime ou d'une suppression. Le bandeau disparaît seul : VoiceOver
+    /// l'annonce, sinon l'échec passait inaperçu (COM-09).
+    @Published var actionErrorMessage: String? {
+        didSet {
+            if let actionErrorMessage, actionErrorMessage != oldValue {
+                UIAccessibility.post(notification: .announcement, argument: actionErrorMessage)
+            }
+        }
+    }
+    /// Gestes en cours, par commentaire : un second toucher pendant la requête ne part pas
+    /// (COM-03, COM-12).
+    private var likesInFlight: Set<String> = []
+    private var deletionsInFlight: Set<String> = []
     @Published var draft: String = ""
     @Published var isSending = false
     @Published var replyTo: SocialComment?
@@ -182,10 +194,9 @@ final class CommentsViewModel: ObservableObject {
             }
         } catch {
             guard !error.isCancellation else { return }
-            if draft == submittedDraft && replyTo?.id == parentID {
-                actionErrorMessage = String(localized: "Échec de l'envoi. Réessaie.")
-                Haptics.error()
-            }
+            // Même si le brouillon a changé entre-temps : l'échec se dit toujours (COM-09).
+            actionErrorMessage = String(localized: "Échec de l'envoi. Réessaie.")
+            Haptics.error()
         }
     }
 
@@ -196,12 +207,15 @@ final class CommentsViewModel: ObservableObject {
     /// puis réconciliation avec la réponse serveur (rollback en cas d'échec).
     /// Même pattern que `FeedViewModel.react`.
     func toggleLike(_ comment: SocialComment) {
+        guard !likesInFlight.contains(comment.id) else { return }
         let wasLiked = comment.likedByMe == true
         let previousCount = comment.likes ?? 0
         guard updateComment(comment.id, liked: !wasLiked,
             count: max(0, previousCount + (wasLiked ? -1 : 1))) else { return }
+        likesInFlight.insert(comment.id)
         Haptics.light()
         Task {
+            defer { likesInFlight.remove(comment.id) }
             do {
                 let response = wasLiked
                     ? try await service.unlike(postId: postId, commentId: comment.id)
@@ -220,6 +234,8 @@ final class CommentsViewModel: ObservableObject {
     /// serveur : un commentaire qui disparaît puis revient serait pire qu'une
     /// seconde d'attente.
     func delete(_ comment: SocialComment) async {
+        guard deletionsInFlight.insert(comment.id).inserted else { return }
+        defer { deletionsInFlight.remove(comment.id) }
         do {
             try await service.delete(postId: postId, commentId: comment.id)
             actionErrorMessage = nil
@@ -469,6 +485,8 @@ struct CommentsSheet: View {
                     model.beginReply(to: comment)
                     inputFocused = true
                 }
+                    // Le nom dans le libellé : « Répondre » se répétait sur chaque commentaire (COM-08).
+                    .accessibilityLabel(String(localized: "Répondre à \(comment.author.displayName)"))
                     .foregroundStyle(SQColor.labelSecondary)
                     .frame(minHeight: 44)
                 let page = model.repliesByParent[comment.id]
@@ -546,6 +564,8 @@ struct CommentsSheet: View {
             authorButton(comment) {
                 SQAvatar(url: comment.author.avatarUrl, name: comment.author.displayName, size: isReply ? 28 : 34)
             }
+            // Le nom porte déjà « Voir le profil de… » : l'avatar faisait un second arrêt identique (COM-08).
+            .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: SQSpace.xxs) {
                 HStack(spacing: SQSpace.xs) {
                     authorButton(comment) {
@@ -592,7 +612,9 @@ struct CommentsSheet: View {
                     .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
-            .accessibilityLabel("Plus d’options")
+            .accessibilityLabel(SQElision.apply(
+                String(localized: "Options du commentaire de \(comment.author.displayName)"),
+                name: comment.author.displayName))
             .accessibilityIdentifier("comment.more.\(comment.id)")
         }
     }
@@ -639,7 +661,10 @@ struct CommentsSheet: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(isLiked ? "Je n’aime plus" : "J’aime")
+        .accessibilityLabel(SQElision.apply(isLiked
+            ? String(localized: "Je n’aime plus le commentaire de \(comment.author.displayName)")
+            : String(localized: "J’aime le commentaire de \(comment.author.displayName)"),
+            name: comment.author.displayName))
         .accessibilityValue(count > 0 ? "\(count) j’aime" : "")
     }
 

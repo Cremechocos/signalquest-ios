@@ -7,6 +7,10 @@ final class FeedViewModel: ObservableObject {
     @Published var selectedHashtag: String? { didSet { if oldValue != selectedHashtag { invalidateQuery() } } }
     @Published var isLoading = false
     @Published var isLoadingMore = false
+    /// La suite du fil n'est pas venue (échec, ou pages vides à la file) : le bas du fil offre
+    /// de réessayer, sinon rien ne relançait le chargement quand les dernières cartes étaient
+    /// déjà à l'écran (COM-04).
+    @Published private(set) var loadMoreStalled = false
     @Published var errorMessage: String?
     /// Échec d'une action (like, vote, épingle…) : message passager, jamais
     /// l'écran d'erreur du chargement, dont « Réessayer » rechargeait tout le
@@ -283,7 +287,7 @@ final class FeedViewModel: ObservableObject {
     private func invalidateQuery() {
         queryRevision = UUID(); loadRevision = UUID()
         detailReceipts.removeAll()
-        page = nil; errorMessage = nil; isLoading = true; isLoadingMore = false
+        page = nil; errorMessage = nil; isLoading = true; isLoadingMore = false; loadMoreStalled = false
         pendingCount = 0; pendingItems = []; pendingBaseline = nil; knownIds.removeAll(); needsLiveCheck = false; liveCheckID = nil
         if metadataOwner != LocalAccountScope.currentOwnerScopeId { trendingHashtags = [] }
         restartStream()
@@ -459,8 +463,10 @@ final class FeedViewModel: ObservableObject {
             // Sans référence encore (lecture d'ouverture ratée ou en cours), celle-ci la fixe.
             guard let baseline = pendingBaseline else { pendingBaseline = PendingBaseline(freshPage.items); return }
             let fresh = Self.newerItems(in: freshPage.items, than: page.items + pendingItems,
-                                        excluding: knownIds.union(deferredDeletions.keys).union(baseline.ids),
+                                        excluding: knownIds.union(deferredDeletions.keys).union(deletions.pendingPostIds)
+                                            .union(baseline.ids),
                                         after: baseline.newest)
+                .filter { !removedAuthorIds.contains($0.author.id) }
             knownIds.formUnion(fresh.map(\.id))
             pendingItems = fresh + pendingItems
             pendingCount = pendingItems.count
@@ -521,7 +527,7 @@ final class FeedViewModel: ObservableObject {
         }
         let context = query, request = UUID()
         let receiptRevisionAtStart = detailReceiptRevision
-        loadRevision = request; isLoading = true; isLoadingMore = false; errorMessage = nil
+        loadRevision = request; isLoading = true; isLoadingMore = false; loadMoreStalled = false; errorMessage = nil
         if metadataOwner != context.owner { trendingHashtags = [] }
         defer { if context == query && loadRevision == request { isLoading = false } }
         if AppEnvironment.usesDemoData {
@@ -536,8 +542,9 @@ final class FeedViewModel: ObservableObject {
                                                     near: context.near, sort: context.sort)
             guard context == query, request == loadRevision, !Task.isCancelled else { return }
             if let radius = loaded.nearRadiusKm, radius > 0 { nearRadiusKm = Int(radius.rounded()) }
+            let deleting = deletions.pendingPostIds
             page = SocialFeedPage(
-                items: loaded.items.filter { deferredDeletions[$0.id] == nil }.map { item in
+                items: loaded.items.filter { deferredDeletions[$0.id] == nil && !deleting.contains($0.id) }.map { item in
                     guard let receipt = detailReceipts[item.id],
                           receipt.revision > receiptRevisionAtStart else { return item }
                     return item.adoptingInteractions(from: receipt.item)
@@ -609,6 +616,7 @@ final class FeedViewModel: ObservableObject {
               var cursor = current.nextCursor, !cursor.isEmpty, !AppEnvironment.usesDemoData else { return }
         let context = query, loading = loadRevision
         isLoadingMore = true
+        loadMoreStalled = false
         defer { if context == query && loading == loadRevision { isLoadingMore = false } }
         do {
             for _ in 0..<Self.emptyPageHops {
@@ -616,83 +624,102 @@ final class FeedViewModel: ObservableObject {
                                                            near: context.near, sort: context.sort)
                 guard context == query, loading == loadRevision, !Task.isCancelled, let current = page else { return }
                 var seen = Set(current.items.map(\.id))
-                let appended = next.items.filter { deferredDeletions[$0.id] == nil && seen.insert($0.id).inserted }
+                let deleting = deletions.pendingPostIds
+                let appended = next.items.filter {
+                    deferredDeletions[$0.id] == nil && !deleting.contains($0.id) && seen.insert($0.id).inserted
+                }
                 page = SocialFeedPage(items: current.items + appended, nextCursor: next.nextCursor,
                     stories: current.stories, trendingHashtags: current.trendingHashtags,
                     suggestedUsers: current.suggestedUsers, requestId: next.requestId ?? current.requestId)
                 guard appended.isEmpty, let following = next.nextCursor, !following.isEmpty else { return }
                 cursor = following
             }
+            // Que des pages vides, et une suite encore annoncée : on s'arrête, sans le taire.
+            loadMoreStalled = true
         } catch {
             guard context == query, loading == loadRevision, !error.isCancellation else { return }
-            // La page déjà lue reste affichée ; faire défiler relance la suite.
+            // La page déjà lue reste affichée ; le bas du fil offre de réessayer.
+            loadMoreStalled = true
             actionError = error.userFacingMessage
         }
     }
 
+    /// Bascules en cours, par publication et par geste (« post-1|react|❤️ ») : un second
+    /// toucher pendant la requête ne part pas, sinon deux réponses se croisaient et la plus
+    /// ancienne pouvait l'emporter (COM-03).
+    private var interactionsInFlight: Set<String> = []
+
     func react(_ item: UnifiedSocialFeedItem, emoji: String = "❤️") {
-        let previous = item
-        Task {
-            await applyLocalToggle(itemId: item.id) { current in
-                var copy = current
-                // État propre à chaque emoji : `likedByMe` ne suit que le ❤️.
-                let selected = !current.hasReacted(with: emoji)
-                if emoji == "❤️" { copy.likedByMe = selected }
-                copy.reactions = updatedReactions(current.reactions, emoji: emoji, selected: selected)
-                return copy
-            }
-        }
-        Task {
-            do {
-                let response = try await service.react(postId: item.id, emoji: emoji)
-                await applyReactionResponse(itemId: item.id, response: response)
-            } catch {
-                await restore(previous)
-                if !error.isCancellation { actionError = error.userFacingMessage }
-            }
-        }
+        interact(item, key: "react|\(emoji)", toggle: { current in
+            var copy = current
+            // État propre à chaque emoji : `likedByMe` ne suit que le ❤️.
+            let selected = !current.hasReacted(with: emoji)
+            if emoji == "❤️" { copy.likedByMe = selected }
+            copy.reactions = self.updatedReactions(current.reactions, emoji: emoji, selected: selected)
+            return copy
+        }, rollback: { current, previous in
+            // Seuls les champs de ce geste reviennent : une autre action faite entre-temps reste.
+            var copy = current
+            copy.likedByMe = previous.likedByMe
+            copy.reactions = previous.reactions
+            return copy
+        }, request: { [service] in try await service.react(postId: item.id, emoji: emoji) })
         Haptics.light()
     }
 
     func repost(_ item: UnifiedSocialFeedItem) {
-        let previous = item
-        Task {
-            await applyLocalToggle(itemId: item.id) { current in
-                var copy = current
-                copy.repostedByMe.toggle()
-                copy.repostsCount = max(0, current.repostsCount + (copy.repostedByMe ? 1 : -1))
-                return copy
-            }
-        }
-        Task {
-            do {
-                let response = try await service.repost(postId: item.id)
-                await applyReactionResponse(itemId: item.id, response: response)
-            } catch {
-                await restore(previous)
-                if !error.isCancellation { actionError = error.userFacingMessage }
-            }
-        }
+        interact(item, key: "repost", toggle: { current in
+            var copy = current
+            copy.repostedByMe.toggle()
+            copy.repostsCount = max(0, current.repostsCount + (copy.repostedByMe ? 1 : -1))
+            return copy
+        }, rollback: { current, previous in
+            var copy = current
+            copy.repostedByMe = previous.repostedByMe
+            copy.repostsCount = previous.repostsCount
+            return copy
+        }, request: { [service] in try await service.repost(postId: item.id) })
         Haptics.medium()
     }
 
     func favorite(_ item: UnifiedSocialFeedItem) {
-        let previous = item
+        interact(item, key: "favorite", toggle: { current in
+            var copy = current
+            copy.favoritedByMe.toggle()
+            copy.favoritesCount = max(0, current.favoritesCount + (copy.favoritedByMe ? 1 : -1))
+            return copy
+        }, rollback: { current, previous in
+            var copy = current
+            copy.favoritedByMe = previous.favoritedByMe
+            copy.favoritesCount = previous.favoritesCount
+            return copy
+        }, request: { [service] in try await service.favorite(postId: item.id) })
+    }
+
+    /// Bascule optimiste : l'état change tout de suite, la réponse du serveur fait foi, et un
+    /// échec ne remet que les champs de ce geste.
+    private func interact(
+        _ item: UnifiedSocialFeedItem,
+        key: String,
+        toggle: @escaping @MainActor (UnifiedSocialFeedItem) -> UnifiedSocialFeedItem,
+        rollback: @escaping @MainActor (UnifiedSocialFeedItem, UnifiedSocialFeedItem) -> UnifiedSocialFeedItem,
+        request: @escaping @MainActor () async throws -> ReactionResponse
+    ) {
+        let flightKey = "\(item.id)|\(key)"
+        guard interactionsInFlight.insert(flightKey).inserted else { return }
+        let previous = currentItem(item)
         Task {
-            await applyLocalToggle(itemId: item.id) { current in
-                var copy = current
-                copy.favoritedByMe.toggle()
-                copy.favoritesCount = max(0, current.favoritesCount + (copy.favoritedByMe ? 1 : -1))
-                return copy
-            }
-        }
-        Task {
+            await applyLocalToggle(itemId: item.id) { toggle($0) }
+            defer { interactionsInFlight.remove(flightKey) }
             do {
-                let response = try await service.favorite(postId: item.id)
+                let response = try await request()
                 await applyReactionResponse(itemId: item.id, response: response)
             } catch {
-                await restore(previous)
-                if !error.isCancellation { actionError = error.userFacingMessage }
+                await applyLocalToggle(itemId: item.id) { rollback($0, previous) }
+                if !error.isCancellation {
+                    Haptics.error()
+                    actionError = error.userFacingMessage
+                }
             }
         }
     }
@@ -744,54 +771,45 @@ final class FeedViewModel: ObservableObject {
 
     /// Suppressions en attente : la publication a quitté le fil tout de suite, le serveur
     /// ne la reçoit qu'au bout du délai d'annulation (plan Fil Communauté, C5, comme
-    /// Android). Un rechargement pendant ce délai ne la fait pas revenir.
+    /// Android). Un rechargement pendant ce délai ne la fait pas revenir. Le délai lui-même
+    /// est tenu par `PendingPostDeletions`, qui l'inscrit sur l'appareil : une app tuée
+    /// pendant ces secondes envoie la suppression au lancement suivant (COM-01).
     private struct DeferredDeletion {
         let item: UnifiedSocialFeedItem
-        let index: Int
+        /// Place dans la page ; nil pour une publication ouverte hors du fil (notification).
+        let index: Int?
         let query: UUID
-        let task: Task<Void, Never>
-        var sending = false
     }
     private var deferredDeletions: [String: DeferredDeletion] = [:]
-    /// Durée du bandeau « Annuler » (`showUndo`) : la suppression part à son terme.
-    nonisolated static let deletionUndoDelay: Duration = .seconds(5)
+    /// File partagée des suppressions ; remplaçable en test.
+    var deletions = PendingPostDeletions.shared
 
     /// Retire la publication et programme sa suppression. Elle revient à sa place si
     /// l'auteur annule, ou si le serveur refuse.
-    func deletePost(_ item: UnifiedSocialFeedItem, after delay: Duration = FeedViewModel.deletionUndoDelay) {
-        guard let page, deferredDeletions[item.id] == nil else { return }
-        let index = page.items.firstIndex { $0.id == item.id } ?? 0
+    func deletePost(_ item: UnifiedSocialFeedItem, after delay: Duration = PendingPostDeletions.undoDelay) {
+        guard deferredDeletions[item.id] == nil else { return }
+        let index = page?.items.firstIndex { $0.id == item.id }
         removeItem(item.id)
-        let task = Task { [weak self] in
-            try? await Task.sleep(for: delay)
-            guard !Task.isCancelled else { return }
-            await self?.sendDeletion(item.id)
+        deferredDeletions[item.id] = DeferredDeletion(item: item, index: index, query: queryRevision)
+        deletions.schedule(postId: item.id, after: delay, service: service) { [weak self] result in
+            self?.deletionFinished(item.id, result)
         }
-        deferredDeletions[item.id] = DeferredDeletion(item: item, index: index, query: queryRevision, task: task)
     }
 
     /// « Annuler » : rien n'est parti, la publication reprend sa place. Trop tard une
     /// fois la demande envoyée.
     func undoDeletion(_ id: String) {
-        guard let pending = deferredDeletions[id], !pending.sending else { return }
+        guard let pending = deferredDeletions[id], deletions.cancel(id) else { return }
         deferredDeletions[id] = nil
-        pending.task.cancel()
         // Onglet changé entre-temps : le prochain chargement la rendra, elle n'est pas supprimée.
-        if pending.query == queryRevision { reinsert(pending.item, at: pending.index) }
+        if pending.query == queryRevision, let index = pending.index { reinsert(pending.item, at: index) }
     }
 
-    private func sendDeletion(_ id: String) async {
-        guard deferredDeletions[id] != nil else { return }
-        deferredDeletions[id]?.sending = true
-        guard let pending = deferredDeletions[id] else { return }
-        do {
-            try await service.deletePost(postId: pending.item.id)
-            deferredDeletions[id] = nil
-        } catch {
-            deferredDeletions[id] = nil
-            if pending.query == queryRevision { reinsert(pending.item, at: pending.index) }
-            if !error.isCancellation { actionError = error.userFacingMessage }
-        }
+    private func deletionFinished(_ id: String, _ result: Result<Void, Error>) {
+        guard let pending = deferredDeletions.removeValue(forKey: id) else { return }
+        guard case .failure(let error) = result else { return }
+        if pending.query == queryRevision, let index = pending.index { reinsert(pending.item, at: index) }
+        if !error.isCancellation { actionError = error.userFacingMessage }
     }
 
     /// Réinsère la seule publication retirée, à sa place : le reste du fil a pu
@@ -809,14 +827,19 @@ final class FeedViewModel: ObservableObject {
 
     /// Vote sur un sondage. Bascule si l'option était déjà choisie.
     ///
-    /// Optimiste sur le seul état de sélection, PAS sur les décomptes : le
-    /// serveur applique ses propres règles (choix unique ou multiple, sondage
-    /// clos, vote déjà émis ailleurs). Recalculer les pourcentages localement
-    /// afficherait un résultat qui saute dès la réponse.
+    /// Rien d'optimiste : le serveur applique ses propres règles (choix unique ou
+    /// multiple, sondage clos, vote déjà émis ailleurs), et sa réponse remplace le
+    /// sondage. Recalculer les pourcentages localement afficherait un résultat qui
+    /// saute dès la réponse.
     func votePoll(_ item: UnifiedSocialFeedItem, option: FeedPoll.Option) {
         guard let poll = item.poll, poll.isOpen else { return }
+        // Un vote à la fois par sondage : deux touchers rapides partaient calculés sur le même
+        // état (COM-07).
+        let flightKey = "\(item.id)|poll"
+        guard interactionsInFlight.insert(flightKey).inserted else { return }
         let removing = option.votedByMe
         Task {
+            defer { interactionsInFlight.remove(flightKey) }
             do {
                 let updated = try await service.votePoll(
                     postId: item.id,
@@ -828,7 +851,10 @@ final class FeedViewModel: ObservableObject {
                     var copy = current; copy.poll = updated; return copy
                 }
             } catch {
-                if !error.isCancellation { actionError = error.userFacingMessage }
+                if !error.isCancellation {
+                    Haptics.error()
+                    actionError = error.userFacingMessage
+                }
             }
         }
     }
@@ -876,8 +902,14 @@ final class FeedViewModel: ObservableObject {
         viewedStoryIds.insert(id)
     }
 
-    /// Retire des publications et des stories d'un membre qu'on vient de bloquer.
+    /// Membres bloqués pendant la session : leurs publications n'entrent plus par la pastille.
+    private var removedAuthorIds: Set<String> = []
+
+    /// Retire des publications et des stories d'un membre qu'on vient de bloquer, y compris
+    /// celles qui attendaient derrière la pastille « N nouvelles » (COM-02).
     func removeAuthor(_ userId: String) {
+        removedAuthorIds.insert(userId)
+        dropPending { $0.author.id == userId }
         guard let page else { return }
         self.page = SocialFeedPage(
             items: page.items.filter { $0.author.id != userId },
@@ -889,8 +921,10 @@ final class FeedViewModel: ObservableObject {
         )
     }
 
-    /// Retire une publication supprimée depuis son détail, sans recharger le fil.
+    /// Retire une publication supprimée depuis son détail, sans recharger le fil ; la pastille
+    /// ne la rend pas non plus (COM-02).
     func removeItem(_ id: String) {
+        dropPending { $0.id == id }
         guard let page else { return }
         self.page = SocialFeedPage(
             items: page.items.filter { $0.id != id },
@@ -900,6 +934,18 @@ final class FeedViewModel: ObservableObject {
             suggestedUsers: page.suggestedUsers,
             requestId: page.requestId
         )
+    }
+
+    /// Sourdine retirée : les publications du membre peuvent de nouveau entrer par la pastille.
+    func restoreAuthor(_ userId: String) {
+        removedAuthorIds.remove(userId)
+    }
+
+    /// Retire des publications en attente derrière la pastille, et la pastille avec elles.
+    private func dropPending(where shouldDrop: (UnifiedSocialFeedItem) -> Bool) {
+        guard pendingItems.contains(where: shouldDrop) else { return }
+        pendingItems.removeAll(where: shouldDrop)
+        pendingCount = pendingItems.count
     }
 
     func removeStory(_ id: String) {
@@ -1017,6 +1063,8 @@ struct FeedView: View {
     @State private var showRecap = false
     /// Post en cours d'édition — ouvre le composer en mode édition.
     @State private var editingPost: UnifiedSocialFeedItem?
+    /// Membre à bloquer depuis le ⋯ d'une de ses publications, en attente de l'alerte.
+    @State private var blockingAuthor: SocialFeedAuthor?
     @State private var presentedStoryStart: Int?
     /// Auteurs dont les stories sont masquées sur cet appareil.
     @State private var hiddenStoryAuthorIds = HiddenStoryAuthorsStore.hiddenIds()
@@ -1230,6 +1278,12 @@ struct FeedView: View {
                         HStack { Spacer(); SQSpinner().tint(SQColor.brandRed); Spacer() }
                             .padding(.vertical, SQSpace.md)
                             .frame(maxWidth: .infinity)
+                    } else if model.loadMoreStalled {
+                        GradientButton("Charger plus de publications", systemImage: "arrow.clockwise", style: .secondary) {
+                            Task { await model.loadMore() }
+                        }
+                        .padding(.vertical, SQSpace.md)
+                        .accessibilityIdentifier("feed.loadMore.retry")
                     }
                 }
                 } header: {
@@ -1365,7 +1419,8 @@ struct FeedView: View {
                 commentsService: services.comments,
                 reportsService: services.reports,
                 onItemChanged: { model.acceptDetailItem($0) },
-                onDeleted: { model.removeItem($0) }
+                onDeleted: { model.removeItem($0) },
+                onDelete: { deleteWithUndo($0) }
             )
         }
         // Publication supprimée, ouverte depuis une notification : un état, pas une
@@ -1405,6 +1460,10 @@ struct FeedView: View {
         .onReceive(NotificationCenter.default.publisher(for: .sqMemberBlocked)) { note in
             if let userId = note.userInfo?["userId"] as? String { model.removeAuthor(userId) }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .sqMemberMuted)) { note in
+            if let userId = note.userInfo?["userId"] as? String { model.removeAuthor(userId) }
+        }
+        .blockAuthorAlert($blockingAuthor, friends: services.friends, notifications: inAppNotifications)
         .onChangeCompat(of: router.openUserProfileId) { _, _ in
             Task { await consumeFeedRoutesIfNeeded() }
         }
@@ -1458,7 +1517,7 @@ struct FeedView: View {
                     },
                     onRepost: {
                         if !item.repostedByMe { recordSignal("repost", for: item) }
-                        model.repost(item)
+                        repostWithUndo(item)
                     },
                     onFavorite: {
                         if !item.favoritedByMe { recordSignal("favorite", for: item) }
@@ -1474,6 +1533,31 @@ struct FeedView: View {
                     onAuthorTap: {
                         presentedSheet = nil
                         pushProfileAfterDismiss(item.author)
+                    },
+                    // Mêmes actions d'auteur que le ⋯ de la carte (signalement du 25/11).
+                    onEdit: {
+                        presentedSheet = nil
+                        Task { @MainActor in
+                            try? await Task.sleep(nanoseconds: 380_000_000)
+                            editingPost = item
+                        }
+                    },
+                    onSetVisibility: { model.setVisibility(item, to: $0) },
+                    onTogglePin: { model.togglePin(item) },
+                    onDelete: {
+                        presentedSheet = nil
+                        deleteWithUndo(item)
+                    },
+                    onMuteAuthor: {
+                        presentedSheet = nil
+                        muteAuthor(item.author)
+                    },
+                    onBlockAuthor: {
+                        presentedSheet = nil
+                        Task { @MainActor in
+                            try? await Task.sleep(nanoseconds: 380_000_000)
+                            blockingAuthor = item.author
+                        }
                     },
                     actionError: model.actionError
                 )
@@ -1581,14 +1665,44 @@ struct FeedView: View {
         }
     }
 
+    // MARK: Sourdine d'un membre
+
+    /// Sourdine depuis le ⋯ : ses publications partent du fil ; « Annuler » la retire et relit.
+    private func muteAuthor(_ author: SocialFeedAuthor) {
+        AuthorModeration.mute(author, friends: services.friends, notifications: inAppNotifications) {
+            model.restoreAuthor(author.id)
+            Task { await model.load() }
+        }
+    }
+
+    // MARK: Repartage annulable
+
+    /// Repartager est public : un bandeau le confirme et offre de l'annuler, au lieu d'un seul
+    /// changement de teinte de l'icône (COM-06). Retirer son repartage n'en demande pas.
+    private func repostWithUndo(_ item: UnifiedSocialFeedItem) {
+        let reposting = !model.currentItem(item).repostedByMe
+        model.repost(item)
+        guard reposting else { return }
+        inAppNotifications.showUndo(
+            body: String(localized: "Publication repartagée"),
+            actionLabel: String(localized: "Annuler")
+        ) {
+            let current = model.currentItem(item)
+            if current.repostedByMe { model.repost(current) }
+        }
+    }
+
     // MARK: Suppression annulable
 
     private func deleteWithUndo(_ item: UnifiedSocialFeedItem) {
         Haptics.light()
-        model.deletePost(item)
+        // Le bandeau dure exactement le délai : « Annuler » reste offert tant que rien n'est parti.
+        let delay = PendingPostDeletions.undoDelay
+        model.deletePost(item, after: delay)
         inAppNotifications.showUndo(
             body: String(localized: "Publication supprimée"),
-            actionLabel: String(localized: "Annuler")
+            actionLabel: String(localized: "Annuler"),
+            duration: delay
         ) {
             model.undoDeletion(item.id)
         }
@@ -2030,9 +2144,11 @@ struct FeedView: View {
                 EmptyStateView(title: String(localized: "Rien de neuf chez les profils que tu suis"),
                                message: String(localized: "Leurs prochaines publications arriveront ici."),
                                systemImage: "person.2")
-            case .none where model.followingCountFailed:
-                EmptyStateView(title: String(localized: "Rien de neuf chez les profils que tu suis"),
-                               message: String(localized: "Leurs prochaines publications arriveront ici."),
+            case .none where model.followingCount == nil && model.followingCountFailed:
+                // Le nombre d'abonnements ne s'est pas lu : rien n'affirme « rien de neuf » à
+                // quelqu'un qui ne suit peut-être personne (COM-05).
+                EmptyStateView(title: String(localized: "Rien ici pour l’instant"),
+                               message: FeedTab.following.emptyMessage,
                                systemImage: "person.2")
             case .none:
                 // Ni « personne » ni « rien de neuf » tant que le nombre d'abonnements n'est pas
@@ -2178,7 +2294,7 @@ struct FeedView: View {
             else { return nil }
             return GalleryTile(item: item, url: url)
         }
-        if tiles.isEmpty, !items.isEmpty, !model.isLoadingMore {
+        if tiles.isEmpty, !items.isEmpty, !model.isLoadingMore, !model.loadMoreStalled {
             // Des publications sans image : la grille resterait vide sans rien dire.
             EmptyStateView(
                 title: String(localized: "Rien ici pour l’instant"),
@@ -2303,7 +2419,7 @@ struct FeedView: View {
             },
             onRepost: {
                 if !item.repostedByMe { recordSignal("repost", for: item) }
-                model.repost(item)
+                repostWithUndo(item)
             },
             onComment: { presentedSheet = .comments(item) },
             onFavorite: {
@@ -2368,46 +2484,24 @@ struct FeedView: View {
         }
     }
 
-    /// Actions d'une publication : appui long et bouton ⋯ de la carte.
-    @ViewBuilder
+    /// Actions d'une publication : appui long et bouton ⋯ de la carte, dans l'ordre commun
+    /// (`PostOptionsMenu`). Suppression sans alerte : la publication disparaît et « Annuler »
+    /// reste 5 s (plan Fil Communauté, C5, comme Android).
     private func postMenu(for item: UnifiedSocialFeedItem) -> some View {
-        // Réservé à l'auteur. Le serveur revérifie et répond
-        // 403 : ce masquage évite d'offrir une action vouée
-        // à échouer, il ne fait pas autorité.
-        if item.canManage {
-            // Un post automatique ne change que de visibilité (403 sinon, #694).
-            if item.canEdit {
-                Button { editingPost = item } label: {
-                    Label("Modifier", systemImage: "pencil")
-                }
-            } else {
-                PostVisibilityPicker(current: item.visibility) { model.setVisibility(item, to: $0) }
-            }
-            Button { model.togglePin(item) } label: {
-                Label(item.isPinned ? "Désépingler" : "Épingler",
-                      systemImage: item.isPinned ? "pin.slash" : "pin")
-            }
-            // Pas d'alerte : la publication disparaît et « Annuler » reste 5 s (plan Fil
-            // Communauté, C5, comme Android). Le profil et le détail gardent leur confirmation.
-            Button(role: .destructive) { deleteWithUndo(item) } label: {
-                Label("Supprimer", systemImage: "trash")
-            }
-        }
-        Button { model.muteNotifications(item) } label: {
-            // Ternaires sortis en variables : imbriqués dans
-            // le `Label`, ils faisaient saturer le
-            // vérificateur de types de ce bloc devenu long.
-            let muted = item.notificationsMutedByMe == true
-            let title: LocalizedStringKey = muted ? "Réactiver les notifications" : "Couper les notifications"
-            let icon = muted ? "bell" : "bell.slash"
-            Label(title, systemImage: icon)
-        }
-        // On ne signale pas sa propre publication.
-        if !item.canManage {
-            Button(role: .destructive) { presentedSheet = .report(item) } label: {
-                Label("Signaler", systemImage: "flag")
-            }
-        }
+        PostOptionsMenu(
+            item: item,
+            onViewProfile: { profileAuthor = item.author },
+            onShare: { presentedSheet = .share(item) },
+            onEdit: { editingPost = item },
+            onSetVisibility: { model.setVisibility(item, to: $0) },
+            onTogglePin: { model.togglePin(item) },
+            onMute: { model.muteNotifications(item) },
+            onDelete: { deleteWithUndo(item) },
+            onMuteAuthor: { muteAuthor(item.author) },
+            onBlockAuthor: { blockingAuthor = item.author },
+            onReport: { presentedSheet = .report(item) },
+            identifierPrefix: "feed.post"
+        )
     }
 
     /// Signal d'engagement du classement « Pour toi », avec l'identifiant brut
@@ -2620,6 +2714,9 @@ struct FeedView: View {
     private func refreshFeed() async {
         await model.load()
         await model.loadPulse(force: true)
+        // Nombre d'abonnements illisible tout à l'heure : tirer pour actualiser le relit
+        // (déjà connu, la lecture ne repart pas).
+        if model.tab == .following, let id = currentUser?.id { await model.loadFollowingCount(userId: id) }
     }
 
     /// Filtre le fil sur un hashtag touché dans une carte.
@@ -2914,6 +3011,8 @@ extension SocialFeedPage {
 extension Notification.Name {
     /// Posté par `FriendsService.block` : `userInfo["userId"]` est le membre bloqué.
     static let sqMemberBlocked = Notification.Name("SignalQuest.MemberBlocked")
+    /// Membre mis en sourdine : ses publications quittent le fil, comme pour un blocage.
+    static let sqMemberMuted = Notification.Name("SignalQuest.MemberMuted")
 }
 
 /// Publication ouverte depuis une notification ou un lien alors qu'elle n'existe plus, ou

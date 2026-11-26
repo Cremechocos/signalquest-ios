@@ -13,7 +13,8 @@ struct PostDetailView: View {
     @State private var showShareSheet = false
     /// Publication ouverte dans le composer (auteur uniquement).
     @State private var editingPost: UnifiedSocialFeedItem?
-    @State private var confirmsDeletion = false
+    /// Auteur à bloquer depuis le ⋯, en attente de l'alerte.
+    @State private var blockingAuthor: SocialFeedAuthor?
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var inAppNotifications: SQInAppNotificationCenter
     @EnvironmentObject private var services: AppServices
@@ -22,6 +23,9 @@ struct PostDetailView: View {
     @State private var profileAuthor: SocialFeedAuthor?
     /// Prévenu quand la publication vient d'être supprimée (identifiant du post).
     private let onDeleted: @MainActor (String) -> Void
+    /// Suppression confiée à l'écran parent, qui sait la remettre à sa place si l'auteur annule
+    /// (le fil). Sans lui, le détail la programme lui-même.
+    private let onDelete: (@MainActor (UnifiedSocialFeedItem) -> Void)?
 
     init(
         item: UnifiedSocialFeedItem,
@@ -30,9 +34,11 @@ struct PostDetailView: View {
         commentsService: CommentsServicing,
         reportsService: ReportsServicing,
         onItemChanged: @escaping @MainActor (UnifiedSocialFeedItem) -> Void = { _ in },
-        onDeleted: @escaping @MainActor (String) -> Void = { _ in }
+        onDeleted: @escaping @MainActor (String) -> Void = { _ in },
+        onDelete: (@MainActor (UnifiedSocialFeedItem) -> Void)? = nil
     ) {
         self.onDeleted = onDeleted
+        self.onDelete = onDelete
         self.item = item
         self.feedService = feedService
         self.messagesService = messagesService
@@ -91,39 +97,21 @@ struct PostDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    // Réservé à l'auteur, comme dans le fil : le serveur revérifie.
-                    if actions.item.canManage {
-                        // Un post automatique ne change que de visibilité (403 sinon, #694).
-                        if actions.item.canEdit {
-                            Button { editingPost = actions.item } label: {
-                                Label("Modifier", systemImage: "pencil")
-                            }
-                        } else {
-                            PostVisibilityPicker(current: actions.item.visibility) { value in
-                                Task { await setVisibility(value) }
-                            }
-                        }
-                        Button { Task { await togglePin() } } label: {
-                            Label(actions.item.isPinned ? "Désépingler" : "Épingler",
-                                  systemImage: actions.item.isPinned ? "pin.slash" : "pin")
-                        }
-                        Button(role: .destructive) { confirmsDeletion = true } label: {
-                            Label("Supprimer", systemImage: "trash")
-                        }
-                    }
-                    // On ne signale pas sa propre publication ; la sourdine, elle,
-                    // reste proposée comme dans la feuille de détail.
-                    if !actions.item.canManage {
-                        Button(role: .destructive) { showReportSheet = true } label: {
-                            Label("Signaler", systemImage: "flag")
-                        }
-                    }
-                    Button { Task { await toggleMute() } } label: {
-                        Label(
-                            actions.item.notificationsMutedByMe == true ? "Réactiver les notifications" : "Couper les notifications",
-                            systemImage: actions.item.notificationsMutedByMe == true ? "bell" : "bell.slash"
-                        )
-                    }
+                    // Ordre commun à toutes les surfaces ; le serveur revérifie.
+                    PostOptionsMenu(
+                        item: actions.item,
+                        onViewProfile: { profileAuthor = actions.item.author },
+                        onShare: { showShareSheet = true },
+                        onEdit: { editingPost = actions.item },
+                        onSetVisibility: { value in Task { await setVisibility(value) } },
+                        onTogglePin: { Task { await togglePin() } },
+                        onMute: { Task { await toggleMute() } },
+                        onDelete: { deleteWithUndo() },
+                        onMuteAuthor: { muteAuthor() },
+                        onBlockAuthor: { blockingAuthor = actions.item.author },
+                        onReport: { showReportSheet = true },
+                        identifierPrefix: "post.detail"
+                    )
                 } label: { Image(systemName: "ellipsis.circle").tint(SQColor.brandRed) }
                 .accessibilityLabel("Plus d’options")
             }
@@ -162,6 +150,14 @@ struct PostDetailView: View {
                                   showSignalSheet = false
                                   pushProfileAfterDismiss(actions.item.author)
                               },
+                              // Mêmes options d'auteur que le ⋯ du détail ; ce qui ouvre un écran
+                              // attend la fermeture de la fiche (AF-FIL-02).
+                              onEdit: { afterSignalSheetDismiss { editingPost = actions.item } },
+                              onSetVisibility: { value in Task { await setVisibility(value) } },
+                              onTogglePin: { Task { await togglePin() } },
+                              onDelete: { afterSignalSheetDismiss { deleteWithUndo() } },
+                              onMuteAuthor: { afterSignalSheetDismiss { muteAuthor() } },
+                              onBlockAuthor: { afterSignalSheetDismiss { blockingAuthor = actions.item.author } },
                               actionError: actions.errorMessage,
                               actionBusy: actions.isMutating)
         }
@@ -188,16 +184,10 @@ struct PostDetailView: View {
             ComposerSheet(service: feedService, editing: post)
                 .onDisappear { Task { await reloadAfterEdit() } }
         }
-        // Alerte centrée, « Annuler » visible : en confirmationDialog, iOS 26 la posait en
-        // bulle sur le centre du fil, pointée vers une autre publication (IOS-044).
-        .alert(
-            "Supprimer cette publication ?",
-            isPresented: $confirmsDeletion
-        ) {
-            Button("Supprimer", role: .destructive) { Task { await deletePost() } }
-            Button("Annuler", role: .cancel) {}
-        } message: {
-            Text("Cette action est irréversible.")
+        .blockAuthorAlert($blockingAuthor, friends: services.friends, notifications: inAppNotifications)
+        // Auteur bloqué (ici ou ailleurs) : sa publication ne reste pas ouverte.
+        .onReceive(NotificationCenter.default.publisher(for: .sqMemberBlocked)) { note in
+            if note.userInfo?["userId"] as? String == actions.item.author.id { dismiss() }
         }
         .sheet(isPresented: $showReportSheet) {
             ReportSheet(target: .post(actions.item.backendPostId), service: reportsService)
@@ -264,15 +254,37 @@ struct PostDetailView: View {
         }
     }
 
-    private func deletePost() async {
-        do {
-            try await feedService.deletePost(postId: actions.item.id)
-            Haptics.success()
-            onDeleted(actions.item.id)
-            dismiss()
-        } catch {
-            if !error.isCancellation { actions.fail(error) }
+    /// Sourdine de l'auteur : le détail se ferme, ses publications quittent le fil.
+    private func muteAuthor() {
+        AuthorModeration.mute(actions.item.author, friends: services.friends, notifications: inAppNotifications) {}
+        dismiss()
+    }
+
+    /// Supprime la publication comme partout ailleurs : le détail se ferme, « Annuler » reste
+    /// le temps du délai et rien ne part avant (choix d'Alexandre du 25/11, plus d'alerte).
+    private func deleteWithUndo() {
+        let item = actions.item
+        Haptics.light()
+        if let onDelete {
+            onDelete(item)
+        } else {
+            let delay = PendingPostDeletions.undoDelay
+            let notifications = inAppNotifications
+            onDeleted(item.id)
+            PendingPostDeletions.shared.schedule(postId: item.id, after: delay, service: feedService) { result in
+                if case .failure(let error) = result, !error.isCancellation {
+                    notifications.showError(error.userFacingMessage)
+                }
+            }
+            notifications.showUndo(
+                body: String(localized: "Publication supprimée"),
+                actionLabel: String(localized: "Annuler"),
+                duration: delay
+            ) {
+                _ = PendingPostDeletions.shared.cancel(item.id)
+            }
         }
+        dismiss()
     }
 
     private func toggleMute() async {
@@ -281,6 +293,16 @@ struct PostDetailView: View {
             actions.update { $0.notificationsMutedByMe = !($0.notificationsMutedByMe ?? false) }
         } catch {
             if !error.isCancellation { actions.fail(error) }
+        }
+    }
+
+    /// Ferme la fiche, puis présente l'écran suivant une fois l'animation finie : deux
+    /// présentations à la fois, SwiftUI en ignore une (AF-FIL-02).
+    private func afterSignalSheetDismiss(_ next: @escaping @MainActor () -> Void) {
+        showSignalSheet = false
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 380_000_000)
+            next()
         }
     }
 

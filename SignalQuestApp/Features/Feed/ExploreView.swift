@@ -108,6 +108,91 @@ final class ExploreViewModel: ObservableObject {
         }
     }
 
+    // Options de l'auteur, comme dans le fil et le profil : Explorer n'offrait que la sourdine
+    // sur ses propres publications (demande d'Alexandre du 25/11).
+
+    /// Épingle ou détache ; le serveur n'en garde qu'un par auteur, l'autre se détache ici aussi.
+    func togglePin(_ item: UnifiedSocialFeedItem) {
+        let willPin = !item.isPinned
+        Task {
+            do {
+                try await service.setPinned(postId: item.id, pinned: willPin)
+                let transform: (UnifiedSocialFeedItem) -> UnifiedSocialFeedItem = { current in
+                    var copy = current
+                    if current.id == item.id { copy.pinnedAt = willPin ? Date() : nil }
+                    else if willPin, current.author.id == item.author.id { copy.pinnedAt = nil }
+                    return copy
+                }
+                searchPosts = searchPosts.map(transform)
+                hashtagItems = hashtagItems.map(transform)
+            } catch {
+                if !error.isCancellation { actionError = error.userFacingMessage }
+            }
+        }
+    }
+
+    /// Appliquée tout de suite, remise en place si le serveur refuse.
+    func setVisibility(_ item: UnifiedSocialFeedItem, to visibility: SocialVisibility) {
+        let previous = item.visibility
+        update(item.id) { var copy = $0; copy.visibility = visibility.rawValue; return copy }
+        Task {
+            do { _ = try await service.setVisibility(postId: item.id, visibility: visibility.rawValue) }
+            catch {
+                update(item.id) { var copy = $0; copy.visibility = previous; return copy }
+                if !error.isCancellation { actionError = error.userFacingMessage }
+            }
+        }
+    }
+
+    /// Places d'origine des publications retirées en attente de leur suppression.
+    private var deferredDeletions: [String: (search: Int?, hashtag: Int?)] = [:]
+    /// File partagée des suppressions ; remplaçable en test.
+    var deletions = PendingPostDeletions.shared
+
+    /// Retire la publication des deux listes ; la suppression part au terme du délai « Annuler »,
+    /// comme dans le fil. Elle revient à sa place si l'auteur annule ou si le serveur refuse.
+    func deletePost(_ item: UnifiedSocialFeedItem, after delay: Duration = PendingPostDeletions.undoDelay) {
+        guard deferredDeletions[item.id] == nil else { return }
+        deferredDeletions[item.id] = (searchPosts.firstIndex { $0.id == item.id },
+                                      hashtagItems.firstIndex { $0.id == item.id })
+        searchPosts.removeAll { $0.id == item.id }
+        hashtagItems.removeAll { $0.id == item.id }
+        deletions.schedule(postId: item.id, after: delay, service: service) { [weak self] result in
+            guard let self, let places = self.deferredDeletions.removeValue(forKey: item.id),
+                  case .failure(let error) = result else { return }
+            self.reinsert(item, at: places)
+            if !error.isCancellation { self.actionError = error.userFacingMessage }
+        }
+    }
+
+    /// « Annuler » : rien n'est parti, la publication reprend sa place.
+    func undoDeletion(_ item: UnifiedSocialFeedItem) {
+        guard let places = deferredDeletions[item.id], deletions.cancel(item.id) else { return }
+        deferredDeletions[item.id] = nil
+        reinsert(item, at: places)
+    }
+
+    private func reinsert(_ item: UnifiedSocialFeedItem, at places: (search: Int?, hashtag: Int?)) {
+        if let index = places.search, !searchPosts.contains(where: { $0.id == item.id }) {
+            searchPosts.insert(item, at: min(index, searchPosts.count))
+        }
+        if let index = places.hashtag, !hashtagItems.contains(where: { $0.id == item.id }) {
+            hashtagItems.insert(item, at: min(index, hashtagItems.count))
+        }
+    }
+
+    /// Membre bloqué ou mis en sourdine : ses publications quittent les listes d'Explorer.
+    func removeAuthor(_ userId: String) {
+        searchPosts.removeAll { $0.author.id == userId }
+        hashtagItems.removeAll { $0.author.id == userId }
+    }
+
+    /// Relit la publication après l'éditeur : le texte modifié remplace l'ancien.
+    func reload(_ item: UnifiedSocialFeedItem) async {
+        guard let fresh = try? await service.post(id: item.id) else { return }
+        update(item.id) { _ in fresh }
+    }
+
     /// Renvoie l'id du message créé, nil si échec (la feuille affiche l'échec).
     func share(_ item: UnifiedSocialFeedItem, to conversation: MessageConversation) async -> String? {
         do {
@@ -184,7 +269,8 @@ final class ExploreViewModel: ObservableObject {
             // qu'un mot-clé ne trouvait jamais le post qui le contenait.
             let result = try await service.explore(query: query)
             searchResults = result.peopleAsSearchResults
-            searchPosts = result.posts
+            let deleting = deletions.pendingPostIds
+            searchPosts = result.posts.filter { !deleting.contains($0.id) }
         } catch {
             // Une frappe rapide annule la recherche précédente : URLSession lève
             // alors `URLError(.cancelled)` ou `APIError.cancelled`, pas
@@ -314,7 +400,8 @@ final class ExploreViewModel: ObservableObject {
         do {
             let page = try await service.loadFeedItems(cursor: nil, hashtag: tag, tab: nil)
             guard selectedHashtag == tag else { return }
-            hashtagItems = page.items
+            let deleting = deletions.pendingPostIds
+            hashtagItems = page.items.filter { !deleting.contains($0.id) }
             hashtagCursor = page.nextCursor
         } catch {
             // Passager : il ne doit pas remplacer la page d'exploration.
@@ -332,7 +419,7 @@ final class ExploreViewModel: ObservableObject {
         do {
             let page = try await service.loadFeedItems(cursor: cursor, hashtag: tag, tab: nil)
             guard selectedHashtag == tag else { return }
-            let known = Set(hashtagItems.map(\.id))
+            let known = Set(hashtagItems.map(\.id)).union(deletions.pendingPostIds)
             hashtagItems.append(contentsOf: page.items.filter { !known.contains($0.id) })
             hashtagCursor = page.nextCursor
         } catch {
@@ -401,6 +488,8 @@ struct ExploreView: View {
     /// Une seule présentation : la fiche détail cède ainsi la place aux
     /// commentaires, au signalement ou au partage (AF-FIL-02).
     @State private var presentedSheet: ExploreSheet?
+    /// Membre à bloquer depuis le ⋯ d'une de ses publications, en attente de l'alerte.
+    @State private var blockingAuthor: SocialFeedAuthor?
     /// Salons publics (ROOM-1) : la liste de tous les salons, ou un salon.
     @State private var roomsRoute: RoomsRoute?
 
@@ -409,8 +498,10 @@ struct ExploreView: View {
         case comments(UnifiedSocialFeedItem)
         case report(UnifiedSocialFeedItem)
         case share(UnifiedSocialFeedItem)
+        case edit(UnifiedSocialFeedItem)
         var id: String {
             switch self {
+            case .edit(let i): return "edit-\(i.id)"
             case .detail(let i): return "detail-\(i.id)"
             case .comments(let i): return "comments-\(i.id)"
             case .report(let i): return "report-\(i.id)"
@@ -489,6 +580,13 @@ struct ExploreView: View {
             if model.trending.isEmpty && model.suggestions.isEmpty { await model.load() }
         }
         .refreshable { await model.load() }
+        .onReceive(NotificationCenter.default.publisher(for: .sqMemberBlocked)) { note in
+            if let userId = note.userInfo?["userId"] as? String { model.removeAuthor(userId) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .sqMemberMuted)) { note in
+            if let userId = note.userInfo?["userId"] as? String { model.removeAuthor(userId) }
+        }
+        .blockAuthorAlert($blockingAuthor, friends: services.friends, notifications: inAppNotifications)
         .onAppear {
             recentProfiles = Self.storedRecentProfiles()
             model.antennas = services.antennas
@@ -523,6 +621,25 @@ struct ExploreView: View {
                     onAuthorTap: {
                         presentedSheet = nil
                         pushProfileAfterDismiss(item.author)
+                    },
+                    // Mêmes options d'auteur que le ⋯ de la carte.
+                    onEdit: { presentedSheet = .edit(item) },
+                    onSetVisibility: { model.setVisibility(item, to: $0) },
+                    onTogglePin: { model.togglePin(item) },
+                    onDelete: {
+                        presentedSheet = nil
+                        deleteWithUndo(item)
+                    },
+                    onMuteAuthor: {
+                        presentedSheet = nil
+                        muteAuthor(item.author)
+                    },
+                    onBlockAuthor: {
+                        presentedSheet = nil
+                        Task { @MainActor in
+                            try? await Task.sleep(nanoseconds: 380_000_000)
+                            blockingAuthor = item.author
+                        }
                     }
                 )
             case .comments(let item):
@@ -538,6 +655,8 @@ struct ExploreView: View {
                     messagesService: services.messages,
                     onShare: { conversation in await model.share(item, to: conversation) }
                 )
+            case .edit(let item):
+                ComposerSheet(service: services.feed, editing: item, onPublished: { Task { await model.reload(item) } })
             }
         }
     }
@@ -967,25 +1086,46 @@ struct ExploreView: View {
             onReact: { emoji in interact(with: item) { try await service.react(postId: $0, emoji: emoji) } },
             onPollVote: { option in model.votePoll(item, option: option) }
         )
-        // Appui long et bouton ⋯ de la carte : couper les notifications, signaler.
+        // Appui long et bouton ⋯ de la carte : mêmes options que dans le fil.
         .contextMenu { exploreMenu(for: item) }
         .environment(\.feedCardMenu, AnyView(exploreMenu(for: item)))
     }
 
-    @ViewBuilder
+    /// Sourdine depuis le ⋯ ; « Annuler » la retire, la recherche suivante rend ses publications.
+    private func muteAuthor(_ author: SocialFeedAuthor) {
+        AuthorModeration.mute(author, friends: services.friends, notifications: inAppNotifications) {}
+    }
+
+    /// Supprime une de tes publications : elle disparaît, « Annuler » reste le temps du délai.
+    private func deleteWithUndo(_ item: UnifiedSocialFeedItem) {
+        Haptics.light()
+        let delay = PendingPostDeletions.undoDelay
+        model.deletePost(item, after: delay)
+        inAppNotifications.showUndo(
+            body: String(localized: "Publication supprimée"),
+            actionLabel: String(localized: "Annuler"),
+            duration: delay
+        ) {
+            model.undoDeletion(item)
+        }
+    }
+
+    /// Options d'une publication, dans l'ordre commun (`PostOptionsMenu`).
     private func exploreMenu(for item: UnifiedSocialFeedItem) -> some View {
-        Button { model.muteNotifications(item) } label: {
-            let muted = item.notificationsMutedByMe == true
-            let title: LocalizedStringKey = muted ? "Réactiver les notifications" : "Couper les notifications"
-            let icon = muted ? "bell" : "bell.slash"
-            Label(title, systemImage: icon)
-        }
-        // On ne signale pas sa propre publication.
-        if !item.canManage {
-            Button(role: .destructive) { presentedSheet = .report(item) } label: {
-                Label("Signaler", systemImage: "flag")
-            }
-        }
+        PostOptionsMenu(
+            item: item,
+            onViewProfile: { profileAuthor = item.author },
+            onShare: { presentedSheet = .share(item) },
+            onEdit: { presentedSheet = .edit(item) },
+            onSetVisibility: { model.setVisibility(item, to: $0) },
+            onTogglePin: { model.togglePin(item) },
+            onMute: { model.muteNotifications(item) },
+            onDelete: { deleteWithUndo(item) },
+            onMuteAuthor: { muteAuthor(item.author) },
+            onBlockAuthor: { blockingAuthor = item.author },
+            onReport: { presentedSheet = .report(item) },
+            identifierPrefix: "explore.post"
+        )
     }
 
     // MARK: Suggestions

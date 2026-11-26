@@ -213,6 +213,11 @@ final class AppServices: ObservableObject {
         PendingQueueFlusher(steps: [
             { [weak self] in await self?.speedtest.retryPendingSaves() },
             { [weak self] in await self?.feed.retryPendingPosts() },
+            // Suppressions annoncées dont le délai « Annuler » a passé sans envoi (app tuée, COM-01).
+            { [weak self] in
+                guard let self else { return }
+                await PendingPostDeletions.shared.flush(using: self.feed)
+            },
             { [weak self] in await self?.retryPendingTextMessages() },
             { [weak self] in await self?.messages.retryPendingAttachments() },
             { [weak self] in await self?.v2SendRetry.runNow() },

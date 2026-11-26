@@ -757,7 +757,19 @@ struct CardActionsBar: View {
     }
 
     /// Bouton ❤️ : tap = like ; appui long = les six réactions.
+    /// Un vrai bouton, pas un geste de toucher : Contrôle de sélection et le clavier
+    /// (Accès complet au clavier) l'atteignent aussi (COM-10).
     private var likeButton: some View {
+        Button(action: onLike) { likeLabel }
+            .buttonStyle(.plain)
+            .accessibilityLabel(item.likedByMe ? "Ne plus aimer" : "J’aime")
+            // Un menu propre au ❤️ : l'appui long de la carte ouvre son propre menu
+            // contextuel, qui prenait le pas sur l'ancien sélecteur flottant, jamais
+            // affiché dans le fil. Le menu le plus proche du doigt l'emporte.
+            .contextMenu { reactionMenu }
+    }
+
+    private var likeLabel: some View {
         HStack(spacing: 5) {
             Image(systemName: item.likedByMe ? "heart.fill" : "heart")
             if reactionCount > 0 {
@@ -781,11 +793,6 @@ struct CardActionsBar: View {
         .padding(.horizontal, SQSpace.sm)
         .frame(minWidth: 44, minHeight: 44)
         .contentShape(Rectangle())
-        .onTapGesture(perform: onLike)
-        // Un menu propre au ❤️ : l'appui long de la carte ouvre son propre menu
-        // contextuel, qui prenait le pas sur l'ancien sélecteur flottant, jamais
-        // affiché dans le fil. Le menu le plus proche du doigt l'emporte.
-        .contextMenu { reactionMenu }
     }
 
     /// Rangée de symboles sous iOS 17 ; liste de libellés avant.

@@ -1,6 +1,22 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "%@ est en sourdine" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is muted"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ est en sourdine"
+          }
+        }
+      }
+    },
     "5G : seulement quand le téléphone l’utilisait." : {
       "localizations" : {
         "en" : {
@@ -17,6 +33,70 @@
         }
       }
     },
+    "Annulable quelques secondes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can be undone for a few seconds"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Annulable quelques secondes"
+          }
+        }
+      }
+    },
+    "Bloquer %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Block %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bloquer %@"
+          }
+        }
+      }
+    },
+    "Contenu problématique" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Problematic content"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contenu problématique"
+          }
+        }
+      }
+    },
+    "Copier le lien" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy link"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copier le lien"
+          }
+        }
+      }
+    },
     "Couleurs de la couverture" : {
       "localizations" : {
         "en" : {
@@ -29,6 +109,162 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Couleurs de la couverture"
+          }
+        }
+      }
+    },
+    "Dans Messages" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In Messages"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dans Messages"
+          }
+        }
+      }
+    },
+    "Je n’aime plus le commentaire de %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlike %@'s comment"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je n’aime plus le commentaire de %@"
+          }
+        }
+      }
+    },
+    "J’aime le commentaire de %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Like %@'s comment"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "J’aime le commentaire de %@"
+          }
+        }
+      }
+    },
+    "Lien copié" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Link copied"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lien copié"
+          }
+        }
+      }
+    },
+    "Masque ses publications et son profil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hides their posts and profile"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masque ses publications et son profil"
+          }
+        }
+      }
+    },
+    "Mettre %@ en sourdine" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mute %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mettre %@ en sourdine"
+          }
+        }
+      }
+    },
+    "Options du commentaire de %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Options for %@'s comment"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Options du commentaire de %@"
+          }
+        }
+      }
+    },
+    "Pour cette publication" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "For this post"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour cette publication"
+          }
+        }
+      }
+    },
+    "SQFormal|Retire ses publications de ton fil, sans bloquer ce membre" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retire ses publications de votre fil, sans bloquer ce membre"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "Retire ses publications de ton fil, sans bloquer ce membre" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Removes their posts from your feed without blocking them"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retire ses publications de ton fil, sans bloquer ce membre"
           }
         }
       }
@@ -89,6 +325,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Choose the measurement that colours the coverage"
+          }
+        }
+      }
+    },
+    "Une seule publication épinglée à la fois" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only one pinned post at a time"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une seule publication épinglée à la fois"
           }
         }
       }

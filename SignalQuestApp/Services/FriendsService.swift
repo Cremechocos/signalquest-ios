@@ -65,6 +65,10 @@ protocol FriendsServicing: Sendable {
     func block(userId: String) async throws
     func unblock(userId: String) async throws
     func blocks() async throws -> [BlockedUser]
+    /// Sourdine d'un membre : ses publications quittent ton fil, sans le bloquer
+    /// (`/api/social/users/{id}/mute`, POST pour activer, DELETE pour retirer).
+    func mute(userId: String) async throws
+    func unmute(userId: String) async throws
 }
 
 /// Les deux sens d'une demande d'ami.
@@ -171,6 +175,22 @@ final class FriendsService: FriendsServicing {
             "/api/users/blocks",
             method: .delete,
             body: ["userId": userId]
+        )
+    }
+
+    func mute(userId: String) async throws {
+        let _: SuccessResponse = try await api.request(
+            APIEndpoint(path: "/api/social/users/\(userId)/mute", method: .post), as: SuccessResponse.self
+        )
+        // Comme un blocage, pour le fil : ses publications partent tout de suite.
+        await MainActor.run {
+            NotificationCenter.default.post(name: .sqMemberMuted, object: nil, userInfo: ["userId": userId])
+        }
+    }
+
+    func unmute(userId: String) async throws {
+        let _: SuccessResponse = try await api.request(
+            APIEndpoint(path: "/api/social/users/\(userId)/mute", method: .delete), as: SuccessResponse.self
         )
     }
 

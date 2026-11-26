@@ -45,7 +45,8 @@ final class UserProfileViewModel: ObservableObject {
             profile = loaded
             isPrivate = false
             let page = try await service.userPosts(userId: userId, cursor: nil, mine: loaded.isSelf)
-            items = page.items
+            let deleting = deletions.pendingPostIds
+            items = page.items.filter { !deleting.contains($0.id) }
             nextCursor = page.nextCursor
         } catch let APIError.http(status, code, _, _, _) where status == 403 && code == "PROFILE_PRIVATE" {
             isPrivate = true
@@ -63,7 +64,7 @@ final class UserProfileViewModel: ObservableObject {
         defer { isLoadingMore = false }
         do {
             let page = try await service.userPosts(userId: userId, cursor: cursor, mine: profile?.isSelf == true)
-            let known = Set(items.map(\.id))
+            let known = Set(items.map(\.id)).union(deletions.pendingPostIds)
             items.append(contentsOf: page.items.filter { !known.contains($0.id) })
             nextCursor = page.nextCursor
         } catch {
@@ -252,19 +253,36 @@ final class UserProfileViewModel: ObservableObject {
         }
     }
 
-    /// Retire la publication tout de suite ; elle revient à sa place si le serveur refuse.
-    func delete(_ item: UnifiedSocialFeedItem) {
-        let index = items.firstIndex { $0.id == item.id } ?? 0
+    /// Index d'origine des publications retirées en attente de leur suppression.
+    private var deferredDeletions: [String: Int] = [:]
+    /// File partagée des suppressions ; remplaçable en test.
+    var deletions = PendingPostDeletions.shared
+
+    /// Retire la publication tout de suite ; la suppression part au terme du délai « Annuler »
+    /// (choix d'Alexandre du 25/11 : annulable partout, plus de confirmation). Elle revient à sa
+    /// place si l'auteur annule ou si le serveur refuse.
+    func deletePost(_ item: UnifiedSocialFeedItem, after delay: Duration = PendingPostDeletions.undoDelay) {
+        guard deferredDeletions[item.id] == nil else { return }
+        deferredDeletions[item.id] = items.firstIndex { $0.id == item.id } ?? 0
         items.removeAll { $0.id == item.id }
-        Task {
-            do { try await service.deletePost(postId: item.id) }
-            catch {
-                if !items.contains(where: { $0.id == item.id }) {
-                    items.insert(item, at: min(index, items.count))
-                }
-                if !error.isCancellation { actionError = error.userFacingMessage }
-            }
+        deletions.schedule(postId: item.id, after: delay, service: service) { [weak self] result in
+            guard let self, let index = self.deferredDeletions.removeValue(forKey: item.id),
+                  case .failure(let error) = result else { return }
+            self.reinsert(item, at: index)
+            if !error.isCancellation { self.actionError = error.userFacingMessage }
         }
+    }
+
+    /// « Annuler » : rien n'est parti, la publication reprend sa place.
+    func undoDeletion(_ item: UnifiedSocialFeedItem) {
+        guard let index = deferredDeletions[item.id], deletions.cancel(item.id) else { return }
+        deferredDeletions[item.id] = nil
+        reinsert(item, at: index)
+    }
+
+    private func reinsert(_ item: UnifiedSocialFeedItem, at index: Int) {
+        guard !items.contains(where: { $0.id == item.id }) else { return }
+        items.insert(item, at: min(index, items.count))
     }
 
     func muteNotifications(_ item: UnifiedSocialFeedItem) {
@@ -407,7 +425,6 @@ struct UserProfileView: View {
     /// « en attente ») : bascule le libellé du menu sur « Demande envoyée ».
     @State private var friendRequestSent = false
     @State private var editingPost: UnifiedSocialFeedItem?
-    @State private var pendingDeletion: UnifiedSocialFeedItem?
     /// Photo récente ouverte en plein écran.
     @State private var openedPhoto: SocialProfilePhoto?
 
@@ -556,7 +573,16 @@ struct UserProfileView: View {
                     onShare: { presentedSheet = .share(item) },
                     onMute: { model.muteNotifications(item) },
                     onReport: { presentedSheet = .report(item) },
-                    onPollVote: { option in model.votePoll(item, option: option) }
+                    onPollVote: { option in model.votePoll(item, option: option) },
+                    // Mêmes actions d'auteur que le ⋯ de la carte (signalement du 25/11) ;
+                    // la fiche se ferme d'abord, la confirmation de suppression suit.
+                    onEdit: { afterDetailDismiss { editingPost = item } },
+                    onSetVisibility: { model.setVisibility(item, to: $0) },
+                    onTogglePin: { model.togglePin(item) },
+                    onDelete: {
+                        presentedSheet = nil
+                        deleteWithUndo(item)
+                    }
                 )
             case .comments(let item):
                 CommentsSheet(service: services.comments, postId: item.backendPostId,
@@ -574,6 +600,16 @@ struct UserProfileView: View {
             case .reportUser:
                 ReportSheet(target: .profile(model.userId), service: services.reports)
             }
+        }
+    }
+
+    /// Ferme la fiche ouverte, puis présente l'écran suivant une fois l'animation finie :
+    /// deux présentations à la fois, SwiftUI en ignore une.
+    private func afterDetailDismiss(_ next: @escaping @MainActor () -> Void) {
+        presentedSheet = nil
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 380_000_000)
+            next()
         }
     }
 
@@ -1283,27 +1319,23 @@ struct UserProfileView: View {
                 .sqKicker()
                 .accessibilityAddTraits(.isHeader)
             .padding(.leading, SQSpace.xs)
-            postsWithDeletionDialog
+            postsSection
         }
     }
 
-    /// Les publications, avec la confirmation avant d'en supprimer une des tiennes.
-    private var postsWithDeletionDialog: some View {
-        postsSection
-            // Alerte centrée, « Annuler » visible : en confirmationDialog, iOS 26 la posait en
-            // bulle sur le centre du fil, pointée vers une autre publication (IOS-044).
-            .alert(
-                "Supprimer cette publication ?",
-                isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } })
-            ) {
-                Button("Supprimer", role: .destructive) {
-                    if let item = pendingDeletion { model.delete(item) }
-                    pendingDeletion = nil
-                }
-                Button("Annuler", role: .cancel) { pendingDeletion = nil }
-            } message: {
-                Text("Cette action est irréversible.")
-            }
+    /// Supprime une de tes publications : elle disparaît, « Annuler » reste le temps du délai,
+    /// comme dans le fil.
+    private func deleteWithUndo(_ item: UnifiedSocialFeedItem) {
+        Haptics.light()
+        let delay = PendingPostDeletions.undoDelay
+        model.deletePost(item, after: delay)
+        inAppNotifications.showUndo(
+            body: String(localized: "Publication supprimée"),
+            actionLabel: String(localized: "Annuler"),
+            duration: delay
+        ) {
+            model.undoDeletion(item)
+        }
     }
 
     @ViewBuilder
@@ -1364,38 +1396,21 @@ struct UserProfileView: View {
         }
     }
 
-    /// Actions d'une publication du profil : modifier, épingler et supprimer les
-    /// tiennes ; couper les notifications et signaler les autres.
-    @ViewBuilder
+    /// Actions d'une publication du profil, dans l'ordre commun (`PostOptionsMenu`) ;
+    /// la suppression passe par une confirmation.
     private func postMenu(for item: UnifiedSocialFeedItem) -> some View {
-        if item.canManage {
-            // Un post automatique ne change que de visibilité (403 sinon, #694).
-            if item.canEdit {
-                Button { editingPost = item } label: {
-                    Label("Modifier", systemImage: "pencil")
-                }
-            } else {
-                PostVisibilityPicker(current: item.visibility) { model.setVisibility(item, to: $0) }
-            }
-            Button { model.togglePin(item) } label: {
-                Label(item.isPinned ? "Désépingler" : "Épingler",
-                      systemImage: item.isPinned ? "pin.slash" : "pin")
-            }
-            Button(role: .destructive) { pendingDeletion = item } label: {
-                Label("Supprimer", systemImage: "trash")
-            }
-        }
-        Button { model.muteNotifications(item) } label: {
-            let muted = item.notificationsMutedByMe == true
-            let title: LocalizedStringKey = muted ? "Réactiver les notifications" : "Couper les notifications"
-            let icon = muted ? "bell" : "bell.slash"
-            Label(title, systemImage: icon)
-        }
-        if !item.canManage {
-            Button(role: .destructive) { presentedSheet = .report(item) } label: {
-                Label("Signaler", systemImage: "flag")
-            }
-        }
+        // Pas de « Voir le profil » : on y est déjà.
+        PostOptionsMenu(
+            item: item,
+            onShare: { presentedSheet = .share(item) },
+            onEdit: { editingPost = item },
+            onSetVisibility: { model.setVisibility(item, to: $0) },
+            onTogglePin: { model.togglePin(item) },
+            onMute: { model.muteNotifications(item) },
+            onDelete: { deleteWithUndo(item) },
+            onReport: { presentedSheet = .report(item) },
+            identifierPrefix: "profile.post"
+        )
     }
 
     @ViewBuilder

@@ -105,6 +105,7 @@
 		165AEDB9CA42FCFB3872E10A /* PhotoModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = E39D8D7ADDF4C4A7FF55C92C /* PhotoModels.swift */; };
 		16EAC2832044E604EDAFED40 /* E2EEV2NotificationContextStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9AB1B5761F3E1CD3E8AB3C2 /* E2EEV2NotificationContextStore.swift */; };
 		17C80EADD96F5E76C237268F /* E2EEV2MessagingRuntimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37523E0389BE8DF2667B2264 /* E2EEV2MessagingRuntimeTests.swift */; };
+		17FB45BA9C4D6E55414FAA3A /* PendingPostDeletions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89A5969A125BADB1D129BA35 /* PendingPostDeletions.swift */; };
 		18D872440A6ABD2924368E0C /* MotionPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A854B36E06AF7EDF5C38F94E /* MotionPolicyTests.swift */; };
 		1903FFA116C3304098389589 /* NewPollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAB8735E7BA1CEC81DED95F9 /* NewPollView.swift */; };
 		1907B4188D8BEDD97540DC8A /* AntennaReportModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 969394914FD409108A452239 /* AntennaReportModels.swift */; };
@@ -480,6 +481,7 @@
 		7759428EA7B63ED878028BC8 /* E2EEAutoMediaOutbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A63679F3E6F19323B749EE7 /* E2EEAutoMediaOutbox.swift */; };
 		77B6BA654472E1B9DEC2B38F /* SessionAnalysisModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FE5C79C83022DCA9EF9955F /* SessionAnalysisModels.swift */; };
 		77C762DF9478D5AAE29C22F2 /* LocationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E27D904CE50C23DE8B0F1C1 /* LocationServiceTests.swift */; };
+		7822E8B89C1A4148C31DDF5D /* PostOptionsMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0142C13CB028B79374FDF5D0 /* PostOptionsMenu.swift */; };
 		7827FB3BCE2C62729FA1C132 /* ProfileReorgQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA9370C0177B2346BC4EBEC5 /* ProfileReorgQATests.swift */; };
 		7834D63E27751200CFE2DCF1 /* MapPhotoViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3943DEC3A15CC630D29F54A /* MapPhotoViewer.swift */; };
 		786E3D51391310F27863A200 /* BlurEditorQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27D1DC6AF7E291BE753B5F53 /* BlurEditorQATests.swift */; };
@@ -1067,6 +1069,7 @@
 		00E6653C0AA5AAB30FE5BCBC /* ActivityCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityCardView.swift; sourceTree = "<group>"; };
 		01369D5FB0B0C64E298726B8 /* VoiceNotePlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceNotePlayer.swift; sourceTree = "<group>"; };
 		0137F623C211B60E80B9A5C8 /* CarPlayPOIController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayPOIController.swift; sourceTree = "<group>"; };
+		0142C13CB028B79374FDF5D0 /* PostOptionsMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostOptionsMenu.swift; sourceTree = "<group>"; };
 		01A136AAB9556457EEA80A8F /* BackgroundTaskScope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundTaskScope.swift; sourceTree = "<group>"; };
 		01B521A888A6F354C88F21D1 /* AntennaReportsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaReportsService.swift; sourceTree = "<group>"; };
 		01FB363AF0BE7B5E3B330E74 /* RemoteImageRuntimeQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteImageRuntimeQATests.swift; sourceTree = "<group>"; };
@@ -1616,6 +1619,7 @@
 		887BA35C4B8B1BD36ECD57D2 /* FollowedAntennaIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FollowedAntennaIntents.swift; sourceTree = "<group>"; };
 		89100923852A4D70110AD4F9 /* QualityScaleContractV11Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QualityScaleContractV11Tests.swift; sourceTree = "<group>"; };
 		896071B7533980CBAF23DA8A /* ICMPPingerLiveCallbackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICMPPingerLiveCallbackTests.swift; sourceTree = "<group>"; };
+		89A5969A125BADB1D129BA35 /* PendingPostDeletions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingPostDeletions.swift; sourceTree = "<group>"; };
 		89BA5EE9C0B99DE64018088D /* IPerfCatalogService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPerfCatalogService.swift; sourceTree = "<group>"; };
 		8A4F1A6B2D39931723BEF026 /* NetworkWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkWidget.swift; sourceTree = "<group>"; };
 		8A63679F3E6F19323B749EE7 /* E2EEAutoMediaOutbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEAutoMediaOutbox.swift; sourceTree = "<group>"; };
@@ -2963,6 +2967,7 @@
 				B011EA71E876281201D74D11 /* OutageCardView.swift */,
 				763622AD001158FA3157D839 /* PhotoCardView.swift */,
 				BA923675E56186A1BD8D5B7F /* PostCardView.swift */,
+				0142C13CB028B79374FDF5D0 /* PostOptionsMenu.swift */,
 				315ABFF13D89760B78440BEC /* RatingCardView.swift */,
 				F21195FC7BA83172FF32A3CC /* SignalFormatters.swift */,
 				448DCE616E7442994EA5AED7 /* SpeedtestCardView.swift */,
@@ -3122,6 +3127,7 @@
 				02B8E44000E7F6CDC6104D82 /* NearbyNetworkQualityService.swift */,
 				BEAB0F4B51977FF72375533F /* NotificationsService.swift */,
 				808A687924991326F85D1C6F /* OutageReportDraftStore.swift */,
+				89A5969A125BADB1D129BA35 /* PendingPostDeletions.swift */,
 				D4801A619D73D0638F27170A /* PendingQueueBackgroundTasks.swift */,
 				447CEC5C48B348EE5F8058C2 /* PendingQueueFlusher.swift */,
 				D2F641884A080F0EC459B546 /* PhotoService.swift */,
@@ -4343,6 +4349,7 @@
 				C6966B68EA445781B7B3D30A /* PasswordResetPresentation.swift in Sources */,
 				ACB138BAA6FF1ED6DBC7D190 /* PasswordResetView.swift in Sources */,
 				CE66573428F3BB839C2DF76B /* PaywallView.swift in Sources */,
+				17FB45BA9C4D6E55414FAA3A /* PendingPostDeletions.swift in Sources */,
 				C670223EF5C275551E8D890D /* PendingQueueBackgroundTasks.swift in Sources */,
 				07CBB20418065EE4F99EAC9A /* PendingQueueFlusher.swift in Sources */,
 				BD8200E5B9155C3BADC730B7 /* PhotoBlur.swift in Sources */,
@@ -4359,6 +4366,7 @@
 				4F87D6C98875D32BB45CB4EA /* PollBubble.swift in Sources */,
 				DA97C11B6664887E0F4F3C42 /* PostCardView.swift in Sources */,
 				C3B0B1D99C78B3D0E3E7A676 /* PostDetailView.swift in Sources */,
+				7822E8B89C1A4148C31DDF5D /* PostOptionsMenu.swift in Sources */,
 				5BFB003C0D28FAE111D9D739 /* PresenceModels.swift in Sources */,
 				30E4F90E285454B66713BC38 /* PrivacyService.swift in Sources */,
 				97024B7E216A3779D06D6075 /* PrivacySettingsView.swift in Sources */,
